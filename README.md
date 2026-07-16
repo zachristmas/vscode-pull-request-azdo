@@ -1,8 +1,13 @@
-> **Fork notice**: This is a fork of [ankitbko/vscode-pull-request-azdo](https://github.com/ankitbko/vscode-pull-request-azdo) adding support for workspaces containing repositories from multiple Azure DevOps projects. All credit for the original extension goes to its author.
+> **Maintained fork**: This is an actively maintained fork of [ankitbko/vscode-pull-request-azdo](https://github.com/ankitbko/vscode-pull-request-azdo), carrying the extension forward. All credit for the original extension goes to its author. Install it from the marketplace as [`ZacharyChristmas.azdo-pull-requests-multiproject`](https://marketplace.visualstudio.com/items?itemName=ZacharyChristmas.azdo-pull-requests-multiproject).
+>
+> Improvements over the original so far:
+>
+> - **Multi-project workspaces** (v1.1.0): open a folder containing repositories from any number of Azure DevOps projects in one org; each repository resolves against the project in its own git remote URL. Also fixes remote auto-detection for HTTPS URLs without a `user@` segment and for project names containing spaces.
+> - **User avatars render** (v1.2.0): avatars are fetched through the authenticated connection and inlined, instead of relying on unauthenticated image URLs that Azure DevOps rejects.
+>
+> Bug reports and feature requests for this fork: [zachristmas/vscode-pull-request-azdo/issues](https://github.com/zachristmas/vscode-pull-request-azdo/issues).
 
 # Review and manage your Azure Devops pull requests directly in VS Code
-
-![Build and Test](https://github.com/ankitbko/vscode-pull-request-azdo/workflows/Build%20and%20Test/badge.svg?branch=master&event=push)
 
 This extension is inspired and based on [Github Pull Request Extension for VS Code](https://github.com/Microsoft/vscode-pull-request-github). The extension only works with _git_ based repository. _TFVC_ is not supported. Below are some the features that extension supports. Read about all the features in [wiki](https://github.com/ankitbko/vscode-pull-request-azdo/wiki).
 
