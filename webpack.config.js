@@ -34,8 +34,8 @@ async function resolveTSConfig(configFile) {
 		);
 	});
 
-	const index = data.indexOf('\n');
-	const json = JSON5.parse(data.substr(index + 1));
+	const trimmed = data.trim();
+	const json = JSON5.parse(trimmed.startsWith('{') ? trimmed : data.substr(data.indexOf('\n') + 1));
 	return json;
 }
 

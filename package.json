@@ -769,7 +769,7 @@
 		"test": "yarn run test:preprocess && node ./out/src/test/runTests.js",
 		"test:preprocess": "yarn run compile:test && yarn run test:preprocess-svg",
 		"test:preprocess-svg": "node scripts/preprocess-svg --in ../resources/ --out out/resources",
-		"update-dts": "pushd \"src/@types\" && npx vscode-dts master && npx vscode-dts dev && popd",
+		"update-dts": "cd src/@types && npx vscode-dts master && npx vscode-dts dev",
 		"watch": "webpack --watch --mode development --env esbuild",
 		"watch:web": "webpack --watch --mode development --config-name extension:webworker --config-name webviews"
 	},
@@ -882,9 +882,6 @@
 	},
 	"optionalDependencies": {
 		"spawn-sync": "^2.0.0"
-	},
-	"resolutions": {
-		"webpack/**/tar": "^6.2.1"
 	},
 	"license": "MIT"
 }
