@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import { resolveAvatarsDeep } from '../azdo/avatarCache';
 
 export interface IRequestMessage<T> {
 	req: string;
@@ -68,12 +69,14 @@ export class WebviewBase {
 		// Without the following ready check, we can end up in a state where the message handler in the webview
 		// isn't ready for any of the messages we post.
 		await this._waitForReady;
+		await resolveAvatarsDeep(message);
 		this._webview?.postMessage({
 			res: message,
 		});
 	}
 
 	protected async _replyMessage(originalMessage: IRequestMessage<any>, message: any) {
+		await resolveAvatarsDeep(message);
 		const reply: IReplyMessage = {
 			seq: originalMessage.req,
 			res: message,

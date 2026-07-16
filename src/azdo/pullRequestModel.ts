@@ -48,6 +48,7 @@ import {
 	PullRequestCompletion,
 	PullRequestVote,
 } from './interface';
+import { resolveAvatarsDeep } from './avatarCache';
 import {
 	convertAzdoPullRequestToRawPullRequest,
 	getDiffHunkFromFileDiff,
@@ -423,9 +424,11 @@ export class PullRequestModel implements IPullRequestModel {
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
 
-		return (await git?.getThreads(repoId, this.getPullRequestId(), undefined, iteration, baseIteration))?.filter(
+		const threads = (await git?.getThreads(repoId, this.getPullRequestId(), undefined, iteration, baseIteration))?.filter(
 			t => !t.isDeleted,
 		);
+		await resolveAvatarsDeep(threads);
+		return threads;
 	}
 
 	async createCommentOnThread(threadId: number, message: string, parentCommentId?: number): Promise<Comment | undefined> {
@@ -939,7 +942,11 @@ export class PullRequestModel implements IPullRequestModel {
 	public async createPatch(repository: Repository, fileChange: InMemFileChange | SlimFileChange): Promise<string> {
 		let patch = '';
 		try {
-			patch = await repository.diffBetween(fileChange.baseCommit, fileChange.headCommit, removeLeadingSlash(fileChange.fileName));
+			patch = await repository.diffBetween(
+				fileChange.baseCommit,
+				fileChange.headCommit,
+				removeLeadingSlash(fileChange.fileName),
+			);
 		} catch (error) {
 			Logger.appendLine(`Error creating patch using git: ${error}`, PullRequestModel.ID);
 			let leftFile = fileChange.previousFileSHA;
@@ -954,7 +961,12 @@ export class PullRequestModel implements IPullRequestModel {
 			const rightFileContentPromise = !rightFile ? '' : this.getFile(rightFile);
 
 			const [leftFileContent, rightFileContent] = await Promise.all([leftFileContentPromise, rightFileContentPromise]);
-			patch = diff.createTwoFilesPatch(fileChange.fileName, fileChange.previousFileName, leftFileContent, rightFileContent);
+			patch = diff.createTwoFilesPatch(
+				fileChange.fileName,
+				fileChange.previousFileName,
+				leftFileContent,
+				rightFileContent,
+			);
 		}
 		return patch;
 	}

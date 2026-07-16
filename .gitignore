@@ -359,3 +359,4 @@ preview-src
 *.re
 *.patch
 .yarn/
+*.vsix

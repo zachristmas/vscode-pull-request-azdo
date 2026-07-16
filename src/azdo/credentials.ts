@@ -8,6 +8,7 @@ import Logger from '../common/logger';
 import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { SETTINGS_NAMESPACE } from '../constants';
+import { initAvatarCache } from './avatarCache';
 
 
 const PROJECT_SETTINGS = 'projectName';
@@ -212,6 +213,7 @@ export class CredentialStore implements vscode.Disposable {
 
 				const azdo = new Azdo(orgConfig.orgUrl, orgConfig.projectName, token, isPatTokenAuth);
 				azdo.authenticatedUser = (await azdo.connection.connect()).authenticatedUser;
+				initAvatarCache(azdo.connection);
 
 				Logger.debug(`Auth> Successful: Logged userid: ${azdo?.authenticatedUser?.id}`, CredentialStore.ID);
 				this._telemetry.sendTelemetryEvent('auth.success');

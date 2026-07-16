@@ -5,6 +5,7 @@
 import { Comment, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { CommentPermissions, IAccount } from './interface';
+import { getAvatarIconUri } from './avatarCache';
 
 export interface GHPRCommentThread extends vscode.CommentThread {
 	threadId: number;
@@ -107,7 +108,7 @@ export class TemporaryComment implements vscode.Comment {
 		this.mode = vscode.CommentMode.Preview;
 		this.author = {
 			name: currentUser.name!,
-			iconPath: currentUser.avatarUrl ? vscode.Uri.parse(`${currentUser.avatarUrl}&s=64`) : undefined,
+			iconPath: getAvatarIconUri(currentUser.avatarUrl, '&s=64'),
 		};
 		this.label = isDraft ? 'Pending' : undefined;
 		this.contextValue = 'canEdit,canDelete';
@@ -194,7 +195,7 @@ export class GHPRComment implements vscode.Comment {
 		this.body.isTrusted = true;
 		this.author = {
 			name: comment.author!.displayName!,
-			iconPath: comment.author && comment.author.imageUrl ? vscode.Uri.parse(comment.author.imageUrl) : undefined,
+			iconPath: comment.author ? getAvatarIconUri(comment.author.imageUrl) : undefined,
 		};
 
 		this.parentCommentId = comment.parentCommentId;
