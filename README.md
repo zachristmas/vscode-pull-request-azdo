@@ -1,3 +1,5 @@
+> **Fork notice**: This is a fork of [ankitbko/vscode-pull-request-azdo](https://github.com/ankitbko/vscode-pull-request-azdo) adding support for workspaces containing repositories from multiple Azure DevOps projects. All credit for the original extension goes to its author.
+
 # Review and manage your Azure Devops pull requests directly in VS Code
 
 ![Build and Test](https://github.com/ankitbko/vscode-pull-request-azdo/workflows/Build%20and%20Test/badge.svg?branch=master&event=push)

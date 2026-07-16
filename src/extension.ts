@@ -33,7 +33,7 @@ import { PullRequestsTreeDataProvider } from './view/prsTreeDataProvider';
 import { ReviewManager } from './view/reviewManager';
 import { ReviewsManager } from './view/reviewsManager';
 
-const aiKey: string = '6d22c8ed-52c8-4779-a6f8-09c748e18e95';
+const aiKey: string = '00000000-0000-0000-0000-000000000000';
 
 // fetch.promise polyfill
 const PolyfillPromise = require('es6-promise').Promise;

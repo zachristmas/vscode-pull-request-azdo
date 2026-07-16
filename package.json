@@ -1,19 +1,19 @@
 {
-	"name": "vscode-pull-request-azdo",
-	"displayName": "AzDO Pull Requests",
-	"description": "Pull Request Provider for Azure Devops",
+	"name": "azdo-pull-requests-multiproject",
+	"displayName": "AzDO Pull Requests (Multi-Project)",
+	"description": "Pull Request Provider for Azure DevOps with multi-project workspace support. Fork of ankitbko/vscode-pull-request-azdo.",
 	"icon": "",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/ankitbko/vscode-pull-request-azdo"
+		"url": "https://github.com/zachristmas/vscode-pull-request-azdo"
 	},
 	"bugs": {
-		"url": "https://github.com/ankitbko/vscode-pull-request-azdo/issues"
+		"url": "https://github.com/zachristmas/vscode-pull-request-azdo/issues"
 	},
 	"enableProposedApi": false,
 	"preview": true,
-	"version": "1.0.2",
-	"publisher": "ankitbko",
+	"version": "1.1.0",
+	"publisher": "ZacharyChristmas",
 	"engines": {
 		"vscode": "^1.97.0"
 	},
