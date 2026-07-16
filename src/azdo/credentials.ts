@@ -122,7 +122,7 @@ export class CredentialStore implements vscode.Disposable {
 		// Assumption for url: https://<org>@dev.azure.com/<org>/<project>/_git/<repo>
 
 		Logger.appendLine('Inferring org config from url: ' + url, CredentialStore.ID);
-		const orgUrlMatch = url.match(/https:\/\/(.+?)@dev\.azure\.com\/(.+?)\//);
+		const orgUrlMatch = url.match(/https:\/\/(?:(.+?)@)?dev\.azure\.com\/(.+?)\//);
 		Logger.debug(`orgUrlMatch: ${orgUrlMatch}`, CredentialStore.ID);
 
 		const orgUrl = orgUrlMatch && orgUrlMatch.length > 2 ? `https://dev.azure.com/${orgUrlMatch[2]}` : undefined; // should be parsed to https://dev.azure.com/<org>
@@ -144,7 +144,7 @@ export class CredentialStore implements vscode.Disposable {
 			const inferredConfigs = remotes.map(r => this.inferOrgConfigFromGitRemote(r)).filter(c => !!c && c.orgUrl && c.projectName);
 
 			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
-			if ([...new Set(inferredConfigs.map(a => a.orgUrl))].length !== 1 || [...new Set(inferredConfigs.map(a => a.projectName))].length !== 1) {
+			if ([...new Set(inferredConfigs.map(a => a.orgUrl))].length !== 1) {
 				Logger.appendLine(`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${inferredConfigs}`, CredentialStore.ID);
 				return undefined;
 			}

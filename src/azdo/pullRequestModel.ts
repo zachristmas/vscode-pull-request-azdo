@@ -656,7 +656,7 @@ export class PullRequestModel implements IPullRequestModel {
 				targetVersionCommit: targetVersionCommit,
 				fileDiffParams: fileDiffParams,
 			},
-			this.azdoRepository.azdo!.projectName,
+			(await azdoRepo.getMetadata())?.project?.name ?? this.azdoRepository.azdo!.projectName,
 			repoId,
 		);
 	}
