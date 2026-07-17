@@ -93,12 +93,26 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this.submitReview(message);
 			case 'pr.checkMergeability':
 				return this._replyMessage(message, await this._item.getMergability());
+			// See pullRequestOverview.ts: guard the throwing fetches so a failure rejects the webview
+			// promise instead of leaving it (and the requeue button) hung forever. (item 1b)
 			case 'pr.checkStatus':
-				return this._replyMessage(message, await this._item.getStatusChecks());
+				try {
+					return await this._replyMessage(message, await this._item.getStatusChecks());
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
 			case 'pr.checkPolicies':
+				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
 				return this._replyMessage(message, await this._item.getPolicyEvaluations());
 			case 'pr.requeue-policy':
-				return this._replyMessage(message, await this._item.requeuePolicyEvaluation(message.args.evaluationId));
+				try {
+					return await this._replyMessage(
+						message,
+						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
+					);
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
 			// The sidebar webview posts pr.debug on every mount (activityBarView/app.tsx). Without a case
 			// it hit the throwing default below and rejected an uncaught promise per activation; mirror
 			// the overview host and just log it. (item 1a)

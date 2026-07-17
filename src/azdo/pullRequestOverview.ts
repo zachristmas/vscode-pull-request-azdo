@@ -367,12 +367,28 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.removeWorkItemFromPR(message);
 			case 'pr.checkMergeability':
 				return this._replyMessage(message, await this._item.getMergability());
+			// getStatusChecks / requeuePolicyEvaluation can throw (network, on-prem servers without the
+			// route). Without the guard the reply never went out and the webview's awaited postMessage
+			// pended forever - the requeue button stuck on "Queuing..." because its finally never ran.
+			// Route failures to _throwError so the client promise rejects. (item 1b)
 			case 'pr.checkStatus':
-				return this._replyMessage(message, await this._item.getStatusChecks());
+				try {
+					return await this._replyMessage(message, await this._item.getStatusChecks());
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
 			case 'pr.checkPolicies':
+				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
 				return this._replyMessage(message, await this._item.getPolicyEvaluations());
 			case 'pr.requeue-policy':
-				return this._replyMessage(message, await this._item.requeuePolicyEvaluation(message.args.evaluationId));
+				try {
+					return await this._replyMessage(
+						message,
+						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
+					);
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
 			case 'pr.add-reviewers':
 				return this.addReviewerToPr(message);
 			case 'pr.remove-reviewer':
