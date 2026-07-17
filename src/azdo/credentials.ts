@@ -9,7 +9,7 @@ import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { SETTINGS_NAMESPACE } from '../constants';
 import { initAvatarCache } from './avatarCache';
-
+import { parseAzdoRemoteUrl } from './remoteUrlParser';
 
 const PROJECT_SETTINGS = 'projectName';
 const ORGURL_SETTINGS = 'orgUrl';
@@ -27,7 +27,12 @@ export class Azdo {
 	public connection: azdev.WebApi;
 	public authenticatedUser: Identity | undefined;
 
-	constructor(public orgUrl: string, public projectName: string, private token: string, private isPatTokenAuth: boolean = false) {
+	constructor(
+		public orgUrl: string,
+		public projectName: string,
+		private token: string,
+		private isPatTokenAuth: boolean = false,
+	) {
 		if (isPatTokenAuth) {
 			this._authHandler = azdev.getPersonalAccessTokenHandler(token, true);
 		} else {
@@ -54,7 +59,7 @@ export class Azdo {
 			const currentTime = Date.now();
 			const bufferTime = 60 * 1000; // 1 minute in milliseconds
 
-			return currentTime >= (expirationTime - bufferTime);
+			return currentTime >= expirationTime - bufferTime;
 		} catch (error) {
 			// If there's an error decoding the token, consider it expired
 			return true;
@@ -72,7 +77,11 @@ export class CredentialStore implements vscode.Disposable {
 	private _sessionId: string | undefined;
 	private _sessionOptions: vscode.AuthenticationGetSessionOptions = { createIfNone: true };
 
-	constructor(private readonly _telemetry: ITelemetry, private readonly _secretStore: vscode.SecretStorage, private readonly _gitAPI: IGit) {
+	constructor(
+		private readonly _telemetry: ITelemetry,
+		private readonly _secretStore: vscode.SecretStorage,
+		private readonly _gitAPI: IGit,
+	) {
 		this._disposables = [];
 		this._disposables.push(
 			vscode.authentication.onDidChangeSessions(async () => {
@@ -114,26 +123,33 @@ export class CredentialStore implements vscode.Disposable {
 	}
 
 	public inferOrgConfigFromGitRemote(remotes: Remote[]): AzdoOrgConfig | undefined {
-		if (remotes.length !== 1) {
-			Logger.appendLine(`Unable to infer org config from git. Remote Length: ${remotes.length}. Remotes: ${remotes.map(r => r.remoteName).join(',')}`, CredentialStore.ID);
+		if (remotes.length === 0) {
+			Logger.appendLine('Unable to infer org config from git. Repository has no remotes.', CredentialStore.ID);
 			return undefined;
 		}
 
-		const url = remotes[0].url;
-		// Assumption for url: https://<org>@dev.azure.com/<org>/<project>/_git/<repo>
+		// Prefer origin, then upstream, then anything that parses as an ADO remote
+		const ordered = [...remotes].sort((a, b) => {
+			const rank = (r: Remote) => (r.remoteName === 'origin' ? 0 : r.remoteName === 'upstream' ? 1 : 2);
+			return rank(a) - rank(b);
+		});
 
-		Logger.appendLine('Inferring org config from url: ' + url, CredentialStore.ID);
-		const orgUrlMatch = url.match(/https:\/\/(?:(.+?)@)?dev\.azure\.com\/(.+?)\//);
-		Logger.debug(`orgUrlMatch: ${orgUrlMatch}`, CredentialStore.ID);
+		for (const remote of ordered) {
+			Logger.appendLine('Inferring org config from url: ' + remote.url, CredentialStore.ID);
+			const parsed = parseAzdoRemoteUrl(remote.url);
+			if (parsed) {
+				Logger.appendLine(`Inferred orgUrl: ${parsed.orgUrl}, projectName: ${parsed.projectName}`, CredentialStore.ID);
+				return new AzdoOrgConfig(parsed.orgUrl, parsed.projectName);
+			}
+		}
 
-		const orgUrl = orgUrlMatch && orgUrlMatch.length > 2 ? `https://dev.azure.com/${orgUrlMatch[2]}` : undefined; // should be parsed to https://dev.azure.com/<org>
-		const projectNameMatch = url.match(/\/([^\/]+)\/_git\//);
-		Logger.debug(`projectNameMatch: ${projectNameMatch}`, CredentialStore.ID);
-
-		const projectName = projectNameMatch && projectNameMatch.length > 1 ? projectNameMatch[1] : undefined; // should be parsed to <project>
-		Logger.appendLine(`Inferred orgUrl: ${orgUrl}, projectName: ${projectName}`, CredentialStore.ID);
-
-		return new AzdoOrgConfig(orgUrl, projectName);
+		Logger.appendLine(
+			`Unable to infer org config from git. No remote matched an Azure DevOps URL shape. Remotes: ${remotes
+				.map(r => r.remoteName)
+				.join(',')}`,
+			CredentialStore.ID,
+		);
+		return undefined;
 	}
 
 	public getOrgConfig(): AzdoOrgConfig | undefined {
@@ -142,15 +158,23 @@ export class CredentialStore implements vscode.Disposable {
 
 		if (!projectName || !orgUrl) {
 			const remotes = this._gitAPI.repositories.map(r => parseRepositoryRemotes(r));
-			const inferredConfigs = remotes.map(r => this.inferOrgConfigFromGitRemote(r)).filter(c => !!c && c.orgUrl && c.projectName);
+			const inferredConfigs = remotes
+				.map(r => this.inferOrgConfigFromGitRemote(r))
+				.filter(c => !!c && c.orgUrl && c.projectName);
 
 			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
 			if ([...new Set(inferredConfigs.map(a => a.orgUrl))].length !== 1) {
-				Logger.appendLine(`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${inferredConfigs}`, CredentialStore.ID);
+				Logger.appendLine(
+					`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${inferredConfigs}`,
+					CredentialStore.ID,
+				);
 				return undefined;
 			}
 
-			Logger.appendLine(`Selected orgUrl: ${inferredConfigs[0]?.orgUrl}, projectName: ${inferredConfigs[0]?.projectName}`, CredentialStore.ID);
+			Logger.appendLine(
+				`Selected orgUrl: ${inferredConfigs[0]?.orgUrl}, projectName: ${inferredConfigs[0]?.projectName}`,
+				CredentialStore.ID,
+			);
 			return inferredConfigs[0];
 		}
 
@@ -186,12 +210,11 @@ export class CredentialStore implements vscode.Disposable {
 		let retry: boolean = true;
 
 		while (retry) {
-			try
-			{
+			try {
 				let isPatTokenAuth = true;
 				let token = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PATTOKEN_SETTINGS);
 
-				if(token === undefined || token === null || token === '') {
+				if (token === undefined || token === null || token === '') {
 					const session = await this.getSession(this._sessionOptions);
 					if (!session) {
 						Logger.appendLine('Auth> Unable to get session', CredentialStore.ID);
@@ -248,7 +271,7 @@ export class CredentialStore implements vscode.Disposable {
 			'microsoft',
 			// This GUID is the Azure DevOps GUID and you basically ask for a token that can be used to interact with AzDO. This is publicly documented all over
 			['499b84ac-1321-427f-aa17-267ca6975798/.default', 'offline_access'],
-			sessionOptions
+			sessionOptions,
 		);
 	}
 

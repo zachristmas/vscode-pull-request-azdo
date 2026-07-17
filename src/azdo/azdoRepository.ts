@@ -7,6 +7,7 @@ import {
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as vscode from 'vscode';
 import Logger from '../common/logger';
+import { parseAzdoRemoteUrl } from './remoteUrlParser';
 import { parseRemote, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { PRCommentControllerRegistry } from '../view/pullRequestCommentControllerRegistry';
@@ -93,8 +94,8 @@ export class AzdoRepository implements vscode.Disposable {
 			return this._metadata;
 		}
 
-		const remoteProjectMatch = this.remote.url?.match(/\/([^\/]+)\/_git\//);
-		const remoteProjectName = remoteProjectMatch ? decodeURIComponent(remoteProjectMatch[1]) : this._hub?.projectName;
+		const parsedRemote = parseAzdoRemoteUrl(this.remote.url);
+		const remoteProjectName = parsedRemote?.projectName ?? this._hub?.projectName;
 		Logger.debug(`Searching for repos in ${remoteProjectName} project`, AzdoRepository.ID);
 		const repos = await gitApi?.getRepositories(remoteProjectName);
 
