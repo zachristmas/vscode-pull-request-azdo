@@ -46,7 +46,7 @@ The audit found six UI surfaces that silently no-op or actively lie. Fixing them
 | 2   | ~~Add "Convert to draft" (rides on 1; ADO resets votes on draft-conversion, confirm and prompt)~~ ✅                                        | XS   | DLA-02  |
 | 3   | ~~Work-item transition checkbox is a silent no-op (`completeWorkitem` vs `transitionWorkItems` name mismatch)~~ ✅                          | XS   | AC-01   |
 | 4   | `azdopr.merge` palette command + activity-bar MergeSimple call a commented-out stub. Reroute all three call sites to `completePullRequest`. | M    | AC-03   |
-| 5   | Activity-bar "Request Changes" silently no-ops, "Approve" posts a plain comment. Map to votes (-5 / +10).                                   | S    | VOTE-02 |
+| 5   | ~~Activity-bar "Request Changes" silently no-ops, "Approve" posts a plain comment. Map to votes (-5 / +10).~~ ✅                            | S    | VOTE-02 |
 | 6   | ~~Activity-bar reviewer list renders a mismatched shape (broken names/avatars/votes); hoist `convertIdentityRefWithVoteToReviewer`~~ ✅     | XS   | VOTE-03 |
 | 7   | Vote commands: approve / approve-with-suggestions / wait-for-author / reject / reset from palette + PR tree context menu                    | S    | VOTE-01 |
 | 8   | `RejectedByPolicy` mislabeled as merge conflicts in overview copy                                                                           | XS   | POL-02  |

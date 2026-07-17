@@ -10,6 +10,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import gfm from 'remark-gfm';
 
+import { PullRequestVote } from '../../src/azdo/interface';
 import { PullRequest, ReviewType } from '../common/cache';
 import PullRequestContext from '../common/context';
 import emitter from '../common/events';
@@ -434,20 +435,28 @@ const COMMENT_METHODS = {
 };
 
 export const AddCommentSimple = (pr: PullRequest) => {
-	const { updatePR, requestChanges, comment } = useContext(PullRequestContext);
+	const { updatePR, votePullRequest, submit } = useContext(PullRequestContext);
 	const textareaRef = useRef<HTMLTextAreaElement>();
 
 	async function submitAction(selected: string): Promise<void> {
 		const { value } = textareaRef.current;
 		switch (selected) {
-			case ReviewType.RequestChanges:
-				await requestChanges(value);
+			case ReviewType.Approve:
+				// Optionally post the typed text as a comment first, then record the ADO vote.
+				if (value) {
+					await submit(value);
+				}
+				await votePullRequest(PullRequestVote.APPROVED);
 				break;
-			// case ReviewType.Approve:
-			// 	await votePullRequest(value);
-			// 	break;
+			case ReviewType.RequestChanges:
+				// ADO's closest idiom to "request changes" is Waiting for author (-5).
+				if (value) {
+					await submit(value);
+				}
+				await votePullRequest(PullRequestVote.WAITING_FOR_AUTHOR);
+				break;
 			default:
-				await comment(value);
+				await submit(value);
 		}
 		updatePR({ pendingCommentText: '', pendingReviewType: undefined });
 	}

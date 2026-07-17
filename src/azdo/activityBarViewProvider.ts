@@ -74,8 +74,14 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this.deleteBranch(message);
 			case 'pr.approve':
 				return this.approvePullRequest(message);
+			case 'pr.vote':
+				return this.votePullRequest(message);
 			case 'pr.submit':
 				return this.submitReview(message);
+			default:
+				// Never drop a message silently: an unhandled command leaves the webview's awaited
+				// postMessage promise pending forever (how the v1.4 sidebar bugs shipped).
+				return this._throwError(message, `Unhandled message: ${message.command}`);
 		}
 	}
 
@@ -184,6 +190,24 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 			}
 		}
+	}
+
+	private votePullRequest(message: IRequestMessage<number>): void {
+		this._item.submitVote(message.args).then(
+			review => {
+				this.updateReviewers(review);
+				this._replyMessage(message, {
+					review: review,
+					reviewers: this._existingReviewers,
+				});
+				//refresh the pr list as the vote changed
+				vscode.commands.executeCommand('azdopr.refreshList');
+			},
+			e => {
+				vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
+				this._throwError(message, `${formatError(e)}`);
+			},
+		);
 	}
 
 	private approvePullRequest(message: IRequestMessage<string>): void {
