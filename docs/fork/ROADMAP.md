@@ -52,7 +52,7 @@ The audit found six UI surfaces that silently no-op or actively lie. Fixing them
 | 8   | ~~`RejectedByPolicy` mislabeled as merge conflicts in overview copy~~ ✅                                                                           | XS   | POL-02  |
 | 9   | ~~Completion failure still replies `state: Completed` to the webview; surface `mergeFailureMessage` persistently~~ ✅                              | XS   | POL-06  |
 | 10  | ~~Status-check rollup: keep PR-level (iteration-less) statuses; empty list must not read as Succeeded~~ ✅                                         | S    | POL-09  |
-| 11  | Work-item unlink produces invalid `/relations/-1` patch for commit-linked items. Guard + explain.                                                  | XS   | WI-05   |
+| 11  | ~~Work-item unlink produces invalid `/relations/-1` patch for commit-linked items. Guard + explain.~~ ✅                                           | XS   | WI-05   |
 | 12  | Thread positions render from stale `orig*` coordinates instead of server-tracked `threadContext`; comments drift after pushes                      | S    | ITER-01 |
 
 ### v1.5: Policy visibility & auto-complete, the ADO flagship (~6-8 weeks)

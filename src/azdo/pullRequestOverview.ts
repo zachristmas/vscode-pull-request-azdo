@@ -587,7 +587,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			})
 			.catch(e => {
 				this._throwError(message, e);
-				vscode.window.showWarningMessage(`Unable to removing PR link in workitem. Error: ${formatError(e)}`);
+				vscode.window.showWarningMessage(formatError(e));
 			});
 	}
 
