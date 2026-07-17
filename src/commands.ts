@@ -434,6 +434,18 @@ export function registerCommands(
 			if (!picked) {
 				return;
 			}
+			// item 4: the strategy quick-pick above mentions only the merge method, but completing also
+			// deletes the source branch and completes linked work items. Disclose both before doing it.
+			const confirmation = await vscode.window.showInformationMessage(
+				`Complete pull request #${pullRequestModel.getPullRequestId()} using ${
+					picked.label
+				}? This will delete the source branch and complete any linked work items.`,
+				{ modal: true },
+				'Complete',
+			);
+			if (confirmation !== 'Complete') {
+				return;
+			}
 			try {
 				const result = await pullRequestModel.completePullRequest({
 					deleteSourceBranch: true,

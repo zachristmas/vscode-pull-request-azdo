@@ -841,7 +841,21 @@ export class PullRequestOverviewPanel extends WebviewBase {
 
 	// AC-03: the legacy FolderRepositoryManager.mergePullRequest is a commented-out stub; route every
 	// merge entry point through the working completePullRequest path instead.
-	private mergePullRequest(message: IRequestMessage<{ title: string; description: string; method: MergeMethod }>): void {
+	private async mergePullRequest(
+		message: IRequestMessage<{ title: string; description: string; method: MergeMethod }>,
+	): Promise<void> {
+		// item 4: this path hardcodes deleteSourceBranch + transitionWorkItems, so the confirmation must
+		// disclose them rather than say a bare "Complete this pull request?".
+		const confirmation = await vscode.window.showInformationMessage(
+			'Complete this pull request? This will delete the source branch and complete any linked work items.',
+			{ modal: true },
+			'Complete',
+		);
+		if (confirmation !== 'Complete') {
+			this._replyMessage(message, { state: PullRequestStatus.Active });
+			return;
+		}
+
 		const mergeStrategy = GitPullRequestMergeStrategy[message.args.method] ?? GitPullRequestMergeStrategy.NoFastForward;
 		this._item
 			.completePullRequest({ deleteSourceBranch: true, transitionWorkItems: true, mergeStrategy })

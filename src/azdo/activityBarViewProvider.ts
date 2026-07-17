@@ -448,8 +448,10 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 	private async mergePullRequest(
 		message: IRequestMessage<{ title: string; description: string; method: MergeMethod }>,
 	): Promise<void> {
+		// item 4: this path hardcodes deleteSourceBranch + transitionWorkItems; disclose both in the
+		// confirmation instead of the bare "Complete this pull request?".
 		const confirmation = await vscode.window.showInformationMessage(
-			'Complete this pull request?',
+			'Complete this pull request? This will delete the source branch and complete any linked work items.',
 			{ modal: true },
 			'Complete',
 		);
