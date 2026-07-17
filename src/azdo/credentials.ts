@@ -7,7 +7,7 @@ import { IGit } from '../api/api';
 import Logger from '../common/logger';
 import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
-import { SETTINGS_NAMESPACE } from '../constants';
+import { EXTENSION_ID, SETTINGS_NAMESPACE } from '../constants';
 import { initAvatarCache } from './avatarCache';
 import { parseAzdoRemoteUrl } from './remoteUrlParser';
 
@@ -204,6 +204,18 @@ export class CredentialStore implements vscode.Disposable {
 		if (!orgConfig) {
 			Logger.appendLine('Unable to get org config', CredentialStore.ID);
 			this._telemetry.sendTelemetryEvent('auth.failed');
+			vscode.window
+				.showErrorMessage(
+					vscode.l10n.t(
+						'Azure DevOps sign-in failed: could not determine organization and project. Set "azdoPullRequests.orgUrl" and "azdoPullRequests.projectName" in settings, or make sure a git remote points at an Azure DevOps URL.',
+					),
+					vscode.l10n.t('Open Settings'),
+				)
+				.then(choice => {
+					if (choice) {
+						vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${EXTENSION_ID}`);
+					}
+				});
 			return undefined;
 		}
 
