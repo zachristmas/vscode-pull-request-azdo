@@ -72,7 +72,10 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 			{state === PullRequestStatus.Completed ? (
 				<>
 					<div className="branch-status-message">{'Pull request successfully merged.'}</div>
-					{/* <DeleteBranch {...pr} /> */}
+					{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
+					    default branch when the deleted branch is active) already existed but was
+					    unreachable here - nothing offered to clean up the now-merged branch. */}
+					<DeleteBranch {...pr} />
 				</>
 			) : state === PullRequestStatus.Abandoned ? (
 				<>
