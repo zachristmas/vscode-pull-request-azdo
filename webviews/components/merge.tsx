@@ -545,33 +545,33 @@ export const DeleteBranch = (pr: PullRequest) => {
 	const { deleteBranch } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 
-	if (pr.head === 'UNKNOWN') {
-		return <div />;
-	} else {
-		return (
-			<div className="branch-status-container">
-				<form
-					onSubmit={async event => {
-						event.preventDefault();
+	// AC-08: this used to hide entirely when pr.head === 'UNKNOWN' - which is exactly what a
+	// completed PR shows once deleteSourceBranch already removed the remote branch, hiding the
+	// button for the PRs that most need local cleanup. The host-side pr.deleteBranch handler already
+	// handles "nothing to delete" gracefully (a warning toast), so just always offer it here.
+	return (
+		<div className="branch-status-container">
+			<form
+				onSubmit={async event => {
+					event.preventDefault();
 
-						try {
-							setBusy(true);
-							const result = await deleteBranch();
-							if (result && result.cancelled) {
-								setBusy(false);
-							}
-						} finally {
+					try {
+						setBusy(true);
+						const result = await deleteBranch();
+						if (result && result.cancelled) {
 							setBusy(false);
 						}
-					}}
-				>
-					<button disabled={isBusy} type="submit">
-						Delete branch
-					</button>
-				</form>
-			</div>
-		);
-	}
+					} finally {
+						setBusy(false);
+					}
+				}}
+			>
+				<button disabled={isBusy} type="submit">
+					Delete branch
+				</button>
+			</form>
+		</div>
+	);
 };
 
 export const SetAutoComplete = (pr: PullRequest) => {

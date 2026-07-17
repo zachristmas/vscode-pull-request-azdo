@@ -17,7 +17,12 @@ import { FolderRepositoryManager } from './folderRepositoryManager';
 import { MergeMethod, PullRequestCompletion, PullRequestVote, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { getDefaultMergeMethod } from './pullRequestOverview';
-import { buildCompletionSummary, convertIdentityRefWithVoteToReviewer, convertRESTUserToAccount } from './utils';
+import {
+	buildCompletionSummary,
+	convertBranchRefToBranchName,
+	convertIdentityRefWithVoteToReviewer,
+	convertRESTUserToAccount,
+} from './utils';
 
 export class PullRequestViewProvider extends WebviewBase implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'azdo:activePullRequest';
@@ -163,8 +168,17 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 						},
 						state: pullRequest.state,
 						isCurrentlyCheckedOut: isCurrentlyCheckedOut,
-						base: pullRequest.base?.ref ?? 'UNKNOWN',
-						head: pullRequest.head?.ref ?? 'UNKNOWN',
+						// AC-08: fall back to the parsed branch name (still known even once the branch
+						// itself is deleted) rather than the literal string "UNKNOWN" - see
+						// pullRequestOverview.ts.
+						base:
+							pullRequest.base?.ref ??
+							convertBranchRefToBranchName(pullRequest.item.targetRefName || '') ??
+							'UNKNOWN',
+						head:
+							pullRequest.head?.ref ??
+							convertBranchRefToBranchName(pullRequest.item.sourceRefName || '') ??
+							'UNKNOWN',
 						canEdit: canEdit,
 						hasWritePermission,
 						mergeable: pullRequest.item.mergeStatus,

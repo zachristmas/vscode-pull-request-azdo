@@ -24,7 +24,12 @@ import { FolderRepositoryManager } from './folderRepositoryManager';
 import { MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { AzdoUserManager } from './userManager';
-import { buildCompletionSummary, convertIdentityRefWithVoteToReviewer, convertRESTUserToAccount } from './utils';
+import {
+	buildCompletionSummary,
+	convertBranchRefToBranchName,
+	convertIdentityRefWithVoteToReviewer,
+	convertRESTUserToAccount,
+} from './utils';
 import { AzdoWorkItem } from './workItem';
 
 export class PullRequestOverviewPanel extends WebviewBase {
@@ -254,8 +259,20 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					threads: threads,
 					commits: commits,
 					isCurrentlyCheckedOut: isCurrentlyCheckedOut,
-					base: (pullRequest.base && pullRequest.base.ref) || 'UNKNOWN',
-					head: (pullRequest.head && pullRequest.head.ref) || 'UNKNOWN',
+					// AC-08: getBranchRef() returns undefined once a branch no longer exists (e.g. the
+					// source branch deleteSourceBranch already removed on a completed PR) - the branch
+					// NAME is still known from source/targetRefName even when the live ref lookup fails,
+					// so fall back to that instead of the literal string "UNKNOWN" (which read as
+					// "from UNKNOWN" in the UI and made DeleteBranch's pr.head === 'UNKNOWN' check hide
+					// the post-merge cleanup button for exactly the PRs that need it most).
+					base:
+						(pullRequest.base && pullRequest.base.ref) ||
+						convertBranchRefToBranchName(pullRequest.item.targetRefName || '') ||
+						'UNKNOWN',
+					head:
+						(pullRequest.head && pullRequest.head.ref) ||
+						convertBranchRefToBranchName(pullRequest.item.sourceRefName || '') ||
+						'UNKNOWN',
 					repositoryDefaultBranch: defaultBranch,
 					canEdit: canEdit,
 					hasWritePermission,
