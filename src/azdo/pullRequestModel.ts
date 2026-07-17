@@ -55,6 +55,7 @@ import { resolveAvatarsDeep } from './avatarCache';
 import { BuildPolicyEvaluationContext } from './policyTypes';
 import {
 	convertAzdoPullRequestToRawPullRequest,
+	convertBranchRefToBranchName,
 	convertPolicyEvaluation,
 	getDiffHunkFromFileDiff,
 	getDiffSide,
@@ -168,10 +169,29 @@ export class PullRequestModel implements IPullRequestModel {
 
 		if (item.head && item.head.exists) {
 			this.head = new GitHubRef(item.head.ref, '', item.head.sha, item.head.repo.cloneUrl);
+		} else if (item.lastMergeSourceCommit?.commitId) {
+			// Merged/abandoned PR whose source branch was deleted: getBranchRef can't resolve the ref
+			// (head.exists=false, sha=''), so isResolved() was false and the tree showed only the
+			// Description node with no file changes. The merge commits still pin the diff, and
+			// getFileChangesInfo() already falls back to them, so resolve head/base from them here to
+			// make isResolved() true and give head.sha a real commit for the diff URIs. (AC-08 sibling)
+			this.head = new GitHubRef(
+				convertBranchRefToBranchName(item.sourceRefName ?? ''),
+				'',
+				item.lastMergeSourceCommit.commitId,
+				this.remote.url,
+			);
 		}
 
 		if (item.base && item.base.exists) {
 			this.base = new GitHubRef(item.base.ref, '', item.base.sha, item.base.repo.cloneUrl);
+		} else if (item.lastMergeTargetCommit?.commitId) {
+			this.base = new GitHubRef(
+				convertBranchRefToBranchName(item.targetRefName ?? ''),
+				'',
+				item.lastMergeTargetCommit.commitId,
+				this.remote.url,
+			);
 		}
 	}
 
