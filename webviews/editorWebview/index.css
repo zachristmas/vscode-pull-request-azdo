@@ -1040,8 +1040,11 @@ code {
 	#sidebar {
 		display: grid;
 		column-gap: var(--azdo-space-5);
+		row-gap: var(--azdo-space-4);
 		grid-template-columns: 50% 50%;
 		padding: 0;
+		/* When the sidebar stacks under #main it otherwise butts right against the composer/timeline. */
+		margin-top: var(--azdo-space-5);
 	}
 
 	.section-content {
