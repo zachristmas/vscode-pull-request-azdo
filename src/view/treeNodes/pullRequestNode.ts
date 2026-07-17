@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as path from 'path';
-import { Comment, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { Comment, GitPullRequestCommentThread, PullRequestAsyncStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { CommentPermissions, CommentWithPermissions, IFileChangeNode } from '../../azdo/interface';
@@ -328,11 +328,21 @@ export class PRNode extends TreeNode {
 		const tooltipPrefix = currentBranchIsForThisPR ? 'Current Branch * ' : '';
 		const formattedPRNumber = number.toString();
 		const label = `${labelPrefix}#${formattedPRNumber}: ${isDraft ? '[DRAFT] ' : ''}${title}`;
-		const tooltip = `${tooltipPrefix}${title} by ${login}`;
 		// AC-02: zero extra API calls - autoCompleteSetBy is already on every fetched PR
 		// (PullRequest extends GitPullRequest).
 		const autoCompleteSuffix = this.pullRequestModel.item.autoCompleteSetBy ? ' - auto-complete' : '';
-		const description = `#${formattedPRNumber} by ${login}${autoCompleteSuffix}`;
+		// POL-08: mergeStatus is already in the PR list payload (zero extra API calls) - a lightweight
+		// blocker signal beats the per-node policy-evaluation fetch (that would be an M-sized, throttled
+		// addition; ship the free version first per ROADMAP Section 2.2).
+		const mergeStatus = this.pullRequestModel.item.mergeStatus;
+		const blockerSuffix =
+			mergeStatus === PullRequestAsyncStatus.Conflicts
+				? ' - conflicts'
+				: mergeStatus === PullRequestAsyncStatus.RejectedByPolicy
+				? ' - blocked by policy'
+				: '';
+		const tooltip = `${tooltipPrefix}${title} by ${login}${blockerSuffix}`;
+		const description = `#${formattedPRNumber} by ${login}${blockerSuffix}${autoCompleteSuffix}`;
 
 		return {
 			label,
