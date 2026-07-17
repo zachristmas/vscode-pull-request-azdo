@@ -631,16 +631,38 @@ export class PullRequestModel implements IPullRequestModel {
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
 
-		// diffCommonCommit is any because https://github.com/microsoft/azure-devops-node-api/issues/429
-		return await git?.getCommitDiffs(
-			repoId,
-			undefined,
-			String(diffCommonCommit) as any,
-			undefined,
-			undefined,
-			base,
-			target,
-		);
+		// Without explicit top/skip the server caps the response (~100 changes),
+		// silently truncating large PRs. Page until the server has no more.
+		const pageSize = 500;
+		const maxPages = 20;
+		let skip = 0;
+		let result: GitCommitDiffs | undefined;
+		for (let page = 0; page < maxPages; page++) {
+			// diffCommonCommit is any because https://github.com/microsoft/azure-devops-node-api/issues/429
+			const batch = await git?.getCommitDiffs(
+				repoId,
+				undefined,
+				String(diffCommonCommit) as any,
+				pageSize,
+				skip,
+				base,
+				target,
+			);
+			if (!batch) {
+				break;
+			}
+			if (!result) {
+				result = batch;
+			} else {
+				result.changes = (result.changes ?? []).concat(batch.changes ?? []);
+			}
+			const received = batch.changes?.length ?? 0;
+			if (received < pageSize) {
+				break;
+			}
+			skip += received;
+		}
+		return result;
 	}
 
 	async getFileDiff(
