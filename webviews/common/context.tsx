@@ -55,6 +55,8 @@ export class PRContext {
 
 	public readyForReview = () => this.postMessage({ command: 'azdopr.readyForReview' });
 
+	public convertToDraft = () => this.postMessage({ command: 'azdopr.convertToDraft' });
+
 	public replyThread = async (body: string, thread: GitPullRequestCommentThread) => {
 		const result = await this.postMessage({ command: 'pr.reply-thread', args: { text: body, threadId: thread.id } });
 		thread.comments.push(result.comment);

@@ -236,6 +236,11 @@
 				"category": "AzDO Pull Requests"
 			},
 			{
+				"command": "azdopr.convertToDraft",
+				"title": "Convert Pull Request To Draft",
+				"category": "AzDO Pull Requests"
+			},
+			{
 				"command": "azdopr.close",
 				"title": "Close Pull Request",
 				"category": "AzDO Pull Requests"
@@ -469,6 +474,10 @@
 					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
 				},
 				{
+					"command": "azdopr.convertToDraft",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
 					"command": "azdopr.openPullRequestInAzdo",
 					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
 				},
@@ -612,6 +621,16 @@
 				{
 					"command": "azdopr.refreshPullRequest",
 					"when": "view == azdopr:azdo && viewItem =~ /pullrequest|description/",
+					"group": "pullrequest@2"
+				},
+				{
+					"command": "azdopr.readyForReview",
+					"when": "view == azdopr:azdo && viewItem =~ /pullrequest(:local)?:(non)?active:draft/",
+					"group": "pullrequest@2"
+				},
+				{
+					"command": "azdopr.convertToDraft",
+					"when": "view == azdopr:azdo && viewItem =~ /pullrequest(:local)?:(non)?active:ready/",
 					"group": "pullrequest@2"
 				},
 				{

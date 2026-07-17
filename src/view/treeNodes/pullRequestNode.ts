@@ -105,7 +105,11 @@ export class PRNode extends TreeNode {
 		private _isLocal: boolean,
 	) {
 		super();
-		this.commentingRangeProvider = new PullRequestCommentingRangeProvider(pullRequestModel, _folderReposManager, async () => await this.getFileChanges());
+		this.commentingRangeProvider = new PullRequestCommentingRangeProvider(
+			pullRequestModel,
+			_folderReposManager,
+			async () => await this.getFileChanges(),
+		);
 	}
 
 	// #region Tree
@@ -266,7 +270,7 @@ export class PRNode extends TreeNode {
 						change.status,
 					),
 					sha,
-					change.previousFileSHA
+					change.previousFileSHA,
 				);
 			}
 
@@ -304,7 +308,7 @@ export class PRNode extends TreeNode {
 				change.diffHunks,
 				comments.filter(comment => comment.threadContext?.filePath === fileName && !!getPositionFromThread(comment)),
 				sha,
-				change.previousFileSHA
+				change.previousFileSHA,
 			);
 
 			return changedItem;
@@ -334,7 +338,10 @@ export class PRNode extends TreeNode {
 			description,
 			collapsibleState: 1,
 			contextValue:
-				'pullrequest' + (this._isLocal ? ':local' : '') + (currentBranchIsForThisPR ? ':active' : ':nonactive'),
+				'pullrequest' +
+				(this._isLocal ? ':local' : '') +
+				(currentBranchIsForThisPR ? ':active' : ':nonactive') +
+				(isDraft ? ':draft' : ':ready'),
 			iconPath: this.pullRequestModel.item.createdBy?.imageUrl
 				? this.pullRequestModel.item.createdBy?.imageUrl
 				: new vscode.ThemeIcon('github'),
@@ -359,7 +366,13 @@ export class PRNode extends TreeNode {
 
 		const isFileRemote = fileChange instanceof RemoteFileChangeNode || fileChange.isPartial;
 
-		const content = await provideDocumentContentForChangeModel(params, this.pullRequestModel, this._folderReposManager, fileChange as IFileChangeNode, isFileRemote);
+		const content = await provideDocumentContentForChangeModel(
+			params,
+			this.pullRequestModel,
+			this._folderReposManager,
+			fileChange as IFileChangeNode,
+			isFileRemote,
+		);
 		return content;
 	}
 

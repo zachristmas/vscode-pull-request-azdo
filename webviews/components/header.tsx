@@ -38,7 +38,7 @@ export function Header({
 }: PullRequest) {
 	return (
 		<>
-			<Title {...{ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue }} />
+			<Title {...{ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, isDraft, state }} />
 			<div className="subtitle">
 				<div id="status">{getStatus(state, isDraft)}</div>
 				{!isIssue ? <Avatar url={author.url} avatarUrl={author.avatarUrl} /> : null}
@@ -63,11 +63,12 @@ export function Header({
 	);
 }
 
-function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue }: Partial<PullRequest>) {
+function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, isDraft, state }: Partial<PullRequest>) {
 	const [inEditMode, setEditMode] = useState(false);
 	const [showActionBar, setShowActionBar] = useState(false);
 	const [currentTitle, setCurrentTitle] = useStateProp(title);
-	const { setTitle, refresh, copyPrLink } = useContext(PullRequestContext);
+	const { setTitle, refresh, copyPrLink, convertToDraft, updatePR } = useContext(PullRequestContext);
+	const canConvertToDraft = !isIssue && !isDraft && state === PullRequestStatus.Active;
 	const editableTitle = inEditMode ? (
 		<form
 			className="editing-form title-editing-form"
@@ -121,6 +122,19 @@ function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue }: 
 							{copyIcon}
 						</button>
 					}
+					{canConvertToDraft ? (
+						<button
+							title="Convert to draft"
+							onClick={async () => {
+								const result = await convertToDraft();
+								if (result && result.isDraft) {
+									updatePR({ isDraft: true });
+								}
+							}}
+						>
+							Convert to draft
+						</button>
+					) : null}
 				</div>
 			) : (
 				<div className="flex-action-bar comment-actons"></div>

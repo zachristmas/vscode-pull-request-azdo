@@ -432,6 +432,31 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.convertToDraft', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
+				return;
+			}
+			const confirmation = await vscode.window.showWarningMessage(
+				'Convert this pull request to a draft? Azure DevOps resets all reviewer votes when a PR is marked as draft.',
+				{ modal: true },
+				'Convert to draft',
+			);
+			if (confirmation !== 'Convert to draft') {
+				return;
+			}
+			try {
+				await pullRequestModel.setReadyForReview(true);
+				vscode.commands.executeCommand('azdopr.refreshList');
+				PullRequestOverviewPanel.refresh();
+				_onDidUpdatePR.fire();
+			} catch (e) {
+				vscode.window.showErrorMessage(`Converting pull request to draft failed. ${formatError(e)}`);
+			}
+		}),
+	);
+
+	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.close', async (pr?: PRNode | PullRequestModel, message?: string) => {
 			let pullRequestModel: PullRequestModel | undefined;
 			if (pr) {

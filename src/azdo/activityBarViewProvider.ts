@@ -67,6 +67,8 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this.mergePullRequest(message);
 			case 'azdopr.readyForReview':
 				return this.setReadyForReview(message, false);
+			case 'azdopr.convertToDraft':
+				return this.setReadyForReview(message, true);
 			case 'pr.deleteBranch':
 				return this.deleteBranch(message);
 			case 'pr.approve':
@@ -320,21 +322,31 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 		}
 	}
 
-	private setReadyForReview(message: IRequestMessage<any>, isDraft: boolean): void {
-		this._item
-			.setReadyForReview(isDraft)
-			.then(result => {
-				vscode.commands.executeCommand('azdopr.refreshList');
-				this._replyMessage(message, { isDraft: result.isDraft });
-			})
-			.catch(e => {
-				vscode.window.showErrorMessage(
-					`${
-						isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
-					} failed. ${formatError(e)}`,
-				);
-				this._throwError(message, `${formatError(e)}`);
-			});
+	private async setReadyForReview(message: IRequestMessage<any>, isDraft: boolean): Promise<void> {
+		if (isDraft) {
+			const confirmation = await vscode.window.showWarningMessage(
+				'Convert this pull request to a draft? Azure DevOps resets all reviewer votes when a PR is marked as draft.',
+				{ modal: true },
+				'Convert to draft',
+			);
+			if (confirmation !== 'Convert to draft') {
+				this._replyMessage(message, { isDraft: this._item.isDraft });
+				return;
+			}
+		}
+
+		try {
+			const result = await this._item.setReadyForReview(isDraft);
+			vscode.commands.executeCommand('azdopr.refreshList');
+			this._replyMessage(message, { isDraft: result.isDraft });
+		} catch (e) {
+			vscode.window.showErrorMessage(
+				`${
+					isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
+				} failed. ${formatError(e)}`,
+			);
+			this._throwError(message, `${formatError(e)}`);
+		}
 	}
 
 	private async mergePullRequest(
