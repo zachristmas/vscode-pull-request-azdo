@@ -21,7 +21,11 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 	if (pr.isIssue) {
 		return null;
 	}
-	const { state, status } = pr;
+	const { state } = pr;
+	const { checkStatus } = useContext(PullRequestContext);
+	// POL-09: statuses were fetched once per overview load; refresh them on the same 3s cycle the
+	// mergeability poll already uses so build results update without reopening the panel.
+	const [status, setStatus] = useState(pr.status);
 	const [showDetails, toggleDetails] = useReducer(
 		show => !show,
 		status.statuses.some(s => s.state === GitStatusState.Failed),
@@ -38,6 +42,16 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 			}
 		}
 	}, status.statuses);
+
+	useEffect(() => {
+		const handle = setInterval(async () => {
+			const fresh = await checkStatus();
+			if (fresh) {
+				setStatus(fresh);
+			}
+		}, 3000);
+		return () => clearInterval(handle);
+	}, []);
 
 	return (
 		<div id="status-checks">

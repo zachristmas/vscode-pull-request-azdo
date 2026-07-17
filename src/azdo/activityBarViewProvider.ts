@@ -83,6 +83,10 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this.votePullRequest(message);
 			case 'pr.submit':
 				return this.submitReview(message);
+			case 'pr.checkMergeability':
+				return this._replyMessage(message, await this._item.getMergability());
+			case 'pr.checkStatus':
+				return this._replyMessage(message, await this._item.getStatusChecks());
 			default:
 				// Never drop a message silently: an unhandled command leaves the webview's awaited
 				// postMessage promise pending forever (how the v1.4 sidebar bugs shipped).

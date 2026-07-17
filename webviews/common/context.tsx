@@ -48,6 +48,8 @@ export class PRContext {
 
 	public checkMergeability = () => this.postMessage({ command: 'pr.checkMergeability' });
 
+	public checkStatus = () => this.postMessage({ command: 'pr.checkStatus' });
+
 	public merge = (args: { title: string; description: string; method: MergeMethod }) =>
 		this.postMessage({ command: 'azdopr.merge', args });
 

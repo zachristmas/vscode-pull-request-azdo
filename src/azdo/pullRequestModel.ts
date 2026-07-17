@@ -732,8 +732,12 @@ export class PullRequestModel implements IPullRequestModel {
 		const git = await azdo?.connection.getGitApi();
 
 		let pr_statuses = (await git?.getPullRequestStatuses(repoId, this.getPullRequestId())) ?? [];
+		// POL-09: keep PR-level (iteration-less) statuses alongside the latest-iteration ones. Statuses
+		// posted without an iterationId were previously dropped whenever any iteration-scoped status existed
+		// (their iterationId ?? 0 never equalled the max iteration).
+		const maxIteration = Math.max(0, ...pr_statuses.map(s => s.iterationId ?? 0));
 		pr_statuses = pr_statuses
-			.filter(p => p.iterationId === Math.max(...pr_statuses.map(s => s.iterationId ?? 0)))
+			.filter(p => p.iterationId === undefined || (p.iterationId ?? 0) === maxIteration)
 			.filter(
 				p =>
 					p.id ===
@@ -759,11 +763,15 @@ export class PullRequestModel implements IPullRequestModel {
 			}),
 		};
 
-		if (pr_statuses?.every(s => s.state === GitStatusState.Succeeded)) {
+		// POL-09: an empty status list must not read as Succeeded ([].every() is vacuously true); a PR with
+		// no posted statuses is NotSet, not implicitly passing.
+		if (pr_statuses.length === 0) {
+			statuses.state = GitStatusState.NotSet;
+		} else if (pr_statuses.every(s => s.state === GitStatusState.Succeeded)) {
 			statuses.state = GitStatusState.Succeeded;
-		} else if (pr_statuses?.some(s => s.state === GitStatusState.Error || s.state === GitStatusState.Failed)) {
+		} else if (pr_statuses.some(s => s.state === GitStatusState.Error || s.state === GitStatusState.Failed)) {
 			statuses.state = GitStatusState.Failed;
-		} else if (pr_statuses?.every(s => s.state === GitStatusState.NotApplicable)) {
+		} else if (pr_statuses.every(s => s.state === GitStatusState.NotApplicable)) {
 			statuses.state = GitStatusState.NotApplicable;
 		}
 

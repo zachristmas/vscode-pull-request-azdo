@@ -322,6 +322,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.removeWorkItemFromPR(message);
 			case 'pr.checkMergeability':
 				return this._replyMessage(message, await this._item.getMergability());
+			case 'pr.checkStatus':
+				return this._replyMessage(message, await this._item.getStatusChecks());
 			case 'pr.add-reviewers':
 				return this.addReviewerToPr(message);
 			case 'pr.remove-reviewer':
