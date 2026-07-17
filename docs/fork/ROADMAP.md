@@ -1315,7 +1315,7 @@ research needed here; this is a design pass over existing webview components.
   when the branch itself has been deleted).
 - Key files: `webviews/components/sidebar.tsx`, `webviews/components/merge.tsx`, `src/azdo/pullRequestOverview.ts`.
 
-#### UX-03 [L] Comment section modernization
+#### ~~UX-03 [L] Comment section modernization~~ Phase A done (composer hints, focus-within actions, theme-aware code blocks); partial Phase B from live feedback (single-card comment restyle, colored status icons, reply placement, bottom margin); still pending (thread status pill, resolved-collapse, ghost reply input, description placeholder, timeline polish)
 
 - Current: functional but visually/interaction-wise identical to the upstream GitHub-extension fork base
   - no threaded-reply affordances beyond what VS Code's native Comment API gives for free, no rich

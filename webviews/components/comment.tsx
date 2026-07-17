@@ -7,7 +7,7 @@ import { Comment } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { prism, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import gfm from 'remark-gfm';
 
 import { PullRequestVote } from '../../src/azdo/interface';
@@ -252,9 +252,12 @@ export interface Embodied {
 
 const renderers = {
 	code: ({ language, value }) => {
+		// UX-03: match the editor theme instead of hardcoding dracula (purple-on-dark inside a light
+		// VS Code). VS Code stamps document.body with vscode-light / vscode-dark / vscode-high-contrast.
+		const isLight = document.body.classList.contains('vscode-light');
 		return (
 			<SyntaxHighlighter
-				style={dracula}
+				style={isLight ? prism : vscDarkPlus}
 				language={language}
 				showLineNumbers={true}
 				wrapLongLines={true}
