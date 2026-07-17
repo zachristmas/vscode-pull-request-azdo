@@ -4,6 +4,7 @@
 >
 > - **Multi-project workspaces** (v1.1.0): open a folder containing repositories from any number of Azure DevOps projects in one org; each repository resolves against the project in its own git remote URL. Also fixes remote auto-detection for HTTPS URLs without a `user@` segment and for project names containing spaces.
 > - **User avatars render** (v1.2.0): avatars are fetched through the authenticated connection and inlined, instead of relying on unauthenticated image URLs that Azure DevOps rejects.
+> - **Quick-win fixes** (v1.3.0): SSH and legacy visualstudio.com remote URL auto-detection; large PRs load all changes (paginated diffs); actionable error when sign-in cannot resolve org/project; case-insensitive repository matching; "mark as viewed" keyed by file path (no more same-name collisions or crashes on deleted files); comment threads anchor to the real selection in the ADO web preview; new "Checkout Pull Request by ID" command.
 >
 > Bug reports and feature requests for this fork: [zachristmas/vscode-pull-request-azdo/issues](https://github.com/zachristmas/vscode-pull-request-azdo/issues).
 
