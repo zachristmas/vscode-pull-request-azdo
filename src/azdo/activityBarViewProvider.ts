@@ -448,12 +448,16 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			const result = await this._item.setAutoComplete(message.args.enable ? message.args.options : undefined);
 			vscode.commands.executeCommand('azdopr.refreshList');
 
+			// webview.postMessage() serializes through JSON.stringify, which drops keys whose value is
+			// `undefined` entirely - the webview's shallow-merge updatePR() then never overwrites the
+			// stale cached value, so canceling looked like it did nothing. Send `null` for "cleared"
+			// instead: it survives serialization and every consumer already treats it as falsy.
 			this._replyMessage(message, {
 				autoCompleteSetBy:
 					result.autoCompleteSetBy && result.autoCompleteSetBy.id !== AUTO_COMPLETE_CLEAR_ID
 						? convertRESTUserToAccount(result.autoCompleteSetBy)
-						: undefined,
-				autoCompleteOptions: buildCompletionSummary(result.completionOptions),
+						: null,
+				autoCompleteOptions: buildCompletionSummary(result.completionOptions) ?? null,
 				state: result.status ?? this._item.item.status,
 				mergeable: result.mergeStatus,
 				mergeFailureMessage: result.mergeFailureMessage,
@@ -468,8 +472,8 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				if (fresh?.state === PullRequestStatus.Completed) {
 					vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
 					this._replyMessage(message, {
-						autoCompleteSetBy: undefined,
-						autoCompleteOptions: undefined,
+						autoCompleteSetBy: null,
+						autoCompleteOptions: null,
 						state: fresh.state,
 						mergeable: fresh.item.mergeStatus,
 					});
