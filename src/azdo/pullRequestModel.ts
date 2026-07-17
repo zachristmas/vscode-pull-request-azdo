@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { Build } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { ResourceRef } from 'azure-devops-node-api/interfaces/common/VSSInterfaces';
 import {
 	Comment,
@@ -22,11 +23,10 @@ import {
 	PullRequestStatus,
 	VersionControlChangeType,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import { Build } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { PolicyEvaluationRecord } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
+import * as diff from 'diff';
 import equals from 'fast-deep-equal';
 import * as vscode from 'vscode';
-import * as diff from 'diff';
 import { Repository } from '../api/api';
 import { IReviewThread, ViewedState } from '../common/comment';
 import { parseDiffAzdo } from '../common/diffHunk';
@@ -38,6 +38,7 @@ import { ITelemetry } from '../common/telemetry';
 import { toPRUriAzdo, toReviewUri } from '../common/uri';
 import { formatError } from '../common/utils';
 import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
+import { resolveAvatarsDeep } from './avatarCache';
 import { AzdoRepository } from './azdoRepository';
 import { FileViewedStatus, PRFileViewedState } from './fileReviewedStatusService';
 import { FolderRepositoryManager } from './folderRepositoryManager';
@@ -51,7 +52,6 @@ import {
 	PullRequestPolicyEvaluation,
 	PullRequestVote,
 } from './interface';
-import { resolveAvatarsDeep } from './avatarCache';
 import { BuildPolicyEvaluationContext } from './policyTypes';
 import {
 	convertAzdoPullRequestToRawPullRequest,

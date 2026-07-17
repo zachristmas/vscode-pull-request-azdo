@@ -36,7 +36,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 		private pullRequestModel: PullRequestModel,
 		private _folderReposManager: FolderRepositoryManager,
 		private _commentController: vscode.CommentController,
-		private getFileChanges: () => Promise<(IFileChangeNodeWithUri)[]>,
+		private getFileChanges: () => Promise<IFileChangeNodeWithUri[]>,
 	) {
 		this._commentHandlerId = uuid();
 		this._commonCommentHandler = new CommonCommentHandler(pullRequestModel, _folderReposManager);
@@ -331,7 +331,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 		return path.relative(this._folderReposManager.repository.rootUri.path, comparePath).replace(/\\/g, '/');
 	}
 
-	public async toggleReaction(comment: GHPRComment, reaction: vscode.CommentReaction): Promise<void> {
+	public async toggleReaction(_comment: GHPRComment, _reaction: vscode.CommentReaction): Promise<void> {
 		// if (comment.parent!.uri.scheme !== 'pr') {
 		// 	return;
 		// }

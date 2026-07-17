@@ -66,7 +66,7 @@ async function init(
 	const localStorageService = new LocalStorageService(context.workspaceState);
 	const fileReviewedStatusService = new FileReviewedStatusService(localStorageService);
 
-	vscode.authentication.onDidChangeSessions(async (e) => {
+	vscode.authentication.onDidChangeSessions(async e => {
 		if (e.provider.id === 'microsoft') {
 			await reposManager.clearCredentialCache();
 			if (reviewManagers) {
@@ -220,7 +220,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	const prTree = new PullRequestsTreeDataProvider(telemetry);
 	context.subscriptions.push(prTree);
 
-	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(URI_SCHEME_PR, getInMemPRContentProvider()));
+	context.subscriptions.push(
+		vscode.workspace.registerTextDocumentContentProvider(URI_SCHEME_PR, getInMemPRContentProvider()),
+	);
 
 	if (apiImpl.repositories.length > 0) {
 		await init(context, apiImpl, credentialStore, apiImpl.repositories, prTree, liveshareApiPromise);
@@ -229,12 +231,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	}
 
 	return apiImpl;
-}
-
-const SCOPES = ['vso.identity', 'vso.code'];
-async function registerGithubExtension() {
-	const session = await vscode.authentication.getSession('azdo', SCOPES, { createIfNone: false });
-	return session;
 }
 
 export async function deactivate() {

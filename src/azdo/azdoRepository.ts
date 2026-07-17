@@ -7,7 +7,6 @@ import {
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as vscode from 'vscode';
 import Logger from '../common/logger';
-import { parseAzdoRemoteUrl } from './remoteUrlParser';
 import { parseRemote, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { PRCommentControllerRegistry } from '../view/pullRequestCommentControllerRegistry';
@@ -15,6 +14,7 @@ import { Azdo, CredentialStore } from './credentials';
 import { FileReviewedStatusService, FileViewedStatus } from './fileReviewedStatusService';
 import { IAccount, IGitHubRef } from './interface';
 import { PullRequestModel } from './pullRequestModel';
+import { parseAzdoRemoteUrl } from './remoteUrlParser';
 import {
 	convertAzdoBranchRefToIGitHubRef,
 	convertAzdoPullRequestToRawPullRequest,

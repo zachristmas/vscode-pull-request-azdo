@@ -19,7 +19,7 @@ import {
 } from '../../src/common/timelineEvent';
 import { groupBy } from '../../src/common/utils';
 import PullRequestContext from '../common/context';
-import { CommentBody, CommentView, ReplyToThread } from './comment';
+import { CommentView, ReplyToThread } from './comment';
 import { chevronIcon, commitIcon, mergeIcon } from './icon';
 import { nbsp, Spaced } from './space';
 // eslint-disable-next-line import/no-named-as-default
@@ -163,7 +163,7 @@ export const ReviewEventView = (event: ReviewEvent) => {
 				</div>
 				{/* {event.state !== 'PENDING' && event.body ? <CommentBody body={event.body} bodyHTML={event.bodyHTML} /> : null} */}
 				<div className="comment-body review-comment-body">
-					{Object.entries(comments).map(([key, thread]) => (
+					{Object.entries(comments).map(() => (
 						<div className="diff-container">
 							{/* <Diff key={key}
 									comment={thread[0]}

@@ -603,7 +603,7 @@ export const MergeSimple = (pr: PullRequest) => {
 	return <Dropdown options={availableOptions} defaultOption={pr.defaultMergeMethod} submitAction={submitAction} />;
 };
 
-export const DeleteBranch = (pr: PullRequest) => {
+export const DeleteBranch = (_pr: PullRequest) => {
 	const { deleteBranch } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 

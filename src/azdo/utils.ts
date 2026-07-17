@@ -39,7 +39,6 @@ import {
 	PullRequestPolicyEvaluation,
 	ReviewState,
 } from './interface';
-import { GHPRComment, GHPRCommentThread } from './prComment';
 import {
 	isBuildValidationSettings,
 	isMergeStrategySettings,
@@ -51,6 +50,7 @@ import {
 	RequiredReviewersPolicySettings,
 	WellKnownPolicyTypeIds,
 } from './policyTypes';
+import { GHPRComment, GHPRCommentThread } from './prComment';
 
 export interface CommentReactionHandler {
 	toggleReaction(comment: vscode.Comment, reaction: vscode.CommentReaction): Promise<void>;

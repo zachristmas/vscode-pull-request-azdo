@@ -386,7 +386,7 @@ export class ReviewCommentController
 
 	async provideCommentingRanges(
 		document: vscode.TextDocument,
-		token: vscode.CancellationToken,
+		_token: vscode.CancellationToken,
 	): Promise<vscode.Range[] | undefined> {
 		let query: ReviewUriParams | undefined;
 
@@ -627,14 +627,14 @@ export class ReviewCommentController
 	// #region Incremental update comments
 	public async update(
 		localFileChanges: GitFileChangeNode[],
-		obsoleteFileChanges: (GitFileChangeNode | RemoteFileChangeNode)[],
+		_obsoleteFileChanges: (GitFileChangeNode | RemoteFileChangeNode)[],
 	): Promise<void> {
 		this._localFileChanges = localFileChanges;
 	}
 	// #endregion
 
 	// #region Reactions
-	async toggleReaction(comment: GHPRComment, reaction: vscode.CommentReaction): Promise<void> {
+	async toggleReaction(_comment: GHPRComment, _reaction: vscode.CommentReaction): Promise<void> {
 		// try {
 		// 	if (!this._reposManager.activePullRequest) {
 		// 		throw new Error('Unable to find active pull request');
