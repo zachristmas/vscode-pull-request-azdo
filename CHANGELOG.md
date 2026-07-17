@@ -1,21 +1,35 @@
 # Changelog
 
+## 1.5.0
+
+UX modernization pass over the PR webviews (design tokens, read-only/completed states, reviewer/vote sidebar, comment section).
+
+- UX-01: "Your review" sidebar card, an always-visible current-vote row, a controlled vote select, busy/success/failure cast feedback (aria-live), and a reset-vote link.
+- UX-02: read-only outcome summary card on completed/abandoned PRs; edit, vote, and add/remove affordances are gated off once a PR is finished.
+- UX-03: comment section pass, single-card comments, a thread-owned container with a left rail and colored status pill, resolved-thread collapse, a full-width ghost reply field, theme-aware code blocks, composer hints, and an empty-description placeholder.
+- UX-04: one editor tab per PR (keyed by PR id) instead of a reused singleton panel.
+- UX-05: a design-token system (radius, spacing, surface, semantic color) applied across both webviews, plus responsive sidebar spacing.
+
 ### 1.0.0
+
 - Autodetect Azure DevOps URL and project name from remote.
 - Fixing a lot of bugs and preparation for AI integration.
 
 ## 0.2.3
+
 - Fixed [#86](https://github.com/ankitbko/vscode-pull-request-azdo/issues/86) thanks to [danigt91](https://github.com/danigt91)
 
-
 ## 0.2.2
+
 - Reintroduced PAT token.
 - Fixed [#63](https://github.com/ankitbko/vscode-pull-request-azdo/issues/63)
 
 ## 0.2.1
+
 - Fixed continuous popup for authentication.
 
 ## 0.2.0
+
 - Fixed [#68](https://github.com/ankitbko/vscode-pull-request-azdo/issues/68) - Changed the authentication mechanism from PAT to OAuth using vscode provided authentication session. This will require users to re-authenticate.
 
 ## 0.0.25
