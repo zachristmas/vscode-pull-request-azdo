@@ -3,12 +3,14 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
 import { useContext, useEffect, useRef, useState } from 'react';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
+import { getClosedCommentDescription } from './header';
 import { checkIcon, deleteIcon, plusIcon } from './icon';
 import { Reviewer, REVIEW_STATE_ICON, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
@@ -22,7 +24,13 @@ export default function Sidebar({ reviewers, workItems, hasWritePermission, isAc
 
 	return (
 		<div id="sidebar">
-			{isActive ? <VotePanel vote={pr.reviewers.find(r => r.reviewer.id === pr.currentUser.id)?.state ?? 0} /> : null}
+			{/* UX-01/UX-02: the vote panel and the outcome card occupy the same slot - you cast a vote
+			    while the PR is active, and once it's finished that space becomes the read-only outcome. */}
+			{isActive ? (
+				<VotePanel vote={pr.reviewers.find(r => r.reviewer.id === pr.currentUser.id)?.state ?? 0} />
+			) : (
+				<OutcomeSummary />
+			)}
 			<ReviewerPanel
 				labelText="Required Reviewers"
 				reviewers={reviewers.filter(r => r.isRequired)}
@@ -222,6 +230,35 @@ const VotePanel = ({ vote }: { vote: number }) => {
 				<button className="reset-vote-link" disabled={busy} onClick={() => cast('0')}>
 					Reset vote
 				</button>
+			) : null}
+		</div>
+	);
+};
+
+// UX-02: on a finished PR the vote-panel slot becomes a read-only outcome card - the first
+// completed-state signal the sidebar has ever had (until now the badge and merge banner both lived in
+// the main column). Status dot + label, the thread-resolution rollup, and your own final vote if any.
+const OutcomeSummary = () => {
+	const { pr } = useContext(PullRequestContext);
+	const isMerged = pr.state === PullRequestStatus.Completed;
+	const myVote = pr.reviewers.find(r => r.reviewer.id === pr.currentUser.id)?.state ?? 0;
+	const voteKey = myVote.toString();
+	return (
+		<div className="section outcome-card">
+			<div className="outcome-status">
+				<span className={`status-dot ${isMerged ? 'status-dot-success' : 'status-dot-muted'}`} />
+				<span className={`outcome-label${isMerged ? '' : ' text-muted'}`}>{isMerged ? 'Merged' : 'Abandoned'}</span>
+			</div>
+			<div className="outcome-threads text-muted">{getClosedCommentDescription(pr.threads ?? [])}</div>
+			{myVote !== 0 ? (
+				<div className="outcome-vote text-muted">
+					Your vote:
+					<span className="vote-status">
+						{REVIEW_STATE_ICON[voteKey]}
+						{nbsp}
+						{VOTE_STATE_TEXT[voteKey]}
+					</span>
+				</div>
 			) : null}
 		</div>
 	);
