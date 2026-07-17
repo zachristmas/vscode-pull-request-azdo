@@ -358,7 +358,7 @@ const PolicyRow = ({
 					{policy.build?.webUrl ? <a href={policy.build.webUrl}>Details</a> : null}
 					{nbsp}
 					<button disabled={isBusy} onClick={requeue}>
-						{buildLabel}
+						{isBusy ? 'Queuing...' : buildLabel}
 					</button>
 				</div>
 			) : null}
