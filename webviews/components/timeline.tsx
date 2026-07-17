@@ -251,8 +251,11 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 	const hasStatus = ThreadStatusOrder.includes(status.toString());
 	const isResolved = RESOLVED_STATUSES.includes(status);
 	// Per-render collapse state (no persistence); resolved threads start collapsed so long PRs aren't
-	// buried in settled conversations, but they stay one click away.
+	// buried in settled conversations, but they stay one click away. Only ever hides content while the
+	// thread is still resolved - reopening via the (always-visible) header pill can't strand a
+	// collapsed thread with its comments hidden and no toggle to reveal them.
 	const [collapsed, setCollapsed] = useState(isResolved);
+	const contentHidden = isResolved && collapsed;
 
 	const onCancel = () => {
 		setEditMode(false);
@@ -286,12 +289,12 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 				</div>
 			) : null}
 			{isResolved ? (
-				<button className="thread-collapse-toggle" aria-expanded={!collapsed} onClick={() => setCollapsed(c => !c)}>
-					<span className={`thread-chevron${collapsed ? '' : ' expanded'}`}>{chevronIcon}</span>
+				<button className="thread-collapse-toggle" aria-expanded={!contentHidden} onClick={() => setCollapsed(c => !c)}>
+					<span className={`thread-chevron${contentHidden ? '' : ' expanded'}`}>{chevronIcon}</span>
 					{commentCount} comment{commentCount === 1 ? '' : 's'} · resolved
 				</button>
 			) : null}
-			{!collapsed ? (
+			{!contentHidden ? (
 				<>
 					{thread.comments.map(c => (
 						<CommentView
