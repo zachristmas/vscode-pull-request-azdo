@@ -71,7 +71,7 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 		<div id="status-checks">
 			{state === PullRequestStatus.Completed ? (
 				<>
-					<div className="branch-status-message">{'Pull request successfully merged.'}</div>
+					<div className="branch-status-message text-success">{'Pull request successfully merged.'}</div>
 					{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
 					    default branch when the deleted branch is active) already existed but was
 					    unreachable here - nothing offered to clean up the now-merged branch. */}
@@ -79,7 +79,7 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 				</>
 			) : state === PullRequestStatus.Abandoned ? (
 				<>
-					<div className="branch-status-message">{'This pull request is abondoned.'}</div>
+					<div className="branch-status-message text-muted">{'This pull request is abandoned.'}</div>
 					{/* <DeleteBranch {...pr} /> */}
 				</>
 			) : (
@@ -90,7 +90,7 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 							<div className="status-section">
 								<div className="status-item">
 									<StateIcon state={status.state} />
-									<div>{getSummaryLabel(status.statuses)}</div>
+									<div className={statusStateTextClass(status.state)}>{getSummaryLabel(status.statuses)}</div>
 									<a aria-role="button" onClick={toggleDetails}>
 										{showDetails ? 'Hide' : 'Show'}
 									</a>
@@ -291,7 +291,7 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 				<PolicyStatusIcon
 					status={pending.length > 0 ? PolicyEvaluationStatus.Rejected : PolicyEvaluationStatus.Approved}
 				/>
-				<div>{summaryLabel}</div>
+				<div className={pending.length > 0 ? 'text-danger' : 'text-success'}>{summaryLabel}</div>
 				<a aria-role="button" onClick={toggleDetails}>
 					{showDetails ? 'Hide' : 'Show'}
 				</a>
@@ -422,7 +422,9 @@ export const MergeStatus = ({
 				: mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure
 				? deleteIcon
 				: pendingIcon}
-			<div>{getMergeabilityDescription(mergeable, mergeFailureMessage, hasPolicySection)}</div>
+			<div className={mergeabilityTextClass(mergeable)}>
+				{getMergeabilityDescription(mergeable, mergeFailureMessage, hasPolicySection)}
+			</div>
 		</div>
 	);
 };
@@ -447,6 +449,21 @@ function getMergeabilityDescription(
 		case PullRequestMergeability.NotSet:
 		default:
 			return 'Checking if this branch can be merged...';
+	}
+}
+
+// UX-05: color the mergeability summary line so a clean merge and a blocked/conflicted one differ
+// by more than the leading icon.
+function mergeabilityTextClass(mergeable: PullRequestMergeability): string {
+	switch (mergeable) {
+		case PullRequestMergeability.Succeeded:
+			return 'text-success';
+		case PullRequestMergeability.Conflicts:
+		case PullRequestMergeability.RejectedByPolicy:
+		case PullRequestMergeability.Failure:
+			return 'text-danger';
+		default:
+			return 'text-muted';
 	}
 }
 
@@ -750,4 +767,17 @@ function StateIcon({ state }: { state: GitStatusState }) {
 			return deleteIcon;
 	}
 	return pendingIcon;
+}
+
+// UX-05: color the status-checks summary line to match its StateIcon.
+function statusStateTextClass(state: GitStatusState): string {
+	switch (state) {
+		case GitStatusState.Succeeded:
+			return 'text-success';
+		case GitStatusState.Error:
+		case GitStatusState.Failed:
+			return 'text-danger';
+		default:
+			return 'text-muted';
+	}
 }

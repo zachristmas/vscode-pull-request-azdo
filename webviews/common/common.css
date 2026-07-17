@@ -33,6 +33,19 @@
 	--azdo-muted: var(--vscode-descriptionForeground);
 }
 
+/* UX-05: status-color utilities for policy/merge summary lines. */
+.text-success {
+	color: var(--azdo-success);
+}
+
+.text-danger {
+	color: var(--azdo-danger);
+}
+
+.text-muted {
+	color: var(--azdo-muted);
+}
+
 body a {
 	text-decoration: none;
 }

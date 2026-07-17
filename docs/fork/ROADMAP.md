@@ -1332,7 +1332,7 @@ research needed here; this is a design pass over existing webview components.
 - Desired: a real decision, not a quick patch - discuss trade-offs (tab clutter vs losing your place)
   before changing. Flagged by user feedback, not yet a design decision.
 
-#### UX-05 [M] General theming pass
+#### ~~UX-05 [M] General theming pass~~ ✅ (design section 7 items 1 and 2: token sheet + sweep + status-color utilities; activity-bar paddings still use raw px, a section 6 follow-on)
 
 - Current: flat gray/white icon and control palette outside of what VOTE-07 (colored vote icons) and
   POL-10 (required-reviewer badge) added this session; no consistent border-radius or spacing system.
