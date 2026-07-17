@@ -786,8 +786,14 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			this.refreshPanel();
 			vscode.commands.executeCommand('azdopr.refreshList');
 
+			// The no-seq broadcast drives the client commandHandler (head -> 'UNKNOWN'); the seq reply
+			// resolves the awaited deleteBranch() promise so the Delete button's finally runs. Without it
+			// the button stayed stuck disabled after a successful delete. (item 1c)
 			this._postMessage({
 				command: 'pr.deleteBranch',
+			});
+			this._replyMessage(message, {
+				cancelled: false,
 			});
 		} else {
 			this._replyMessage(message, {

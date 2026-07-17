@@ -401,8 +401,13 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 
 			vscode.commands.executeCommand('azdopr.refreshList');
 
+			// See pullRequestOverview.ts: broadcast drives the head->'UNKNOWN' commandHandler, seq reply
+			// resolves the awaited deleteBranch() promise so the button recovers. (item 1c)
 			this._postMessage({
 				command: 'pr.deleteBranch',
+			});
+			this._replyMessage(message, {
+				cancelled: false,
 			});
 		} else {
 			this._replyMessage(message, {
