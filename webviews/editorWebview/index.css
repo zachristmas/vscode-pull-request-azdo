@@ -539,7 +539,10 @@ body .overview-title .button-group button {
 	display: flex;
 }
 
-.section button {
+/* Scoped to the header so it only styles the "+" add buttons. Left unscoped, the transparent /
+   padding:0 / margin-left:auto bled onto the review-card's Vote button, turning it into bare text and
+   eating the flex free space so the vote <select> collapsed and its label was cut off. */
+.section-header button {
 	margin-left: auto;
 	padding: 0;
 	background: transparent;
@@ -550,8 +553,8 @@ body .overview-title .button-group button {
 	margin-right: 0;
 }
 
-.section button:hover,
-.section button:focus {
+.section-header button:hover,
+.section-header button:focus {
 	background: transparent;
 }
 
