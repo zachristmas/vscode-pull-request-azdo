@@ -577,6 +577,8 @@ body .overview-title .button-group button {
 	box-sizing: border-box;
 }
 
+/* UX-03: system/commit timeline rows recede to muted single-line rows so they don't compete with
+   actual comment threads; the 16px icon and right-aligned timestamp are already in place. */
 .commit,
 .review,
 .merged {
@@ -584,7 +586,12 @@ body .overview-title .button-group button {
 	width: 100%;
 	border: none;
 	font-size: 12px;
-	color: var(--vscode-foreground);
+	color: var(--azdo-muted);
+}
+
+.commit .icon svg path,
+.merged .icon svg path {
+	fill: currentColor;
 }
 
 .review {
@@ -761,6 +768,14 @@ body .comment-form .form-actions button {
 
 .details .comment-body {
 	padding: var(--azdo-space-5) 0;
+}
+
+/* UX-03: empty-description placeholder reads as a fillable slot, not a bare line. */
+.description-placeholder {
+	border: 1px dashed var(--azdo-border);
+	border-radius: var(--azdo-radius-md);
+	padding: var(--azdo-space-3);
+	font-style: italic;
 }
 
 blockquote {

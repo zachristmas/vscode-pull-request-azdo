@@ -242,9 +242,11 @@ const renderers = {
 
 export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, body }: Embodied) => {
 	if (!body && !bodyHTML) {
+		// UX-03: dashed-border muted placeholder rather than a bare line - it reads as a fillable slot
+		// (Edit lives in the hover/focus actions, canEdit permitting).
 		return (
 			<div className="comment-body">
-				<em>No description provided.</em>
+				<div className="description-placeholder text-muted">No description provided</div>
 			</div>
 		);
 	}

@@ -1315,7 +1315,7 @@ research needed here; this is a design pass over existing webview components.
   when the branch itself has been deleted).
 - Key files: `webviews/components/sidebar.tsx`, `webviews/components/merge.tsx`, `src/azdo/pullRequestOverview.ts`.
 
-#### ~~UX-03 [L] Comment section modernization~~ Phase A done (composer hints, focus-within actions, theme-aware code blocks); Phase B: single-card comment restyle + colored status icons + reply placement + bottom margin (live feedback), thread-owned container + status pill + resolved-collapse + ghost reply (design section 7 item 10); still pending (description placeholder, timeline event polish - design section 7 item 11)
+#### ~~UX-03 [L] Comment section modernization~~ ✅ Phase A (composer hints, focus-within actions, theme-aware code blocks); Phase B: single-card comment restyle + colored status icons + reply placement + bottom margin (live feedback), thread-owned container + status pill + resolved-collapse + ghost reply (design section 7 item 10), empty-description dashed placeholder + muted single-line system/commit timeline rows (design section 7 item 11). Newest-first ordering + composer-above-timeline recorded as deliberate. Follow-on (out of this pass): composer formatting toolbar (with DLA-07), editor-margin thread styling (THR-01/02, v1.7).
 
 - Current: functional but visually/interaction-wise identical to the upstream GitHub-extension fork base
   - no threaded-reply affordances beyond what VS Code's native Comment API gives for free, no rich

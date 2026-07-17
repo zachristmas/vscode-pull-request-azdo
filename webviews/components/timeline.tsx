@@ -29,6 +29,9 @@ import { AuthorLink, Avatar } from './user';
 
 export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestCommentThread[]; currentUser: Identity }) => (
 	<>
+		{/* UX-03: newest-first is deliberate (matches ADO web) and pairs with the composer sitting ABOVE
+		    the timeline (overview.tsx) - a new comment appears directly under the box. Do not "fix" the
+		    ordering to oldest-first without also moving the composer to the bottom. */}
 		{threads
 			.sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime())
 			.map(
