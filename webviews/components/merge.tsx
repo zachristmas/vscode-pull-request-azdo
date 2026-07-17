@@ -59,6 +59,11 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
+			// UX-04: don't poll a hidden tab (retainContextWhenHidden keeps this webview alive); the host
+			// refreshes on became-visible instead. (item 3)
+			if (document.hidden) {
+				return;
+			}
 			// Only re-fetch while checks are actively running (mirrors the mergeability poll, which stops
 			// once resolved). Avoids an unbounded 3s API poll when statuses are terminal or absent; the
 			// manual Refresh button covers later re-runs.
@@ -124,19 +129,34 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 
 	const [mergeable, setMergeability] = useState(_mergeable);
 	const { checkMergeability } = useContext(PullRequestContext);
+	// UX-04: throttle the armed-auto-complete wait to ~15s (item 3). useRef so the timestamp survives the
+	// re-render this effect triggers - the effect has no deps and re-creates the interval each render.
+	const lastArmedPoll = useRef(0);
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
+			// UX-04: pause polling while the tab is hidden; the host refreshes on became-visible. (item 3)
+			if (document.hidden) {
+				return;
+			}
 			// AC-02: keep polling mergeability while auto-complete is armed too, so the merge-status text
 			// picks up Succeeded once the server completes the PR - not just while NotSet/Queued.
 			const autoCompleteArmed = !!pr.autoCompleteSetBy && pr.state === PullRequestStatus.Active;
-			if (
-				mergeable === PullRequestMergeability.NotSet ||
-				mergeable === PullRequestMergeability.Queued ||
-				autoCompleteArmed
-			) {
-				setMergeability(await checkMergeability());
+			const activelyChecking =
+				mergeable === PullRequestMergeability.NotSet || mergeable === PullRequestMergeability.Queued;
+			if (!activelyChecking && !autoCompleteArmed) {
+				return;
 			}
+			// When the only reason to poll is the armed-auto-complete wait (nothing is actively
+			// resolving), back off to 15s - a 3s cadence there is the refresh storm UX-04 flagged.
+			if (!activelyChecking && autoCompleteArmed) {
+				const now = Date.now();
+				if (now - lastArmedPoll.current < 15000) {
+					return;
+				}
+				lastArmedPoll.current = now;
+			}
+			setMergeability(await checkMergeability());
 		}, 3000);
 		return () => clearInterval(handle);
 	});
@@ -252,6 +272,9 @@ export function pendingBlockingPolicies(policies?: PullRequestPolicyEvaluation[]
 const PolicySection = ({ pr }: { pr: PullRequest }) => {
 	const { checkPolicies } = useContext(PullRequestContext);
 	const [policies, setPolicies] = useState(pr.policies);
+	// UX-04: throttle the armed-auto-complete wait to ~15s (item 3); useRef survives the effect's
+	// per-render interval re-creation.
+	const lastArmedPoll = useRef(0);
 
 	const pending = pendingBlockingPolicies(policies);
 	const [showDetails, toggleDetails] = useReducer(
@@ -266,6 +289,10 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
+			// UX-04: pause polling while the tab is hidden; the host refreshes on became-visible. (item 3)
+			if (document.hidden) {
+				return;
+			}
 			// Self-limiting like the mergeability/status polls: keep refreshing only while something
 			// could still change - a policy is actively evaluating, or auto-complete is armed and
 			// waiting to observe server-side completion (POL-01/AC-02 share this poll).
@@ -275,6 +302,15 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 			const autoCompleteArmed = !!pr.autoCompleteSetBy && pr.state === PullRequestStatus.Active;
 			if (!stillEvaluating && !autoCompleteArmed) {
 				return;
+			}
+			// Back off the armed-only wait (nothing actively evaluating) to 15s to avoid the refresh
+			// storm UX-04 flagged.
+			if (!stillEvaluating && autoCompleteArmed) {
+				const now = Date.now();
+				if (now - lastArmedPoll.current < 15000) {
+					return;
+				}
+				lastArmedPoll.current = now;
 			}
 			const fresh = await checkPolicies();
 			if (fresh) {

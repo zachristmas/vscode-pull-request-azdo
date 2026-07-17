@@ -100,9 +100,18 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		}
 	}
 
+	// UX-04: refreshes only apply to a visible panel; a palette action (commands.ts) or list refresh that
+	// targets a hidden tab would otherwise be dropped, leaving it stale until the user manually refreshed.
+	// Remember the request and replay it the moment the tab becomes visible (see onDidChangeViewState).
+	// (item 3)
+	private _refreshWhenVisible = false;
+
 	public async refreshPanel(): Promise<void> {
 		if (this._panel && this._panel.visible) {
+			this._refreshWhenVisible = false;
 			this.update(this._folderRepositoryManager, this._item);
+		} else {
+			this._refreshWhenVisible = true;
 		}
 	}
 
@@ -143,6 +152,19 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		// Listen for when the panel is disposed
 		// This happens when the user closes the panel or when the panel is closed programatically
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+		// UX-04: replay a refresh that was requested while this tab was hidden, so switching back to it
+		// shows current data instead of a stale snapshot (item 3).
+		this._panel.onDidChangeViewState(
+			() => {
+				if (this._panel.visible && this._refreshWhenVisible) {
+					this._refreshWhenVisible = false;
+					this.update(this._folderRepositoryManager, this._item);
+				}
+			},
+			null,
+			this._disposables,
+		);
 
 		this._folderRepositoryManager.onDidChangeActiveIssue(
 			_ => {
