@@ -12,7 +12,9 @@ import {
 	MergeMethod,
 	MergeMethodsAvailability,
 	PullRequestChecks,
+	PullRequestCompletionSummary,
 	PullRequestMergeability,
+	PullRequestPolicyEvaluation,
 	ReviewState,
 } from '../../src/azdo/interface';
 import { TimelineEvent } from '../../src/common/timelineEvent';
@@ -67,6 +69,12 @@ export interface PullRequest {
 	commits: GitCommitRef[];
 	currentUser: Identity;
 	workItems: WorkItem[];
+
+	// POL-01: undefined = not fetched (simple view pre-POL-05, fetch error); [] = "No branch policies apply".
+	policies?: PullRequestPolicyEvaluation[];
+	// AC-02: undefined = auto-complete not set.
+	autoCompleteSetBy?: IAccount;
+	autoCompleteOptions?: PullRequestCompletionSummary;
 }
 
 export function getState(): PullRequest {

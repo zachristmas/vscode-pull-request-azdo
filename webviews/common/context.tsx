@@ -50,6 +50,8 @@ export class PRContext {
 
 	public checkStatus = () => this.postMessage({ command: 'pr.checkStatus' });
 
+	public checkPolicies = () => this.postMessage({ command: 'pr.checkPolicies' });
+
 	public merge = (args: { title: string; description: string; method: MergeMethod }) =>
 		this.postMessage({ command: 'azdopr.merge', args });
 

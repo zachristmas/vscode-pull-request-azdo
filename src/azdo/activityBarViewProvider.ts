@@ -17,7 +17,7 @@ import { FolderRepositoryManager } from './folderRepositoryManager';
 import { MergeMethod, PullRequestVote, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { getDefaultMergeMethod } from './pullRequestOverview';
-import { convertIdentityRefWithVoteToReviewer } from './utils';
+import { buildCompletionSummary, convertIdentityRefWithVoteToReviewer, convertRESTUserToAccount } from './utils';
 
 export class PullRequestViewProvider extends WebviewBase implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'azdo:activePullRequest';
@@ -87,6 +87,8 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this._replyMessage(message, await this._item.getMergability());
 			case 'pr.checkStatus':
 				return this._replyMessage(message, await this._item.getStatusChecks());
+			case 'pr.checkPolicies':
+				return this._replyMessage(message, await this._item.getPolicyEvaluations());
 			default:
 				// Never drop a message silently: an unhandled command leaves the webview's awaited
 				// postMessage promise pending forever (how the v1.4 sidebar bugs shipped).
@@ -102,9 +104,12 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				pullRequestModel.getPullRequestId(),
 			),
 			this._folderRepositoryManager.getPullRequestRepositoryAccessAndMergeMethods(pullRequestModel),
+			// POL-05: pre-stage the sidebar compact policy summary here; POL-01's fetch failure must not
+			// sink the whole sidebar the way the other members here fail loudly.
+			pullRequestModel.getPolicyEvaluations().catch(() => undefined),
 		])
 			.then(result => {
-				const [pullRequest, repositoryAccess] = result;
+				const [pullRequest, repositoryAccess, policies] = result;
 				if (!pullRequest) {
 					throw new Error(
 						`Fail to resolve Pull Request #${pullRequestModel.getPullRequestId()} in ${
@@ -163,6 +168,13 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 						isIssue: false,
 						isAuthor: currentUser.id === pullRequest.item.createdBy?.id,
 						reviewers: this._existingReviewers,
+						policies,
+						autoCompleteSetBy: pullRequest.item.autoCompleteSetBy
+							? convertRESTUserToAccount(pullRequest.item.autoCompleteSetBy)
+							: undefined,
+						autoCompleteOptions: pullRequest.item.autoCompleteSetBy
+							? buildCompletionSummary(pullRequest.item.completionOptions)
+							: undefined,
 					},
 				});
 			})

@@ -24,7 +24,7 @@ import { FolderRepositoryManager } from './folderRepositoryManager';
 import { MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { AzdoUserManager } from './userManager';
-import { convertIdentityRefWithVoteToReviewer } from './utils';
+import { buildCompletionSummary, convertIdentityRefWithVoteToReviewer, convertRESTUserToAccount } from './utils';
 import { AzdoWorkItem } from './workItem';
 
 export class PullRequestOverviewPanel extends WebviewBase {
@@ -192,8 +192,21 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				this._folderRepositoryManager.getPullRequestRepositoryAccessAndMergeMethods(pullRequestModel),
 				pullRequestModel.azdoRepository.getAuthenticatedUser(),
 				this.getWorkItemsWithPr(pullRequestModel),
+				// POL-01: policy data is progressive enhancement - a fetch failure must not sink the
+				// whole panel the way the other members here fail loudly.
+				pullRequestModel.getPolicyEvaluations().catch(() => undefined),
 			]);
-			const [pullRequest, threads, commits, defaultBranch, status, repositoryAccess, currentUser, workItems] = result;
+			const [
+				pullRequest,
+				threads,
+				commits,
+				defaultBranch,
+				status,
+				repositoryAccess,
+				currentUser,
+				workItems,
+				policies,
+			] = result;
 			const canEditPr = pullRequest?.canEdit();
 			const requestedReviewers = pullRequestModel.item.reviewers;
 			if (!pullRequest) {
@@ -257,6 +270,13 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					isIssue: false,
 					currentUser: currentUser,
 					workItems: workItems,
+					policies,
+					autoCompleteSetBy: pullRequest.item.autoCompleteSetBy
+						? convertRESTUserToAccount(pullRequest.item.autoCompleteSetBy)
+						: undefined,
+					autoCompleteOptions: pullRequest.item.autoCompleteSetBy
+						? buildCompletionSummary(pullRequest.item.completionOptions)
+						: undefined,
 				},
 			});
 		} catch (e) {
@@ -324,6 +344,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this._replyMessage(message, await this._item.getMergability());
 			case 'pr.checkStatus':
 				return this._replyMessage(message, await this._item.getStatusChecks());
+			case 'pr.checkPolicies':
+				return this._replyMessage(message, await this._item.getPolicyEvaluations());
 			case 'pr.add-reviewers':
 				return this.addReviewerToPr(message);
 			case 'pr.remove-reviewer':

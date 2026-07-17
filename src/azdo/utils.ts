@@ -7,11 +7,14 @@ import {
 	GitCommitRef,
 	GitPullRequest,
 	GitPullRequestCommentThread,
+	GitPullRequestCompletionOptions,
+	GitPullRequestMergeStrategy,
 	IdentityRefWithVote,
 	LineDiffBlockChangeType,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
+import { PolicyEvaluationRecord, PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as vscode from 'vscode';
 import { Repository } from '../api/api';
 import { GitApiImpl } from '../api/api1';
@@ -20,8 +23,27 @@ import { DiffChangeType, DiffHunk, DiffLine, getGitChangeTypeFromVersionControlC
 import { Resource } from '../common/resources';
 import { ThreadData } from '../view/treeNodes/pullRequestNode';
 import { AzdoRepository } from './azdoRepository';
-import { IAccount, IFileChangeNode, IGitHubRef, IRawFileChange, PullRequest, ReviewState } from './interface';
+import {
+	IAccount,
+	IFileChangeNode,
+	IGitHubRef,
+	IRawFileChange,
+	PullRequest,
+	PullRequestCompletionSummary,
+	PullRequestPolicyEvaluation,
+	ReviewState,
+} from './interface';
 import { GHPRComment, GHPRCommentThread } from './prComment';
+import {
+	isBuildValidationSettings,
+	isMergeStrategySettings,
+	isMinimumReviewersSettings,
+	isRequiredReviewersSettings,
+	MergeStrategyPolicySettings,
+	MinimumReviewersPolicySettings,
+	RequiredReviewersPolicySettings,
+	WellKnownPolicyTypeIds,
+} from './policyTypes';
 
 export interface CommentReactionHandler {
 	toggleReaction(comment: vscode.Comment, reaction: vscode.CommentReaction): Promise<void>;
@@ -64,6 +86,111 @@ export function convertIdentityRefWithVoteToReviewer(r: IdentityRefWithVote): Re
 		},
 		state: r.vote ?? 0,
 		isRequired: r.isRequired ?? false,
+	};
+}
+
+/**
+ * POL-01: convert a raw PolicyEvaluationRecord (untyped settings/context, PolicyInterfaces.d.ts:37,79)
+ * into the webview DTO. Kind detection is shape-first with a GUID tiebreaker only for the two
+ * settings-shapeless types (ROADMAP Section 4); unmatched types fall back to 'other' so custom/unknown
+ * policies stay visible instead of being dropped. Returns undefined for NotApplicable/disabled records.
+ */
+export function convertPolicyEvaluation(
+	record: PolicyEvaluationRecord,
+	typeMap: Map<string, string>,
+): PullRequestPolicyEvaluation | undefined {
+	const configuration = record.configuration;
+	if (!configuration || configuration.isEnabled === false) {
+		return undefined;
+	}
+
+	const settings: any = configuration.settings ?? {};
+	const typeId = configuration.type?.id;
+	const displayName = (typeId && typeMap.get(typeId)) || configuration.type?.displayName || 'Branch policy';
+
+	let kind: PullRequestPolicyEvaluation['kind'] = 'other';
+	let detail: string | undefined;
+
+	if (isMinimumReviewersSettings(settings)) {
+		kind = 'minimumReviewers';
+		detail = buildMinimumReviewersDetail(settings);
+	} else if (isBuildValidationSettings(settings)) {
+		kind = 'build';
+		detail = settings.displayName ? `Build: ${settings.displayName}` : 'Build validation';
+	} else if (isRequiredReviewersSettings(settings)) {
+		kind = 'requiredReviewers';
+		detail = buildRequiredReviewersDetail(settings);
+	} else if (isMergeStrategySettings(settings)) {
+		kind = 'mergeStrategy';
+		detail = buildMergeStrategyDetail(settings);
+	} else if (typeId === WellKnownPolicyTypeIds.workItemLinking) {
+		kind = 'workItemLinking';
+		detail = 'Work item linking';
+	} else if (typeId === WellKnownPolicyTypeIds.commentRequirements) {
+		kind = 'commentRequirements';
+		detail = 'Comment resolution';
+	}
+
+	return {
+		evaluationId: record.evaluationId ?? '',
+		kind,
+		displayName,
+		detail,
+		isBlocking: configuration.isBlocking ?? false,
+		status: record.status ?? PolicyEvaluationStatus.Queued,
+	};
+}
+
+function buildMinimumReviewersDetail(settings: MinimumReviewersPolicySettings): string {
+	const n = settings.minimumApproverCount ?? 0;
+	const suffix = settings.creatorVoteCounts ? ', creator vote counts' : '';
+	return `${n} reviewer${n === 1 ? '' : 's'} required${suffix}`;
+}
+
+function buildRequiredReviewersDetail(settings: RequiredReviewersPolicySettings): string {
+	const n = settings.requiredReviewerIds?.length ?? 0;
+	return `${n} required reviewer${n === 1 ? '' : 's'}`;
+}
+
+function buildMergeStrategyDetail(settings: MergeStrategyPolicySettings): string {
+	const allowed: string[] = [];
+	if (settings.useSquashMerge) {
+		return 'Allowed: Squash';
+	}
+	if (settings.allowNoFastForward) {
+		allowed.push('Merge commit');
+	}
+	if (settings.allowSquash) {
+		allowed.push('Squash');
+	}
+	if (settings.allowRebase) {
+		allowed.push('Rebase');
+	}
+	if (settings.allowRebaseMerge) {
+		allowed.push('Semi-linear merge');
+	}
+	return allowed.length ? `Allowed: ${allowed.join(', ')}` : 'No merge strategies allowed';
+}
+
+/**
+ * AC-02: convert the PR's completionOptions (populated whenever autoCompleteSetBy is set) into the
+ * webview's compact options-summary line, e.g. "Squash, delete branch, complete work items".
+ */
+export function buildCompletionSummary(
+	options: GitPullRequestCompletionOptions | undefined,
+): PullRequestCompletionSummary | undefined {
+	if (!options) {
+		return undefined;
+	}
+
+	return {
+		mergeStrategy:
+			options.mergeStrategy !== undefined
+				? (GitPullRequestMergeStrategy[options.mergeStrategy] as PullRequestCompletionSummary['mergeStrategy'])
+				: undefined,
+		deleteSourceBranch: options.deleteSourceBranch,
+		transitionWorkItems: options.transitionWorkItems,
+		mergeCommitMessage: options.mergeCommitMessage,
 	};
 }
 

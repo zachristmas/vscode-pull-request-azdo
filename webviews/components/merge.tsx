@@ -4,10 +4,11 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { GitStatusState, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
 import { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
-import { MergeMethod, PullRequestChecks, PullRequestMergeability } from '../../src/azdo/interface';
+import { MergeMethod, PullRequestChecks, PullRequestMergeability, PullRequestPolicyEvaluation } from '../../src/azdo/interface';
 import { groupBy } from '../../src/common/utils';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
@@ -73,6 +74,7 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 				</>
 			) : (
 				<>
+					<PolicySection pr={pr} />
 					{status.statuses.length ? (
 						<>
 							<div className="status-section">
@@ -116,7 +118,12 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 
 	return (
 		<span>
-			<MergeStatus mergeable={mergeable} isSimple={isSimple} mergeFailureMessage={pr.mergeFailureMessage} />
+			<MergeStatus
+				mergeable={mergeable}
+				isSimple={isSimple}
+				mergeFailureMessage={pr.mergeFailureMessage}
+				hasPolicySection={!!pr.policies?.length}
+			/>
 			<PrActions pr={{ ...pr, mergeable }} isSimple={isSimple} />
 		</span>
 	);
@@ -124,14 +131,124 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 
 export default StatusChecks;
 
+// AC-02/POL-01: a blocking policy that is Queued/Running/Rejected/Broken is one that still stands
+// between this PR and completion. Rejected/Broken are deliberately included: a rejected build
+// validation still auto-completes after a re-run passes, so this is the single signal both the POL-01
+// summary row and (later) AC-02's Set-auto-complete show/hide logic key off of - they can never disagree
+// about whether the PR is blocked.
+export function pendingBlockingPolicies(policies?: PullRequestPolicyEvaluation[]): PullRequestPolicyEvaluation[] {
+	return (policies ?? []).filter(
+		p =>
+			p.isBlocking &&
+			(p.status === PolicyEvaluationStatus.Queued ||
+				p.status === PolicyEvaluationStatus.Running ||
+				p.status === PolicyEvaluationStatus.Rejected ||
+				p.status === PolicyEvaluationStatus.Broken),
+	);
+}
+
+// POL-01: the "why can't this complete" panel. Renders nothing when `policies` is undefined (fetch
+// unavailable/failed - e.g. on-prem servers without the preview evaluations route) or empty (no branch
+// policies apply); this is strictly additive over today's checks section.
+const PolicySection = ({ pr }: { pr: PullRequest }) => {
+	const { checkPolicies } = useContext(PullRequestContext);
+	const [policies, setPolicies] = useState(pr.policies);
+
+	const pending = pendingBlockingPolicies(policies);
+	const [showDetails, toggleDetails] = useReducer(
+		show => !show,
+		(policies ?? []).some(
+			p =>
+				p.status === PolicyEvaluationStatus.Rejected ||
+				p.status === PolicyEvaluationStatus.Broken ||
+				p.status === PolicyEvaluationStatus.Running,
+		),
+	) as [boolean, () => void];
+
+	useEffect(() => {
+		const handle = setInterval(async () => {
+			// Self-limiting like the mergeability/status polls: keep refreshing only while something
+			// could still change - a policy is actively evaluating, or auto-complete is armed and
+			// waiting to observe server-side completion (POL-01/AC-02 share this poll).
+			const stillEvaluating = (policies ?? []).some(
+				p => p.status === PolicyEvaluationStatus.Queued || p.status === PolicyEvaluationStatus.Running,
+			);
+			const autoCompleteArmed = !!pr.autoCompleteSetBy && pr.state === PullRequestStatus.Active;
+			if (!stillEvaluating && !autoCompleteArmed) {
+				return;
+			}
+			const fresh = await checkPolicies();
+			if (fresh) {
+				setPolicies(fresh);
+			}
+		}, 3000);
+		return () => clearInterval(handle);
+	});
+
+	if (!policies || policies.length === 0) {
+		return null;
+	}
+
+	const summaryLabel =
+		pending.length > 0
+			? `${pending.length} blocking ${pending.length === 1 ? 'policy' : 'policies'} not satisfied`
+			: 'All branch policies passed';
+
+	return (
+		<div className="status-section policy-section">
+			<div className="status-item">
+				<PolicyStatusIcon
+					status={pending.length > 0 ? PolicyEvaluationStatus.Rejected : PolicyEvaluationStatus.Approved}
+				/>
+				<div>{summaryLabel}</div>
+				<a aria-role="button" onClick={toggleDetails}>
+					{showDetails ? 'Hide' : 'Show'}
+				</a>
+			</div>
+			{showDetails ? <PolicyDetails policies={policies} /> : null}
+		</div>
+	);
+};
+
+const PolicyDetails = ({ policies }: { policies: PullRequestPolicyEvaluation[] }) => (
+	<div>
+		{policies.map(p => (
+			<div key={p.evaluationId} className="status-check">
+				<div>
+					<PolicyStatusIcon status={p.status} />
+					<span className="status-check-detail-text">
+						{p.displayName}
+						{p.detail ? `: ${p.detail}` : ''}
+						{!p.isBlocking ? ' (optional)' : ''}
+					</span>
+				</div>
+			</div>
+		))}
+	</div>
+);
+
+function PolicyStatusIcon({ status }: { status: PolicyEvaluationStatus }) {
+	switch (status) {
+		case PolicyEvaluationStatus.Approved:
+			return checkIcon;
+		case PolicyEvaluationStatus.Rejected:
+		case PolicyEvaluationStatus.Broken:
+			return deleteIcon;
+		default:
+			return pendingIcon;
+	}
+}
+
 export const MergeStatus = ({
 	mergeable,
 	isSimple,
 	mergeFailureMessage,
+	hasPolicySection,
 }: {
 	mergeable: PullRequestMergeability;
 	isSimple: boolean;
 	mergeFailureMessage?: string;
+	hasPolicySection?: boolean;
 }) => {
 	return (
 		<div className="status-item status-section">
@@ -142,21 +259,25 @@ export const MergeStatus = ({
 				: mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure
 				? deleteIcon
 				: pendingIcon}
-			<div>{getMergeabilityDescription(mergeable, mergeFailureMessage)}</div>
+			<div>{getMergeabilityDescription(mergeable, mergeFailureMessage, hasPolicySection)}</div>
 		</div>
 	);
 };
 
 // POL-02: a policy-blocked PR with a clean merge was previously described as "conflicts"; give each
 // PullRequestAsyncStatus its own copy instead of collapsing everything non-Succeeded to the conflict message.
-function getMergeabilityDescription(mergeable: PullRequestMergeability, mergeFailureMessage?: string): string {
+function getMergeabilityDescription(
+	mergeable: PullRequestMergeability,
+	mergeFailureMessage?: string,
+	hasPolicySection?: boolean,
+): string {
 	switch (mergeable) {
 		case PullRequestMergeability.Succeeded:
 			return 'This branch has no conflicts with the base branch.';
 		case PullRequestMergeability.Conflicts:
 			return 'This branch has conflicts that must be resolved.';
 		case PullRequestMergeability.RejectedByPolicy:
-			return 'Completion is blocked by branch policy.';
+			return `Completion is blocked by branch policy.${hasPolicySection ? ' See policies above.' : ''}`;
 		case PullRequestMergeability.Failure:
 			return mergeFailureMessage || 'This pull request could not be completed.';
 		case PullRequestMergeability.Queued:

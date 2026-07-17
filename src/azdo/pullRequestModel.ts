@@ -46,11 +46,13 @@ import {
 	PullRequest,
 	PullRequestChecks,
 	PullRequestCompletion,
+	PullRequestPolicyEvaluation,
 	PullRequestVote,
 } from './interface';
 import { resolveAvatarsDeep } from './avatarCache';
 import {
 	convertAzdoPullRequestToRawPullRequest,
+	convertPolicyEvaluation,
 	getDiffHunkFromFileDiff,
 	getDiffSide,
 	getPositionFromThread,
@@ -776,6 +778,57 @@ export class PullRequestModel implements IPullRequestModel {
 		}
 
 		return statuses;
+	}
+
+	/**
+	 * POL-01: fetch branch-policy evaluations for this PR - the "why can't this complete" signal that
+	 * getStatusChecks() (custom PR statuses) never surfaces for build-validation/min-reviewer/comment-
+	 * resolution policies. Never throws; policy data is progressive enhancement (degrades to []).
+	 */
+	async getPolicyEvaluations(): Promise<PullRequestPolicyEvaluation[]> {
+		try {
+			const azdoRepo = await this.azdoRepository.ensure();
+			const projectId = (await azdoRepo.getMetadata())?.project?.id;
+			if (!projectId) {
+				Logger.appendLine(
+					`Fetch policy evaluations for PR #${this.getPullRequestId()} skipped - no project id`,
+					PullRequestModel.ID,
+				);
+				return [];
+			}
+
+			const azdo = azdoRepo.azdo;
+			const policyApi = await azdo?.connection.getPolicyApi();
+			const artifactId = `vstfs:///CodeReview/CodeReviewId/${projectId}/${this.getPullRequestId()}`;
+			const records = (await policyApi?.getPolicyEvaluations(projectId, artifactId)) ?? [];
+
+			const typeMap = await azdoRepo.getPolicyTypeMap();
+			return records
+				.map(record => convertPolicyEvaluation(record, typeMap))
+				.filter((p): p is PullRequestPolicyEvaluation => !!p);
+		} catch (e) {
+			Logger.appendLine(`Fetch policy evaluations for PR #${this.getPullRequestId()} failed: ${e}`, PullRequestModel.ID);
+			return [];
+		}
+	}
+
+	/**
+	 * POL-04: requeue a (build-validation) policy evaluation, e.g. after fixing the build or on an
+	 * expired result. Returns the full refreshed list so the webview can replace state wholesale and
+	 * pick up any cascading status changes.
+	 */
+	async requeuePolicyEvaluation(evaluationId: string): Promise<PullRequestPolicyEvaluation[]> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const projectId = (await azdoRepo.getMetadata())?.project?.id;
+		if (!projectId) {
+			return this.getPolicyEvaluations();
+		}
+
+		const azdo = azdoRepo.azdo;
+		const policyApi = await azdo?.connection.getPolicyApi();
+		await policyApi?.requeuePolicyEvaluation(projectId, evaluationId);
+
+		return this.getPolicyEvaluations();
 	}
 
 	/**

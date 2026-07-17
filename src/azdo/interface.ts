@@ -10,6 +10,7 @@ import {
 	GitStatusState,
 	VersionControlChangeType,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import { Uri } from 'vscode';
 import { DiffHunk } from '../common/diffHunk';
 import { GitChangeType } from '../common/file';
@@ -158,7 +159,6 @@ export interface IRawFileChange {
 	headCommit: string;
 }
 
-
 export interface IFileChangeNode {
 	status: GitChangeType;
 	sha?: string;
@@ -173,7 +173,6 @@ export interface IFileChangeNodeWithUri extends IFileChangeNode {
 	filePath: Uri;
 	parentFilePath: Uri;
 }
-
 
 export interface IPullRequestsPagingOptions {
 	fetchNextPage: boolean;
@@ -235,7 +234,44 @@ export interface PullRequestCompletion {
 	transitionWorkItems: boolean;
 }
 
+// AC-02: options summary for an armed auto-complete / a completed PR's completion options.
+export interface PullRequestCompletionSummary {
+	mergeStrategy?: MergeMethod;
+	deleteSourceBranch?: boolean;
+	transitionWorkItems?: boolean;
+	mergeCommitMessage?: string;
+}
+
 export enum DiffBaseConfig {
 	head = 'head',
 	mergeBase = 'mergebase',
+}
+
+// POL-01: local DTO for policy evaluations. Raw settings/context are untyped in node-api 10.2.2
+// (see policyTypes.ts) - `kind`/`displayName`/`detail` are resolved host-side so the webview never
+// touches the raw shapes.
+export type PolicyEvaluationKind =
+	| 'minimumReviewers'
+	| 'commentRequirements'
+	| 'build'
+	| 'workItemLinking'
+	| 'requiredReviewers'
+	| 'mergeStrategy'
+	| 'other';
+
+export interface PullRequestPolicyEvaluation {
+	evaluationId: string; // PolicyInterfaces.d.ts:83
+	kind: PolicyEvaluationKind;
+	displayName: string; // runtime-resolved type name
+	detail?: string; // host-built human line, e.g. "2 reviewers required" / "Build: PR build (expired)"
+	isBlocking: boolean; // PolicyInterfaces.d.ts:21
+	status: PolicyEvaluationStatus; // PolicyInterfaces.d.ts:96-121
+	/** POL-04 enrichment, build kind only */
+	build?: {
+		buildId?: number;
+		buildNumber?: string; // BuildInterfaces.d.ts:143
+		result?: number; // BuildResult, BuildInterfaces.d.ts:260
+		webUrl?: string; // Build._links.web.href, BuildInterfaces.d.ts:135
+		isExpired?: boolean; // evaluation context
+	};
 }
