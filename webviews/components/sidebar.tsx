@@ -13,30 +13,34 @@ import { deleteIcon, plusIcon } from './icon';
 import { Reviewer } from './reviewer';
 import { nbsp } from './space';
 
-export default function Sidebar({ reviewers, workItems, hasWritePermission }: PullRequest) {
+export default function Sidebar({ reviewers, workItems, hasWritePermission, isActive }: PullRequest & { isActive: boolean }) {
 	const { addRequiredReviewers, addOptionalReviewers, associateWorkItem, updatePR, pr } = useContext(PullRequestContext);
+
+	// UX-02: on a finished PR keep the reviewer/work-item rows (they are the review record) but drop
+	// every mutation affordance - the vote panel, the add (+) buttons, and the hover-remove.
+	const canManage = hasWritePermission && isActive;
 
 	return (
 		<div id="sidebar">
-			<VotePanel vote={pr.reviewers.find(r => r.reviewer.id === pr.currentUser.id)?.state ?? 0} />
+			{isActive ? <VotePanel vote={pr.reviewers.find(r => r.reviewer.id === pr.currentUser.id)?.state ?? 0} /> : null}
 			<ReviewerPanel
 				labelText="Required Reviewers"
 				reviewers={reviewers.filter(r => r.isRequired)}
 				addReviewers={addRequiredReviewers}
-				hasWritePermission={hasWritePermission}
+				hasWritePermission={canManage}
 				updatePR={newReviewers => updatePR({ reviewers: pr.reviewers.concat(newReviewers.added) })}
 			/>
 			<ReviewerPanel
 				labelText="Optional Reviewers"
 				reviewers={reviewers.filter(r => !r.isRequired)}
 				addReviewers={addOptionalReviewers}
-				hasWritePermission={hasWritePermission}
+				hasWritePermission={canManage}
 				updatePR={newReviewers => updatePR({ reviewers: pr.reviewers.concat(newReviewers.added) })}
 			/>
 			<div id="work-item" className="section">
 				<div className="section-header">
 					<div>Work Items</div>
-					{hasWritePermission ? (
+					{canManage ? (
 						<button
 							title="Add Work Items"
 							onClick={async () => {
@@ -48,8 +52,7 @@ export default function Sidebar({ reviewers, workItems, hasWritePermission }: Pu
 					) : null}
 				</div>
 				<div className="work-item-body-container">
-					{workItems &&
-						workItems.map(workItem => <WorkItem key={workItem.id} {...workItem} canDelete={hasWritePermission} />)}
+					{workItems && workItems.map(workItem => <WorkItem key={workItem.id} {...workItem} canDelete={canManage} />)}
 				</div>
 			</div>
 		</div>

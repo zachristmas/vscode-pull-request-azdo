@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { Comment, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { Comment } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -341,7 +341,7 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 	);
 }
 
-export function AddComment({ pendingCommentText, state, hasWritePermission, isIssue }: PullRequest) {
+export function AddComment({ pendingCommentText, hasWritePermission, isIssue, isActive }: PullRequest & { isActive: boolean }) {
 	const { updatePR, comment, close } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 	const form = useRef<HTMLFormElement>();
@@ -405,14 +405,10 @@ export function AddComment({ pendingCommentText, state, hasWritePermission, isIs
 				placeholder="Leave a comment"
 			/>
 			<div className="form-actions">
-				{hasWritePermission && !isIssue ? (
-					<button
-						id="close"
-						className="secondary"
-						disabled={isBusy || state !== PullRequestStatus.Active}
-						onClick={onClick}
-						data-command="close"
-					>
+				{/* UX-02: drop the Close button entirely on a finished PR (§2.2) rather than rendering it
+				    disabled. The comment box itself stays - ADO allows commenting on completed PRs. */}
+				{hasWritePermission && !isIssue && isActive ? (
+					<button id="close" className="secondary" disabled={isBusy} onClick={onClick} data-command="close">
 						Close Pull Request
 					</button>
 				) : null}

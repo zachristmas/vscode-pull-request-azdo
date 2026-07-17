@@ -35,10 +35,11 @@ export function Header({
 	isDraft,
 	isIssue,
 	threads,
-}: PullRequest) {
+	isActive,
+}: PullRequest & { isActive: boolean }) {
 	return (
 		<>
-			<Title {...{ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, isDraft, state }} />
+			<Title {...{ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, isDraft, state, isActive }} />
 			<div className="subtitle">
 				<div id="status">{getStatus(state, isDraft)}</div>
 				{!isIssue ? <Avatar url={author.url} avatarUrl={author.avatarUrl} /> : null}
@@ -63,7 +64,17 @@ export function Header({
 	);
 }
 
-function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, isDraft, state }: Partial<PullRequest>) {
+function Title({
+	title,
+	number,
+	url,
+	canEdit,
+	isCurrentlyCheckedOut,
+	isIssue,
+	isDraft,
+	state,
+	isActive,
+}: Partial<PullRequest> & { isActive?: boolean }) {
 	const [inEditMode, setEditMode] = useState(false);
 	const [showActionBar, setShowActionBar] = useState(false);
 	const [currentTitle, setCurrentTitle] = useStateProp(title);
@@ -112,11 +123,11 @@ function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, is
 			</div>
 			{canEdit && showActionBar && !inEditMode ? (
 				<div className="flex-action-bar comment-actions">
-					{
+					{isActive ? (
 						<button title="Edit" onClick={() => setEditMode(true)}>
 							{editIcon}
 						</button>
-					}
+					) : null}
 					{
 						<button title="Copy Link" onClick={copyPrLink}>
 							{copyIcon}
@@ -140,14 +151,14 @@ function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, is
 				<div className="flex-action-bar comment-actons"></div>
 			)}
 			<div className="button-group">
-				<CheckoutButtons {...{ isCurrentlyCheckedOut, isIssue }} />
+				<CheckoutButtons {...{ isCurrentlyCheckedOut, isIssue, isActive }} />
 				<button onClick={refresh}>Refresh</button>
 			</div>
 		</div>
 	);
 }
 
-const CheckoutButtons = ({ isCurrentlyCheckedOut, isIssue }) => {
+const CheckoutButtons = ({ isCurrentlyCheckedOut, isIssue, isActive }) => {
 	const { exitReviewMode, checkout } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 
@@ -181,7 +192,9 @@ const CheckoutButtons = ({ isCurrentlyCheckedOut, isIssue }) => {
 				</button>
 			</>
 		);
-	} else if (!isIssue) {
+	} else if (!isIssue && isActive) {
+		// UX-02: never offer plain Checkout on a finished PR (§2.2). Exit Review Mode above stays
+		// available regardless of state so a user can leave review mode of a merged PR.
 		return (
 			<button aria-live="polite" disabled={isBusy} onClick={() => onClick('checkout')}>
 				Checkout

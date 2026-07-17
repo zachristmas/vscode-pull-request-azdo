@@ -1303,7 +1303,7 @@ research needed here; this is a design pass over existing webview components.
   state change, or both).
 - Key files: `webviews/components/sidebar.tsx`, `webviews/common/common.css`.
 
-#### UX-02 [M] Merged/completed PR view should not look like an active one
+#### ~~UX-02 [M] Merged/completed PR view should not look like an active one~~ Phase A done (read-only gating, design section 7 item 3); Phase B pending (outcome-summary card, design section 7 item 8)
 
 - Current: every control (Checkout, Approve/Cast Vote, Required/Optional Reviewers add buttons, Work
   Items add button) still renders on a `Completed` PR - verified live. Only the merge banner and badge
