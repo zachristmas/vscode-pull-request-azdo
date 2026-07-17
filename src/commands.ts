@@ -11,7 +11,7 @@ import { Repository } from './api/api';
 import { GitErrorCodes } from './api/api1';
 import { CredentialStore } from './azdo/credentials';
 import { FolderRepositoryManager } from './azdo/folderRepositoryManager';
-import { IFileChangeNodeWithUri, IRawFileChange, PullRequest } from './azdo/interface';
+import { IFileChangeNodeWithUri, IRawFileChange, PullRequest, PullRequestVote } from './azdo/interface';
 import { GHPRComment, GHPRCommentThread, TemporaryComment } from './azdo/prComment';
 import { PullRequestModel } from './azdo/pullRequestModel';
 import { PullRequestOverviewPanel } from './azdo/pullRequestOverview';
@@ -94,6 +94,29 @@ async function resolveTargetPullRequest(
 		itemValue => `${itemValue.getPullRequestId()}: ${itemValue.item.title}`,
 		'Pull request',
 	);
+}
+
+/**
+ * Cast an ADO reviewer vote on the resolved target PR. All plumbing (submitVote + refresh) already
+ * exists; the vote commands are thin wrappers so approving is a single palette/tree action.
+ */
+async function submitVoteToPullRequest(
+	reposManager: RepositoriesManager,
+	pr: PRNode | PullRequestModel | undefined,
+	vote: PullRequestVote,
+): Promise<void> {
+	const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+	if (!pullRequestModel) {
+		return;
+	}
+	try {
+		await pullRequestModel.submitVote(vote);
+		vscode.commands.executeCommand('azdopr.refreshList');
+		PullRequestOverviewPanel.refresh();
+		_onDidUpdatePR.fire();
+	} catch (e) {
+		vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
+	}
 }
 
 export function registerCommands(
@@ -427,6 +450,54 @@ export function registerCommands(
 			} catch (e) {
 				vscode.window.showErrorMessage(`Unable to complete pull request. ${formatError(e)}`);
 			}
+		}),
+	);
+
+	// VOTE-01: vote on the checked-out PR or a selected PR tree node without opening the description webview.
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.approve', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.APPROVED),
+		),
+		vscode.commands.registerCommand('azdopr.approveWithSuggestions', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.APPROVED_WITH_SUGGESTION),
+		),
+		vscode.commands.registerCommand('azdopr.waitForAuthor', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.WAITING_FOR_AUTHOR),
+		),
+		vscode.commands.registerCommand('azdopr.reject', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.REJECTED),
+		),
+		vscode.commands.registerCommand('azdopr.resetVote', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.NO_VOTE),
+		),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.vote', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
+				return;
+			}
+			const currentUserId = reposManager.getManagerForPullRequestModel(pullRequestModel)?.getCurrentUser().id;
+			const currentVote =
+				pullRequestModel.item.reviewers?.find(r => r.id === currentUserId)?.vote ?? PullRequestVote.NO_VOTE;
+			const options: { label: string; vote: PullRequestVote }[] = [
+				{ label: 'Approve', vote: PullRequestVote.APPROVED },
+				{ label: 'Approve with Suggestions', vote: PullRequestVote.APPROVED_WITH_SUGGESTION },
+				{ label: 'Wait for Author', vote: PullRequestVote.WAITING_FOR_AUTHOR },
+				{ label: 'Reject', vote: PullRequestVote.REJECTED },
+				{ label: 'Reset Vote', vote: PullRequestVote.NO_VOTE },
+			];
+			const items: (vscode.QuickPickItem & { vote: PullRequestVote })[] = options.map(o =>
+				o.vote === currentVote ? { ...o, description: '(current vote)' } : o,
+			);
+			const picked = await vscode.window.showQuickPick(items, {
+				placeHolder: `Vote on pull request #${pullRequestModel.getPullRequestId()}`,
+			});
+			if (!picked) {
+				return;
+			}
+			await submitVoteToPullRequest(reposManager, pullRequestModel, picked.vote);
 		}),
 	);
 
