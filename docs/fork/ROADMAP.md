@@ -1252,6 +1252,110 @@ Four gap areas independently hit "creation is a dead stub" (`folderRepositoryMan
 - Data: `PolicyApi.getPolicyConfigurations` filtered to the required-reviewer policy type; `settings.filenamePatterns` + `scope[].refName` matching (settings are untyped `any` in 10.2.2, define local interfaces).
 - Lands naturally as a POL-01 follow-up row type; scheduled with the v1.5 stretch items.
 
+### 2.9 UI/UX modernization (UX-\*)
+
+Found by live-verifying the v1.5 policy/auto-complete work (POL-01, POL-04, AC-02, AC-04, AC-05, POL-10,
+VOTE-07, POL-08, POL-05, AC-08 - see `docs/fork/designs/v1.5-policy-autocomplete.md`) against a real test
+org (`dev.azure.com/zachristmas`, project "open source", repo `policy-verify`) rather than reading code
+in isolation. Distinct from the functional bugs that verification pass also turned up (those are fixed,
+one commit each, on `fix/v1.4-repair`) - these are design/layout debt: the controls work, they just look
+and feel like the GitHub-extension UI this was forked from, not an ADO-native experience. No ADO API
+research needed here; this is a design pass over existing webview components.
+
+<details><summary><b>Current fork state</b> (verified live, click to expand)</summary>
+
+- **Reviewer/vote sidebar** (`webviews/components/sidebar.tsx` - the right-hand column of the full PR
+  panel, NOT the Activity Bar's compact "Active Pull Request" view, which is POL-05's separate surface).
+  Layout is cramped: the Approve-method dropdown and Cast Vote button sit awkwardly stacked with no
+  breathing room, `VotePanel`'s "current vote" indicator only appears as dropdown-option text (never
+  visible without reopening the dropdown), and casting a vote gives no visible confirmation - the button
+  just goes from enabled to disabled (a real live test: clicking Cast Vote produced no visible change
+  the reviewer could point to, even though the vote did register server-side).
+- **Merged/completed PR view** shows the exact same controls as an active PR - Checkout button, Approve
+  dropdown + Cast Vote, Required/Optional Reviewers with "+" add affordances, Work Items "+" - none of
+  which make sense once a PR is done. Verified live on a real completed PR (screenshot): "Checkout",
+  "Approve"/"Cast Vote", and reviewer-add controls were all still rendered and interactive-looking on a
+  `Merged` PR.
+  the `Merged` badge and "Pull request successfully merged." message are the only signal it's over.
+- **Comment section** (`webviews/components/comment.tsx` and the thread-rendering in
+  `webviews/editorWebview/`) - functional (verified: create, reply, resolve/reopen all work after the
+  POL-01-adjacent fixes this session), but visually and interaction-wise unchanged from the upstream
+  GitHub-extension fork base. User's explicit ask: "the whole comment section also needs a modern UX
+  overhaul" - not a bug list, a design pass.
+- **PR-open behavior**: clicking a different PR reveals/reuses the single existing
+  `PullRequestOverviewPanel.currentPanel` (`src/azdo/pullRequestOverview.ts:67-79`) rather than opening a
+  new editor tab per PR. This is deliberate existing design (matches upstream), not a bug - but user
+  feedback was "clicking a PR should open a new tab, not overwrite the existing one." Needs a real
+  decision (single-panel-reuse vs one-tab-per-PR), not a quick patch either way.
+- **General theming**: flat gray/white palette throughout (icons, badges, buttons) with no color coding
+  beyond what VOTE-07/POL-10 added this session (colored vote icons, required-reviewer badge). User
+  feedback: needs a real color system and border-radius/spacing pass, not one-off tweaks.
+
+</details>
+
+#### UX-01 [M] Reviewer/vote sidebar layout pass
+
+- Current: `VotePanel` + `ReviewerPanel` (`webviews/components/sidebar.tsx:16-177`) stack the vote-method
+  dropdown, Cast Vote button, and per-category reviewer lists with minimal spacing; no visual hierarchy
+  distinguishes "your vote" from the list of other reviewers.
+- Desired: proper spacing/grouping, an unmistakable "your current vote" indicator that doesn't require
+  reopening a dropdown, and clear before/after feedback when Cast Vote is clicked (a toast, an inline
+  state change, or both).
+- Key files: `webviews/components/sidebar.tsx`, `webviews/common/common.css`.
+
+#### UX-02 [M] Merged/completed PR view should not look like an active one
+
+- Current: every control (Checkout, Approve/Cast Vote, Required/Optional Reviewers add buttons, Work
+  Items add button) still renders on a `Completed` PR - verified live. Only the merge banner and badge
+  color signal it's done.
+- Desired: a distinct read-only/summary presentation for completed (and abandoned) PRs - reviewer list
+  without vote controls, no add-reviewer affordances, Checkout replaced with something meaningful (e.g.
+  nothing, or a "View merge commit" link) once the source branch may already be gone (see AC-08, this
+  session - `pr.head` now falls back to the parsed branch name instead of the literal string "UNKNOWN"
+  when the branch itself has been deleted).
+- Key files: `webviews/components/sidebar.tsx`, `webviews/components/merge.tsx`, `src/azdo/pullRequestOverview.ts`.
+
+#### UX-03 [L] Comment section modernization
+
+- Current: functional but visually/interaction-wise identical to the upstream GitHub-extension fork base
+  - no threaded-reply affordances beyond what VS Code's native Comment API gives for free, no rich
+    formatting toolbar, dated bubble styling.
+- Desired: a real design pass - open-ended pending the design session, not a bug list. Cover thread
+  creation, reply, resolve/reopen, and how resolved-vs-active threads are visually distinguished.
+- Key files: `webviews/components/comment.tsx`, `webviews/editorWebview/index.css`, `src/view/reviewCommentController.ts`.
+
+#### UX-04 [note] PR-open panel-reuse vs one-tab-per-PR
+
+- Current: `PullRequestOverviewPanel.currentPanel` is a singleton (`src/azdo/pullRequestOverview.ts:67-79`)
+  - opening a second PR reveals/updates the same panel/tab rather than opening a new one. Deliberate
+    existing design (also how the upstream GitHub extension behaves), not a regression.
+- Desired: a real decision, not a quick patch - discuss trade-offs (tab clutter vs losing your place)
+  before changing. Flagged by user feedback, not yet a design decision.
+
+#### UX-05 [M] General theming pass
+
+- Current: flat gray/white icon and control palette outside of what VOTE-07 (colored vote icons) and
+  POL-10 (required-reviewer badge) added this session; no consistent border-radius or spacing system.
+- Desired: a real color/spacing system applied consistently, not one-off per-component tweaks.
+- Key files: `webviews/common/common.css`, `webviews/editorWebview/index.css`, `webviews/activityBarView/index.css`.
+
+Adjacent but distinct from UX-\* (engineering/scale, not visual design):
+
+- **Real PR-list pagination**: `PRCategoryActionType.More` ("Load more") and the `hasMorePages`/
+  `fetchNextPage` bookkeeping already exist in `src/view/treeNodes/categoryNode.ts`, but every category
+  (including the new `AllStatuses` one added this session) hardcodes `hasMorePages: false` -
+  `AzdoRepository.getPullRequests()` never passes `skip`/`top` to `GitApi.getPullRequests` (`GitApi.d.ts:90`
+  supports both) despite `PULL_REQUEST_PAGE_SIZE` already being defined (`azdoRepository.ts:24`) and
+  unused for this purpose. The `azdopr.loadMore` command the "Load more" button invokes
+  (`categoryNode.ts:48,56`) is not registered anywhere - clicking it today would error. Needed once any
+  category can plausibly exceed one server page (verified: a real org's default page size is well under
+  1000, so any repo with substantial PR history needs this).
+- **`strict`/`strictNullChecks`**: currently `false` in `tsconfig.base.json` - this whole session's live
+  bug hunt (unguarded `.commitId`/`.rightFileStart` access, `undefined` silently dropped by
+  `webview.postMessage()`'s JSON serialization, etc.) would have been caught at compile time with these
+  on. Flipping them surfaces ~120 pre-existing errors across the codebase (verified: `npx tsc --noEmit --strict --strictNullChecks`), unrelated to any single roadmap item - a dedicated cleanup pass, not
+  bundled into feature work.
+
 ## 3. Upstream inventory (Half 1): complete portable/partial catalog
 
 Every entry from `ms/main` CHANGELOG.md 0.16.0-0.158.0 classified. Portable/partial items below, ordered newest release first; not-portable / already-in-fork / superseded lists follow. `[SCOPED]`-era notes: "Vs scoping doc" says what this adds beyond UPSTREAM-SCOPING.md. Multi-release features are grouped; the same theme can recur across release eras, milestones name the union.
