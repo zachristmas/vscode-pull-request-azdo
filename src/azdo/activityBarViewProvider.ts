@@ -10,6 +10,7 @@ import {
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
+import Logger from '../common/logger';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
 import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
@@ -98,6 +99,11 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this._replyMessage(message, await this._item.getPolicyEvaluations());
 			case 'pr.requeue-policy':
 				return this._replyMessage(message, await this._item.requeuePolicyEvaluation(message.args.evaluationId));
+			// The sidebar webview posts pr.debug on every mount (activityBarView/app.tsx). Without a case
+			// it hit the throwing default below and rejected an uncaught promise per activation; mirror
+			// the overview host and just log it. (item 1a)
+			case 'pr.debug':
+				return this.webviewDebug(message);
 			default:
 				// Never drop a message silently: an unhandled command leaves the webview's awaited
 				// postMessage promise pending forever (how the v1.4 sidebar bugs shipped).
@@ -497,6 +503,10 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			vscode.window.showErrorMessage(`Unable to update auto-complete. ${formatError(e)}`);
 			this._throwError(message, {});
 		}
+	}
+
+	private webviewDebug(message: IRequestMessage<string>): void {
+		Logger.debug(message.args, PullRequestViewProvider.viewType);
 	}
 
 	private _getHtmlForWebview() {
