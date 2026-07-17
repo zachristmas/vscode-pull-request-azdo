@@ -12,7 +12,7 @@ import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
 import { getClosedCommentDescription } from './header';
 import { checkIcon, deleteIcon, plusIcon } from './icon';
-import { Reviewer, REVIEW_STATE_ICON, VOTE_STATE_TEXT } from './reviewer';
+import { REVIEW_STATE_ICON, Reviewer, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
 
 export default function Sidebar({ reviewers, workItems, hasWritePermission, isActive }: PullRequest & { isActive: boolean }) {
