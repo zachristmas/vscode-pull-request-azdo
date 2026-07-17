@@ -137,6 +137,9 @@ export class CategoryTreeNode extends TreeNode implements vscode.TreeItem {
 			case PRType.CreatedByMe:
 				this.label = 'Created By Me';
 				break;
+			case PRType.AllStatuses:
+				this.label = 'All Pull Requests';
+				break;
 			default:
 				break;
 		}

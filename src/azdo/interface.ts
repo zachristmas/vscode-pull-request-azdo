@@ -21,6 +21,7 @@ export enum PRType {
 	LocalPullRequest,
 	CreatedByMe,
 	AssignedToMe,
+	AllStatuses,
 }
 
 export enum ReviewEvent {

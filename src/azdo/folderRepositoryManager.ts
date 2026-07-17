@@ -803,6 +803,20 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								}),
 								hasMorePages: false,
 							};
+						} else if (type === PRType.AllStatuses) {
+							// Every other category here hardcodes status: Active, so a completed or
+							// abandoned PR has no tree category to browse back to at all - the PR panel
+							// itself still refreshes to show the completed state if left open, but there
+							// was no way to reopen one once its panel was closed (found while verifying
+							// AC-08's post-completion cleanup prompt, which needs a completed PR to click
+							// into). PullRequestStatus.All is documented as "used in pull request search
+							// criteria to include all statuses" (GitInterfaces.d.ts:2853).
+							return {
+								items: await azdoRepository.getPullRequests({
+									status: PullRequestStatus.All,
+								}),
+								hasMorePages: false,
+							};
 						} else {
 							return { items: await azdoRepository.getPullRequests(prSearchCriteria!), hasMorePages: false };
 						}
