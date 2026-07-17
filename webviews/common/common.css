@@ -133,6 +133,12 @@ body img.avatar {
 	color: var(--vscode-editor-foreground);
 }
 
+/* AC-02: cancel button gets its own row below the "Auto-complete set by" line, not crammed onto the
+   same line inside .status-item's flex row. */
+.auto-complete-cancel {
+	margin-top: 6px;
+}
+
 /* VOTE-07: inline vote text next to the per-vote icon, not tooltip-only. */
 .vote-status {
 	display: flex;

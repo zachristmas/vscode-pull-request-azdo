@@ -176,15 +176,19 @@ const AutoCompleteSection = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 		return (
 			<span>
 				{mergeStatus}
-				<div className="status-item status-section">
-					<div>
+				<div className="status-section">
+					{/* .status-item is display:flex - putting the button inside it crammed both onto one
+					    line; give the button its own row instead. */}
+					<div className="status-item">
 						Auto-complete set by {label}
 						{summary ? ` (${summary})` : ''}
 					</div>
 					{canCancel ? (
-						<button disabled={isBusy} onClick={cancel}>
-							Cancel auto-complete
-						</button>
+						<div className="auto-complete-cancel">
+							<button disabled={isBusy} onClick={cancel}>
+								Cancel auto-complete
+							</button>
+						</div>
 					) : null}
 				</div>
 			</span>
