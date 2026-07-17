@@ -4,10 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
-import { cloneElement, useContext, useState } from 'react';
+import { useContext, useState } from 'react';
 import { PullRequestVote, ReviewState } from '../../src/azdo/interface';
 import PullRequestContext from '../common/context';
-import { checkIcon, deleteIcon, pendingIcon } from './icon';
+import { approveIcon, approveSuggestionIcon, deleteIcon, noVoteIcon, rejectedIcon, waitingForAuthorIcon } from './icon';
 import { VoteText } from './sidebar';
 import { nbsp } from './space';
 import { AuthorLink, Avatar } from './user';
@@ -16,6 +16,7 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 	const { reviewer, state, isRequired, canDelete } = reviewState;
 	const [showDelete, setShowDelete] = useState(false);
 	const { removeReviewer } = useContext(PullRequestContext);
+	const voteKey = state?.toString() ?? PullRequestVote.NO_VOTE.toString();
 	return (
 		<div
 			className="section-item reviewer"
@@ -35,15 +36,21 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 					</a>
 				</>
 			) : null}
-			{REVIEW_STATE[state?.toString() ?? PullRequestVote.NO_VOTE.toString()]}
+			{/* VOTE-07: five distinct glyphs/colors (not just gray check/dot/X with a tooltip-only
+			    difference), with the vote text inline so it doesn't require a hover to see. */}
+			<span className="push-right vote-status" title={VoteText[voteKey]}>
+				{REVIEW_STATE_ICON[voteKey]}
+				{nbsp}
+				<span className="vote-status-text">{VoteText[voteKey]}</span>
+			</span>
 		</div>
 	);
 }
 
-const REVIEW_STATE: { [state: string]: React.ReactElement } = {
-	'10': cloneElement(checkIcon, { className: 'push-right', title: VoteText['10'] }),
-	'5': cloneElement(checkIcon, { className: 'push-right', title: VoteText['5'] }),
-	'-5': cloneElement(pendingIcon, { className: 'push-right', title: VoteText['-5'] }),
-	'-10': cloneElement(deleteIcon, { className: 'push-right', title: VoteText['-10'] }),
-	'0': cloneElement(pendingIcon, { className: 'push-right', title: VoteText['0'] }),
+const REVIEW_STATE_ICON: { [state: string]: React.ReactElement } = {
+	'10': approveIcon,
+	'5': approveSuggestionIcon,
+	'-5': waitingForAuthorIcon,
+	'-10': rejectedIcon,
+	'0': noVoteIcon,
 };

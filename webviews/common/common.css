@@ -133,6 +133,17 @@ body img.avatar {
 	color: var(--vscode-editor-foreground);
 }
 
+/* VOTE-07: inline vote text next to the per-vote icon, not tooltip-only. */
+.vote-status {
+	display: flex;
+	align-items: center;
+}
+
+.vote-status-text {
+	font-size: 12px;
+	opacity: 0.85;
+}
+
 /* POL-10: required-reviewer badge, matching the ADO web UI's reviewer row. */
 .required-badge {
 	box-sizing: border-box;

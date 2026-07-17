@@ -24,3 +24,11 @@ export const editIcon = <Icon src={require('../../resources/icons/edit.svg')} />
 export const plusIcon = <Icon src={require('../../resources/icons/plus.svg')} />;
 export const pendingIcon = <Icon src={require('../../resources/icons/dot.svg')} />;
 export const diffIcon = <Icon src={require('../../resources/icons/diff.svg')} />;
+
+// VOTE-07: distinct per-vote glyphs/colors matching ADO web (checkIcon/deleteIcon/pendingIcon are
+// reused elsewhere for statuses/policies and stay gray on purpose).
+export const approveIcon = <Icon src={require('../../resources/icons/approve.svg')} />;
+export const approveSuggestionIcon = <Icon src={require('../../resources/icons/approve-suggestion.svg')} />;
+export const waitingForAuthorIcon = <Icon src={require('../../resources/icons/waiting-for-author.svg')} />;
+export const noVoteIcon = <Icon src={require('../../resources/icons/no-vote.svg')} />;
+export const rejectedIcon = <Icon src={require('../../resources/icons/rejected.svg')} />;
