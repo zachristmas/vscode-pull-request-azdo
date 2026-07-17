@@ -25,6 +25,12 @@ import { alertIcon, checkIcon, deleteIcon, pendingIcon } from './icon';
 import { nbsp } from './space';
 import { Avatar } from './user';
 
+// UX-05: check/delete/dot are shared gray glyphs; wrapping them in a text-* class recolors them
+// (CSS fill: currentColor) so the status/policy icons match their summary line, not stay gray.
+const successIcon = <span className="text-success">{checkIcon}</span>;
+const dangerIcon = <span className="text-danger">{deleteIcon}</span>;
+const mutedIcon = <span className="text-muted">{pendingIcon}</span>;
+
 export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
 	if (pr.isIssue) {
 		return null;
@@ -393,12 +399,12 @@ function buildResultText(result?: number): string {
 function PolicyStatusIcon({ status }: { status: PolicyEvaluationStatus }) {
 	switch (status) {
 		case PolicyEvaluationStatus.Approved:
-			return checkIcon;
+			return successIcon;
 		case PolicyEvaluationStatus.Rejected:
 		case PolicyEvaluationStatus.Broken:
-			return deleteIcon;
+			return dangerIcon;
 		default:
-			return pendingIcon;
+			return mutedIcon;
 	}
 }
 
@@ -418,10 +424,10 @@ export const MergeStatus = ({
 			{isSimple
 				? null
 				: mergeable === PullRequestMergeability.Succeeded
-				? checkIcon
+				? successIcon
 				: mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure
-				? deleteIcon
-				: pendingIcon}
+				? dangerIcon
+				: mutedIcon}
 			<div className={mergeabilityTextClass(mergeable)}>
 				{getMergeabilityDescription(mergeable, mergeFailureMessage, hasPolicySection)}
 			</div>
@@ -760,13 +766,13 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 function StateIcon({ state }: { state: GitStatusState }) {
 	switch (state) {
 		case GitStatusState.Succeeded:
-			return checkIcon;
+			return successIcon;
 		case GitStatusState.Error:
-			return deleteIcon;
+			return dangerIcon;
 		case GitStatusState.Failed:
-			return deleteIcon;
+			return dangerIcon;
 	}
-	return pendingIcon;
+	return mutedIcon;
 }
 
 // UX-05: color the status-checks summary line to match its StateIcon.

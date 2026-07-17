@@ -228,6 +228,7 @@ body .comment-container .review-comment-header {
 #status-checks {
 	padding: var(--azdo-space-3);
 	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
 	margin-bottom: var(--azdo-space-5);
 }
 
@@ -292,6 +293,25 @@ body .comment-container .comment-body,
 	border-top: none;
 }
 
+/* UX-03: single-card comment. The container owns one rounded border + surface; the header loses its
+   selection-color fill and full border, keeping only a subtle bottom rule; the body drops its own box
+   border. Replaces the dated two-stacked-boxes look. */
+.comment-container.review-comment > .review-comment-container {
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
+	background: var(--azdo-surface);
+}
+
+body .comment-container.review-comment .review-comment-header {
+	background: transparent;
+	border: none;
+	border-bottom: 1px solid var(--azdo-border-subtle);
+}
+
+body .comment-container.review-comment .comment-body {
+	border: none;
+}
+
 body .comment-container .review-comment-container .review-comment-body {
 	padding: 0;
 	margin: 0 0 0 36px;
@@ -314,7 +334,7 @@ body {
 	margin: auto;
 	width: 100%;
 	max-width: 925px;
-	padding: 0 32px;
+	padding: 0 32px var(--azdo-space-6);
 	box-sizing: border-box;
 }
 
@@ -1003,7 +1023,8 @@ code {
 }
 
 .thread-container .reply-thread {
-	text-align: right;
+	text-align: left;
+	padding-top: var(--azdo-space-2);
 }
 
 .thread-container .diff-container {
