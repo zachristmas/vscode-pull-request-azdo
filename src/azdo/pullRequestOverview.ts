@@ -415,7 +415,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				vscode.window.showErrorMessage(message.args);
 				return;
 			default:
-				return this.MESSAGE_UNHANDLED;
+				// Never drop a message silently: an unhandled command leaves the webview's awaited
+				// postMessage promise pending forever. Mirror the sidebar host's throwing default. (item 1e)
+				return this._throwError(message, `Unhandled message: ${message.command}`);
 		}
 	}
 
