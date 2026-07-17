@@ -54,6 +54,8 @@ export interface PullRequest {
 	pendingReviewType?: ReviewType;
 	status: PullRequestChecks;
 	mergeable: PullRequestMergeability;
+	mergeFailureMessage?: string;
+	mergeFailureType?: number;
 	defaultMergeMethod: MergeMethod;
 	mergeMethodsAvailability: MergeMethodsAvailability;
 	reviewers: ReviewState[];

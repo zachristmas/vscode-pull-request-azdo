@@ -96,7 +96,7 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 
 	return (
 		<span>
-			<MergeStatus mergeable={mergeable} isSimple={isSimple} />
+			<MergeStatus mergeable={mergeable} isSimple={isSimple} mergeFailureMessage={pr.mergeFailureMessage} />
 			<PrActions pr={{ ...pr, mergeable }} isSimple={isSimple} />
 		</span>
 	);
@@ -104,7 +104,15 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 
 export default StatusChecks;
 
-export const MergeStatus = ({ mergeable, isSimple }: { mergeable: PullRequestMergeability; isSimple: boolean }) => {
+export const MergeStatus = ({
+	mergeable,
+	isSimple,
+	mergeFailureMessage,
+}: {
+	mergeable: PullRequestMergeability;
+	isSimple: boolean;
+	mergeFailureMessage?: string;
+}) => {
 	return (
 		<div className="status-item status-section">
 			{isSimple
@@ -114,16 +122,29 @@ export const MergeStatus = ({ mergeable, isSimple }: { mergeable: PullRequestMer
 				: mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure
 				? deleteIcon
 				: pendingIcon}
-			<div>
-				{mergeable === PullRequestMergeability.Succeeded
-					? 'This branch has no conflicts with the base branch.'
-					: mergeable === PullRequestMergeability.Queued
-					? 'Checking if this branch can be merged...'
-					: 'This branch has conflicts that must be resolved.'}
-			</div>
+			<div>{getMergeabilityDescription(mergeable, mergeFailureMessage)}</div>
 		</div>
 	);
 };
+
+// POL-02: a policy-blocked PR with a clean merge was previously described as "conflicts"; give each
+// PullRequestAsyncStatus its own copy instead of collapsing everything non-Succeeded to the conflict message.
+function getMergeabilityDescription(mergeable: PullRequestMergeability, mergeFailureMessage?: string): string {
+	switch (mergeable) {
+		case PullRequestMergeability.Succeeded:
+			return 'This branch has no conflicts with the base branch.';
+		case PullRequestMergeability.Conflicts:
+			return 'This branch has conflicts that must be resolved.';
+		case PullRequestMergeability.RejectedByPolicy:
+			return 'Completion is blocked by branch policy.';
+		case PullRequestMergeability.Failure:
+			return mergeFailureMessage || 'This pull request could not be completed.';
+		case PullRequestMergeability.Queued:
+		case PullRequestMergeability.NotSet:
+		default:
+			return 'Checking if this branch can be merged...';
+	}
+}
 
 export const ReadyForReview = () => {
 	const [isBusy, setBusy] = useState(false);
