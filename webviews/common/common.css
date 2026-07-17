@@ -159,9 +159,17 @@ body img.avatar {
 	flex-shrink: 0;
 }
 
-.section-item .login {
-	width: 129px;
-	flex-shrink: 0;
+/* UX-01: let the reviewer name flex and ellipsis instead of a fixed 129px column, so long display
+   names and the right-aligned vote status share the row predictably. (.login is legacy-dead from the
+   GitHub-extension base; .author-link is the element that actually carries the name today - both are
+   set so the rule holds if either class is used.) */
+.section-item .login,
+.section-item .author-link {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .section-item {

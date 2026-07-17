@@ -6,11 +6,11 @@
 import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
-import { useContext, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
-import { deleteIcon, plusIcon } from './icon';
-import { Reviewer } from './reviewer';
+import { checkIcon, deleteIcon, plusIcon } from './icon';
+import { Reviewer, REVIEW_STATE_ICON, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
 
 export default function Sidebar({ reviewers, workItems, hasWritePermission, isActive }: PullRequest & { isActive: boolean }) {
@@ -39,7 +39,7 @@ export default function Sidebar({ reviewers, workItems, hasWritePermission, isAc
 			/>
 			<div id="work-item" className="section">
 				<div className="section-header">
-					<div>Work Items</div>
+					<div className="section-title">Work Items</div>
 					{canManage ? (
 						<button
 							title="Add Work Items"
@@ -52,7 +52,11 @@ export default function Sidebar({ reviewers, workItems, hasWritePermission, isAc
 					) : null}
 				</div>
 				<div className="work-item-body-container">
-					{workItems && workItems.map(workItem => <WorkItem key={workItem.id} {...workItem} canDelete={canManage} />)}
+					{workItems && workItems.length > 0 ? (
+						workItems.map(workItem => <WorkItem key={workItem.id} {...workItem} canDelete={canManage} />)
+					) : (
+						<div className="section-item none-label text-muted">None</div>
+					)}
 				</div>
 			</div>
 		</div>
@@ -98,7 +102,7 @@ const WorkItemDetails = (workItem: WorkItem) => (
 const ReviewerPanel = ({ reviewers, labelText, hasWritePermission, addReviewers, updatePR }) => (
 	<div id="reviewers" className="section">
 		<div className="section-header">
-			<div>{labelText}</div>
+			<div className="section-title">{labelText}</div>
 			{hasWritePermission ? (
 				<button
 					title={`Add ${labelText}`}
@@ -111,9 +115,13 @@ const ReviewerPanel = ({ reviewers, labelText, hasWritePermission, addReviewers,
 				</button>
 			) : null}
 		</div>
-		{reviewers
-			? reviewers.map(state => <Reviewer key={state.reviewer.id} {...state} canDelete={hasWritePermission} />)
-			: []}
+		{/* UX-01: empty categories render "None" (muted) instead of collapsing to zero height, so the
+		    section rhythm and grouping stay legible even with no reviewers. */}
+		{reviewers && reviewers.length > 0 ? (
+			reviewers.map(state => <Reviewer key={state.reviewer.id} {...state} canDelete={hasWritePermission} />)
+		) : (
+			<div className="section-item none-label text-muted">None</div>
+		)}
 	</div>
 );
 
@@ -125,56 +133,96 @@ export const VoteText = {
 	'0': 'Reset Vote',
 };
 
-const VoteOrder = ['10', '5', '-5', '-10', '0'];
+// Real votes only; '0' (Reset Vote) is no longer an option in the select - it moved to the reset link.
+const VoteOrder = ['10', '5', '-5', '-10'];
 
+type CastState = 'idle' | 'busy' | 'success' | 'error';
+
+// UX-01: "Your review" card. Three parts, top to bottom: an always-visible current-vote row (icon +
+// text, re-derived from the live pr.reviewers-sourced `vote` prop so it can't disagree with the
+// reviewer row), a controlled select + Cast button, and a Reset link shown only when you have a
+// standing vote. Casting has three visible phases - busy / success / failure - so a vote never lands
+// silently the way "Cast Vote just goes disabled" did before.
 const VotePanel = ({ vote }: { vote: number }) => {
-	const select = useRef<HTMLSelectElement>();
-	// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-	select;
 	const { votePullRequest } = useContext(PullRequestContext);
-	const [selectedVote, changeVote] = useState(vote.toString());
+	const liveVote = vote.toString();
+	// Controlled select. Default to Approve when you haven't voted; otherwise start on your standing vote.
+	const [selectedVote, setSelectedVote] = useState(vote === 0 ? '10' : liveVote);
+	const [castState, setCastState] = useState<CastState>('idle');
+	const successTimer = useRef<ReturnType<typeof setTimeout>>();
 
-	const castVote = async (vote: string) => {
-		await votePullRequest(parseInt(vote));
+	useEffect(() => () => clearTimeout(successTimer.current), []);
+
+	const cast = async (value: string) => {
+		clearTimeout(successTimer.current);
+		setCastState('busy');
+		try {
+			// votePullRequest -> appendReview replaces pr.reviewers, re-rendering Sidebar and this card
+			// with a fresh `vote` prop, so the current-vote row updates without extra plumbing.
+			await votePullRequest(parseInt(value));
+			setCastState('success');
+			successTimer.current = setTimeout(() => setCastState('idle'), 2500);
+		} catch (_) {
+			// postMessage rejections used to vanish (votePullRequest never caught); surface them instead.
+			setCastState('error');
+		}
 	};
 
+	const voteKey = VOTE_STATE_TEXT[liveVote] ? liveVote : '0';
+	const busy = castState === 'busy';
+
 	return (
-		<>
-			<div className="vote">
-				<div className="vote-select">
-					<VoteSelect currentVote={vote} changeVote={newVote => changeVote(newVote)} />
-				</div>
-				<button
-					className="vote-button"
-					onClick={async () => await castVote(selectedVote)}
-					disabled={vote.toString() === selectedVote}
-				>
-					Cast Vote
-				</button>
+		<div className="section review-card">
+			<div className="section-title">Your Review</div>
+			{/* aria-live so screen readers announce both the standing-vote change and the transient
+			    confirmation without the user having to move focus. */}
+			<div className={`current-vote-row${vote === 0 ? ' text-muted' : ''}`} aria-live="polite">
+				<span className="vote-status">
+					{REVIEW_STATE_ICON[voteKey]}
+					{nbsp}
+					<span className="current-vote-text">{VOTE_STATE_TEXT[voteKey]}</span>
+				</span>
 			</div>
-		</>
+			<div className="review-vote-actions">
+				<select
+					className="vote-select"
+					value={selectedVote}
+					disabled={busy}
+					onChange={e => setSelectedVote(e.target.value)}
+				>
+					{VoteOrder.map(v => (
+						<option key={v} value={v}>
+							{VoteText[v]}
+						</option>
+					))}
+				</select>
+				{castState === 'success' ? (
+					<span className="cast-feedback text-success" role="status">
+						{checkIcon}
+						{nbsp}Vote recorded
+					</span>
+				) : (
+					<button
+						className="vote-button"
+						aria-busy={busy}
+						disabled={busy || selectedVote === liveVote}
+						onClick={() => cast(selectedVote)}
+					>
+						{busy ? 'Casting…' : 'Vote'}
+					</button>
+				)}
+			</div>
+			{/* Kept next to (not replacing) the button so the user can retry a failed cast. */}
+			{castState === 'error' ? (
+				<div className="cast-feedback text-danger" role="alert">
+					Vote failed, try again
+				</div>
+			) : null}
+			{vote !== 0 ? (
+				<button className="reset-vote-link" disabled={busy} onClick={() => cast('0')}>
+					Reset vote
+				</button>
+			) : null}
+		</div>
 	);
 };
-
-// const VoteSelect = React.forwardRef<HTMLSelectElement, {currentVote: number}>((
-// 	{currentVote},
-// 	ref) =>
-// 	<select ref={ref} defaultValue={VoteText[currentVote === 0 ? '10' : currentVote.toString()]}>{
-// 		VoteOrder
-// 			.map((vote) =>
-// 				<option key={vote} value={vote}>
-// 					{VoteText[vote]}{currentVote.toString() === vote ? ' (current vote)' : null}
-// 				</option>
-// 			)
-// 	}</select>);
-
-const VoteSelect = ({ currentVote, changeVote }) => (
-	<select onChange={e => changeVote(e.target.value)} defaultValue={currentVote === 0 ? '10' : currentVote?.toString()}>
-		{VoteOrder.map(vote => (
-			<option key={vote} value={vote}>
-				{VoteText[vote]}
-				{currentVote?.toString() === vote ? ' (current vote)' : null}
-			</option>
-		))}
-	</select>
-);

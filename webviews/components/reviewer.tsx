@@ -47,7 +47,9 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 	);
 }
 
-const REVIEW_STATE_ICON: { [state: string]: React.ReactElement } = {
+// UX-01: exported so the "Your review" card (sidebar.tsx) shows the same glyph/text as the reviewer
+// row; a single source of truth means the card and the row can't disagree about your standing vote.
+export const REVIEW_STATE_ICON: { [state: string]: React.ReactElement } = {
 	'10': approveIcon,
 	'5': approveSuggestionIcon,
 	'-5': waitingForAuthorIcon,
@@ -59,7 +61,7 @@ const REVIEW_STATE_ICON: { [state: string]: React.ReactElement } = {
 // clearing your vote). Reusing it here for STATE display read oddly - "Reset Vote" next to a reviewer
 // who simply hasn't voted yet looks like a stray action prompt, not a status. Every other vote value
 // reads fine as both an action and a state; only '0' needs its own label here.
-const VOTE_STATE_TEXT: { [state: string]: string } = {
+export const VOTE_STATE_TEXT: { [state: string]: string } = {
 	...VoteText,
 	'0': 'No vote',
 };

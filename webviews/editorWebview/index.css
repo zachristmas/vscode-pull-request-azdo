@@ -25,18 +25,79 @@
 	grid-row: 2;
 }
 
-#sidebar .vote {
+/* UX-01: "Your review" card + UX-02: outcome summary card. Same card treatment (surface, subtle
+   border, large radius) as the comment cards so the sidebar reads as part of one system. */
+.review-card,
+.outcome-card {
+	background: var(--azdo-surface);
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
+	padding: var(--azdo-space-3);
 	margin-bottom: var(--azdo-space-5);
 }
 
-#sidebar .vote .vote-select {
-	margin-bottom: var(--azdo-space-1);
+/* UX-01: section-label treatment shared by the card heading and the Required/Optional/Work Items
+   headers - 11px uppercase muted, so "your vote" and the reviewer groups read as peer sections. */
+.section-title {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 600;
+	color: var(--azdo-muted);
 }
 
-.vote .vote-button {
-	margin-left: auto;
+.review-card .current-vote-row {
 	display: flex;
-	align-self: auto;
+	align-items: center;
+	font-size: 13px;
+	font-weight: 600;
+	margin: var(--azdo-space-2) 0;
+}
+
+.review-card .current-vote-row.text-muted {
+	font-weight: 400;
+}
+
+.review-card .review-vote-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+}
+
+.review-card .review-vote-actions .vote-select {
+	flex: 1;
+	min-width: 0;
+}
+
+.review-card .review-vote-actions .vote-button {
+	flex-shrink: 0;
+}
+
+.review-card .cast-feedback {
+	display: flex;
+	align-items: center;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.review-card .review-vote-actions .cast-feedback {
+	flex-shrink: 0;
+}
+
+/* Link-styled Reset action; only rendered when a standing vote exists. */
+.review-card .reset-vote-link {
+	background: transparent;
+	color: var(--vscode-textLink-foreground);
+	padding: 0;
+	margin-top: var(--azdo-space-2);
+	border: none;
+	font-size: 12px;
+}
+
+.review-card .reset-vote-link:hover:enabled,
+.review-card .reset-vote-link:focus:enabled {
+	background: transparent;
+	text-decoration: underline;
 }
 
 a:focus,

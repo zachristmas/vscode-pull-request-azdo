@@ -1293,7 +1293,7 @@ research needed here; this is a design pass over existing webview components.
 
 </details>
 
-#### UX-01 [M] Reviewer/vote sidebar layout pass
+#### ~~UX-01 [M] Reviewer/vote sidebar layout pass~~ ✅ (design section 7 item 7: "Your review" card - always-visible current-vote row, controlled vote select minus the Reset-Vote option hack, three-phase cast feedback (busy/success/failure with aria-live), Reset-vote link, 11px uppercase section headers with empty="None", reviewer-row flex/ellipsis fix; exports REVIEW_STATE_ICON/VOTE_STATE_TEXT from reviewer.tsx)
 
 - Current: `VotePanel` + `ReviewerPanel` (`webviews/components/sidebar.tsx:16-177`) stack the vote-method
   dropdown, Cast Vote button, and per-category reviewer lists with minimal spacing; no visual hierarchy
