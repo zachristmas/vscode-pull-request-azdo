@@ -248,6 +248,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					hasWritePermission,
 					status: !!status ? status : { statuses: [] },
 					mergeable: pullRequest.item.mergeStatus,
+					mergeFailureMessage: pullRequest.item.mergeFailureMessage,
+					mergeFailureType: pullRequest.item.mergeFailureType,
 					reviewers: this._existingReviewers,
 					isDraft: pullRequest.isDraft,
 					mergeMethodsAvailability,
@@ -936,13 +938,25 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			.then(result => {
 				vscode.commands.executeCommand('azdopr.refreshList');
 
+				// POL-06: a failed completion previously still replied state: Completed, so the webview
+				// rendered "successfully merged" for a PR that did not merge. Reply the PR's real
+				// post-attempt status and surface the failure reason persistently.
 				if (result.closedBy === undefined) {
-					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage}`);
+					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage ?? 'unknown error'}`);
+					this._replyMessage(message, {
+						state: result.status ?? PullRequestStatus.Active,
+						mergeable: result.mergeStatus,
+						mergeFailureMessage: result.mergeFailureMessage,
+						mergeFailureType: result.mergeFailureType,
+					});
+					return;
 				}
 
 				this._replyMessage(message, {
 					state: PullRequestStatus.Completed,
 					mergeable: result.mergeStatus,
+					mergeFailureMessage: undefined,
+					mergeFailureType: undefined,
 				});
 			})
 			.catch(e => {
