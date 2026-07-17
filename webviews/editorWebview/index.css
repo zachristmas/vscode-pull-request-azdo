@@ -73,15 +73,13 @@
 	flex-shrink: 0;
 }
 
+/* Success/failure text sits on its own line below the actions row, so it never resizes the select. */
 .review-card .cast-feedback {
 	display: flex;
 	align-items: center;
 	font-size: 12px;
 	white-space: nowrap;
-}
-
-.review-card .review-vote-actions .cast-feedback {
-	flex-shrink: 0;
+	margin-top: var(--azdo-space-2);
 }
 
 /* Link-styled Reset action; only rendered when a standing vote exists. */

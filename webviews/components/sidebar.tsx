@@ -204,23 +204,24 @@ const VotePanel = ({ vote }: { vote: number }) => {
 						</option>
 					))}
 				</select>
-				{castState === 'success' ? (
-					<span className="cast-feedback text-success" role="status">
-						{checkIcon}
-						{nbsp}Vote recorded
-					</span>
-				) : (
-					<button
-						className="vote-button"
-						aria-busy={busy}
-						disabled={busy || selectedVote === liveVote}
-						onClick={() => cast(selectedVote)}
-					>
-						{busy ? 'Casting…' : 'Vote'}
-					</button>
-				)}
+				{/* The button stays put in every phase; the success/failure text drops onto its own line
+				    below so the select never reflows (replacing the button in-row shrank it to a stub). */}
+				<button
+					className="vote-button"
+					aria-busy={busy}
+					disabled={busy || selectedVote === liveVote}
+					onClick={() => cast(selectedVote)}
+				>
+					{busy ? 'Casting…' : 'Vote'}
+				</button>
 			</div>
-			{/* Kept next to (not replacing) the button so the user can retry a failed cast. */}
+			{castState === 'success' ? (
+				<div className="cast-feedback text-success" role="status">
+					{checkIcon}
+					{nbsp}Vote recorded
+				</div>
+			) : null}
+			{/* Left below (not replacing) the button so the user can retry a failed cast. */}
 			{castState === 'error' ? (
 				<div className="cast-feedback text-danger" role="alert">
 					Vote failed, try again
