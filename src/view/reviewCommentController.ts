@@ -64,7 +64,9 @@ export class ReviewCommentController
 			_reposManager.activePullRequest!.item.title ?? '',
 		);
 		this._commentController.commentingRangeProvider = this;
-		this._commentController.reactionHandler = this.toggleReaction.bind(this);
+		// Azure DevOps has no comment-reactions concept (this was GitHub GraphQL logic, entirely
+		// commented out below) - reactionHandler is optional on CommentController, so leaving it
+		// unset removes the non-functional emoji-picker button entirely instead of shipping a broken one.
 		this._localToDispose.push(this._commentController);
 		this._commentHandlerId = uuid();
 		this._commonCommentHandler = new CommonCommentHandler(_reposManager.activePullRequest!, _reposManager);

@@ -25,7 +25,10 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 
 	constructor(public commentsController: vscode.CommentController) {
 		this.commentsController.commentingRangeProvider = this;
-		this.commentsController.reactionHandler = this.toggleReaction.bind(this);
+		// Azure DevOps has no comment-reactions concept (this fork's toggleReaction implementations
+		// are entirely commented-out GitHub GraphQL logic) - reactionHandler is optional on
+		// CommentController, so leaving it unset removes the non-functional emoji-picker button
+		// entirely instead of shipping a broken one.
 	}
 
 	async provideCommentingRanges(
