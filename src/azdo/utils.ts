@@ -7,6 +7,7 @@ import {
 	GitCommitRef,
 	GitPullRequest,
 	GitPullRequestCommentThread,
+	IdentityRefWithVote,
 	LineDiffBlockChangeType,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
@@ -19,7 +20,7 @@ import { DiffChangeType, DiffHunk, DiffLine, getGitChangeTypeFromVersionControlC
 import { Resource } from '../common/resources';
 import { ThreadData } from '../view/treeNodes/pullRequestNode';
 import { AzdoRepository } from './azdoRepository';
-import { IAccount, IFileChangeNode, IGitHubRef, IRawFileChange, PullRequest } from './interface';
+import { IAccount, IFileChangeNode, IGitHubRef, IRawFileChange, PullRequest, ReviewState } from './interface';
 import { GHPRComment, GHPRCommentThread } from './prComment';
 
 export interface CommentReactionHandler {
@@ -49,6 +50,20 @@ export function convertRESTUserToAccount(user: IdentityRef): IAccount {
 		url: user.url,
 		id: user.id,
 		avatarUrl: user.imageUrl,
+	};
+}
+
+export function convertIdentityRefWithVoteToReviewer(r: IdentityRefWithVote): ReviewState {
+	return {
+		reviewer: {
+			email: r.uniqueName,
+			name: r.displayName,
+			avatarUrl: r?.['_links']?.['avatar']?.['href'],
+			url: r.reviewerUrl,
+			id: r.id,
+		},
+		state: r.vote ?? 0,
+		isRequired: r.isRequired ?? false,
 	};
 }
 
@@ -421,11 +436,11 @@ export function isCommentResolved(status: CommentThreadStatus): boolean {
 export function convertRawFileChangeToFileChangeNode(fileChange: IRawFileChange): IFileChangeNode {
 	return {
 		blobUrl: fileChange.blob_url,
-		status:  getGitChangeTypeFromVersionControlChangeType(fileChange.status),
+		status: getGitChangeTypeFromVersionControlChangeType(fileChange.status),
 		fileName: fileChange.filename,
 		previousFileName: fileChange.previous_filename,
 		sha: fileChange.file_sha,
 		diffHunks: fileChange.diffHunks,
-		previousFileSha: fileChange.previous_file_sha
+		previousFileSha: fileChange.previous_file_sha,
 	};
 }

@@ -9,16 +9,17 @@ import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
 import { SETTINGS_NAMESPACE } from '../constants';
 import { FolderRepositoryManager } from './folderRepositoryManager';
-import { GithubItemStateEnum, MergeMethod, PullRequestVote } from './interface';
+import { GithubItemStateEnum, MergeMethod, PullRequestVote, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { getDefaultMergeMethod } from './pullRequestOverview';
+import { convertIdentityRefWithVoteToReviewer } from './utils';
 
 export class PullRequestViewProvider extends WebviewBase implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'azdo:activePullRequest';
 
 	private _view?: vscode.WebviewView;
 
-	private _existingReviewers: IdentityRefWithVote[];
+	private _existingReviewers: ReviewState[];
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
@@ -114,7 +115,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 					.get<MergeMethod>('defaultMergeMethod');
 				const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 				const currentUser = this._folderRepositoryManager.getCurrentUser();
-				this._existingReviewers = pullRequest.item.reviewers ?? [];
+				this._existingReviewers = (pullRequest.item.reviewers ?? []).map(convertIdentityRefWithVoteToReviewer);
 
 				this._postMessage({
 					command: 'pr.initialize',
@@ -145,7 +146,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 						mergeMethodsAvailability,
 						defaultMergeMethod,
 						isIssue: false,
-						isAuthor: currentUser.id === pullRequest.item.createdBy?.uniqueName,
+						isAuthor: currentUser.id === pullRequest.item.createdBy?.id,
 						reviewers: this._existingReviewers,
 					},
 				});
@@ -175,11 +176,12 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 
 	private updateReviewers(review?: IdentityRefWithVote): void {
 		if (review) {
-			const existingReviewer = this._existingReviewers.find(reviewer => review.uniqueName === reviewer.uniqueName);
+			const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
 			if (existingReviewer) {
-				existingReviewer.vote = review.vote;
+				existingReviewer.state = review.vote ?? 0;
+				existingReviewer.isRequired = review.isRequired ?? false;
 			} else {
-				this._existingReviewers.push(review);
+				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 			}
 		}
 	}

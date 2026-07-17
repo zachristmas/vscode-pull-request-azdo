@@ -23,6 +23,7 @@ import { FolderRepositoryManager } from './folderRepositoryManager';
 import { GithubItemStateEnum, MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { AzdoUserManager } from './userManager';
+import { convertIdentityRefWithVoteToReviewer } from './utils';
 import { AzdoWorkItem } from './workItem';
 
 export class PullRequestOverviewPanel extends WebviewBase {
@@ -215,7 +216,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				.get<MergeMethod>('defaultMergeMethod');
 			const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 
-			this._existingReviewers = requestedReviewers?.map(this.convertIdentityRefWithVoteToReviewer) ?? [];
+			this._existingReviewers = requestedReviewers?.map(convertIdentityRefWithVoteToReviewer) ?? [];
 
 			Logger.debug('pr.initialize', PullRequestOverviewPanel.ID);
 			this._postMessage({
@@ -804,7 +805,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				existingReviewer.state = review.vote ?? 0;
 				existingReviewer.isRequired = review.isRequired ?? false;
 			} else {
-				this._existingReviewers.push(this.convertIdentityRefWithVoteToReviewer(review));
+				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 			}
 		}
 	}
@@ -947,20 +948,6 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
 				this._throwError(message, {});
 			});
-	}
-
-	private convertIdentityRefWithVoteToReviewer(r: IdentityRefWithVote) {
-		return {
-			reviewer: {
-				email: r.uniqueName,
-				name: r.displayName,
-				avatarUrl: r?.['_links']?.['avatar']?.['href'],
-				url: r.reviewerUrl,
-				id: r.id,
-			},
-			state: r.vote ?? 0,
-			isRequired: r.isRequired ?? false,
-		};
 	}
 
 	dispose() {
