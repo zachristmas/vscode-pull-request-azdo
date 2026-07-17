@@ -87,7 +87,12 @@ export function convertIdentityRefWithVoteToReviewer(r: IdentityRefWithVote): Re
 		reviewer: {
 			email: r.uniqueName,
 			name: r.displayName,
-			avatarUrl: r?.['_links']?.['avatar']?.['href'],
+			// Verified live against dev.azure.com: IdentityRefWithVote carries no `_links` object at
+			// all (unlike some other identity payloads) - avatarUrl comes through as a flat `imageUrl`,
+			// same as every other identity conversion in this file (convertRESTUserToAccount et al).
+			// The old `_links.avatar.href` lookup always resolved to undefined, so reviewer avatars
+			// never rendered.
+			avatarUrl: r.imageUrl,
 			url: r.reviewerUrl,
 			id: r.id,
 		},
