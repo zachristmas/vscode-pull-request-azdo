@@ -499,14 +499,18 @@ export const PrActions = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean
 		return canEdit ? <ReadyForReview /> : null;
 	}
 
-	if (mergeable === PullRequestMergeability.Succeeded && hasWritePermission) {
-		return isSimple ? <MergeSimple {...pr} /> : <Merge {...pr} />;
-	}
-
-	// AC-02 NONE/blocked: something (policy, build) is still pending - offer to set auto-complete
-	// instead of the dead end today's Merge-button-only gate leaves when mergeable !== Succeeded.
+	// AC-02 NONE/blocked takes priority over NONE/completable: mergeable only reflects git
+	// mergeability (conflicts), not policy state - on a policy-governed repo mergeable is Succeeded
+	// almost all the time, with pending policies as the actual blocker (verified live: a PR with 2
+	// failing policies still reports mergeable: Succeeded). Checking mergeable first meant the
+	// immediate-merge button always won and "Set auto-complete" was unreachable in the common case,
+	// offering an action (immediate complete) that would just fail with a policy-rejected error.
 	if (hasWritePermission && pendingBlockingPolicies(pr.policies).length > 0) {
 		return <SetAutoComplete {...pr} />;
+	}
+
+	if (mergeable === PullRequestMergeability.Succeeded && hasWritePermission) {
+		return isSimple ? <MergeSimple {...pr} /> : <Merge {...pr} />;
 	}
 
 	return null;
