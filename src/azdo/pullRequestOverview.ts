@@ -1068,21 +1068,27 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		} catch (e) {
 			// Race: canceling just as the server completes the PR fails the cancel PATCH (the PR is no
 			// longer Active). Re-fetch the real state and land in Completed instead of an error toast.
+			// Guard the recovery fetch: a second network failure here must still fall through to the
+			// error toast + _throwError, or the webview promise pends forever. (item 1d)
 			if (!message.args.enable) {
-				const fresh = await this._folderRepositoryManager.resolvePullRequest(
-					this._item.remote.owner,
-					this._item.remote.repositoryName,
-					this._item.getPullRequestId(),
-				);
-				if (fresh?.state === PullRequestStatus.Completed) {
-					vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
-					this._replyMessage(message, {
-						autoCompleteSetBy: null,
-						autoCompleteOptions: null,
-						state: fresh.state,
-						mergeable: fresh.item.mergeStatus,
-					});
-					return;
+				try {
+					const fresh = await this._folderRepositoryManager.resolvePullRequest(
+						this._item.remote.owner,
+						this._item.remote.repositoryName,
+						this._item.getPullRequestId(),
+					);
+					if (fresh?.state === PullRequestStatus.Completed) {
+						vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
+						this._replyMessage(message, {
+							autoCompleteSetBy: null,
+							autoCompleteOptions: null,
+							state: fresh.state,
+							mergeable: fresh.item.mergeStatus,
+						});
+						return;
+					}
+				} catch {
+					// Recovery fetch failed too; fall through to the error path below.
 				}
 			}
 			vscode.window.showErrorMessage(`Unable to update auto-complete. ${formatError(e)}`);

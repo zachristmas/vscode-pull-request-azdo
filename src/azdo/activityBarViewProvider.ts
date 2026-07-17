@@ -502,21 +502,27 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				mergeFailureMessage: result.mergeFailureMessage,
 			});
 		} catch (e) {
+			// See pullRequestOverview.ts: guard the recovery fetch so a second failure still routes to
+			// the error toast + _throwError instead of leaving the webview promise pending. (item 1d)
 			if (!message.args.enable) {
-				const fresh = await this._folderRepositoryManager.resolvePullRequest(
-					this._item.remote.owner,
-					this._item.remote.repositoryName,
-					this._item.getPullRequestId(),
-				);
-				if (fresh?.state === PullRequestStatus.Completed) {
-					vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
-					this._replyMessage(message, {
-						autoCompleteSetBy: null,
-						autoCompleteOptions: null,
-						state: fresh.state,
-						mergeable: fresh.item.mergeStatus,
-					});
-					return;
+				try {
+					const fresh = await this._folderRepositoryManager.resolvePullRequest(
+						this._item.remote.owner,
+						this._item.remote.repositoryName,
+						this._item.getPullRequestId(),
+					);
+					if (fresh?.state === PullRequestStatus.Completed) {
+						vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
+						this._replyMessage(message, {
+							autoCompleteSetBy: null,
+							autoCompleteOptions: null,
+							state: fresh.state,
+							mergeable: fresh.item.mergeStatus,
+						});
+						return;
+					}
+				} catch {
+					// Recovery fetch failed too; fall through to the error path below.
 				}
 			}
 			vscode.window.showErrorMessage(`Unable to update auto-complete. ${formatError(e)}`);
