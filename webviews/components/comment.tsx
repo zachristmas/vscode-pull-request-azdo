@@ -203,7 +203,9 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 
 	return (
 		<form ref={form} onSubmit={onSubmit}>
-			<textarea name="markdown" defaultValue={body} onKeyDown={onKeyDown} onInput={onInput} />
+			{/* item 5: focus the textarea when this composer swaps in (Edit clicked), so the caret lands
+			    where the user is about to type without a manual click. */}
+			<textarea name="markdown" autoFocus defaultValue={body} onKeyDown={onKeyDown} onInput={onInput} />
 			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
@@ -307,7 +309,9 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 
 	return (
 		<form ref={form} onSubmit={onSubmit}>
-			<textarea name="markdown" onKeyDown={onKeyDown} />
+			{/* item 5: focus the textarea when the ghost Reply field swaps in, so the user can type
+			    immediately without clicking into it. */}
+			<textarea name="markdown" autoFocus onKeyDown={onKeyDown} />
 			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
