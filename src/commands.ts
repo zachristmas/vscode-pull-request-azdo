@@ -624,7 +624,7 @@ export function registerCommands(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.refreshDescription', async () => {
-			if (PullRequestOverviewPanel.currentPanel) {
+			if (PullRequestOverviewPanel.panels.size > 0) {
 				PullRequestOverviewPanel.refresh();
 			}
 		}),

@@ -1324,7 +1324,7 @@ research needed here; this is a design pass over existing webview components.
   creation, reply, resolve/reopen, and how resolved-vs-active threads are visually distinguished.
 - Key files: `webviews/components/comment.tsx`, `webviews/editorWebview/index.css`, `src/view/reviewCommentController.ts`.
 
-#### UX-04 [note] PR-open panel-reuse vs one-tab-per-PR
+#### ~~UX-04 [note] PR-open panel-reuse vs one-tab-per-PR~~ ✅ (design section 7 item 4: singleton to Map, one tab per PR with reveal-if-open)
 
 - Current: `PullRequestOverviewPanel.currentPanel` is a singleton (`src/azdo/pullRequestOverview.ts:67-79`)
   - opening a second PR reveals/updates the same panel/tab rather than opening a new one. Deliberate

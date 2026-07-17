@@ -48,7 +48,13 @@ describe('PullRequestOverview', function () {
 		gitImpl.registerGitProvider(mockGitProvider);
 		const credentialStore = new CredentialStore(telemetry, createFakeSecretStorage(), gitImpl);
 		fileReviewedStatusService = sinon.createStubInstance(FileReviewedStatusService);
-		pullRequestManager = new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, fileReviewedStatusService);
+		pullRequestManager = new FolderRepositoryManager(
+			repository,
+			telemetry,
+			new GitApiImpl(),
+			credentialStore,
+			fileReviewedStatusService,
+		);
 		workItem = new AzdoWorkItem(credentialStore, telemetry);
 		userManager = new AzdoUserManager(credentialStore, telemetry);
 
@@ -58,8 +64,10 @@ describe('PullRequestOverview', function () {
 	});
 
 	afterEach(function () {
-		if (PullRequestOverviewPanel.currentPanel) {
-			PullRequestOverviewPanel.currentPanel.dispose();
+		// UX-04: dispose every open panel (one per PR now, not a singleton). Snapshot the values
+		// first since dispose() mutates the map.
+		for (const panel of [...PullRequestOverviewPanel.panels.values()]) {
+			panel.dispose();
 		}
 
 		pullRequestManager.dispose();
@@ -69,7 +77,7 @@ describe('PullRequestOverview', function () {
 
 	describe('createOrShow', function () {
 		it('creates a new panel', async function () {
-			assert.strictEqual(PullRequestOverviewPanel.currentPanel, undefined);
+			assert.strictEqual(PullRequestOverviewPanel.panels.size, 0);
 			const createWebviewPanel = sinon.spy(vscode.window, 'createWebviewPanel');
 
 			const prItem = await convertAzdoPullRequestToRawPullRequest(
@@ -87,10 +95,30 @@ describe('PullRequestOverview', function () {
 					localResourceRoots: [vscode.Uri.file(path.resolve(EXTENSION_PATH, 'dist'))],
 				}),
 			);
-			assert.notStrictEqual(PullRequestOverviewPanel.currentPanel, undefined);
+			assert.strictEqual(PullRequestOverviewPanel.panels.size, 1);
+			assert(PullRequestOverviewPanel.panels.has(1000));
 		});
 
-		it('reveals and updates an existing panel', async function () {
+		it('reveals the existing tab when the same PR is reopened', async function () {
+			const createWebviewPanel = sinon.spy(vscode.window, 'createWebviewPanel');
+
+			const prItem = await convertAzdoPullRequestToRawPullRequest(
+				createMock<GitPullRequest>({ pullRequestId: 1000 }),
+				repo,
+			);
+			const prModel = new PullRequestModel(telemetry, repo, remote, prItem);
+			sinon.stub(pullRequestManager, 'resolvePullRequest').resolves(prModel);
+			sinon.stub(prModel, 'getStatusChecks').resolves({ state: GitStatusState.Pending, statuses: [] });
+
+			await PullRequestOverviewPanel.createOrShow(EXTENSION_PATH, pullRequestManager, prModel, workItem, userManager);
+			await PullRequestOverviewPanel.createOrShow(EXTENSION_PATH, pullRequestManager, prModel, workItem, userManager);
+
+			// Reopening the same PR reveals the existing tab; it does not spawn a second one.
+			assert.strictEqual(createWebviewPanel.callCount, 1);
+			assert.strictEqual(PullRequestOverviewPanel.panels.size, 1);
+		});
+
+		it('opens a separate tab for each PR', async function () {
 			const createWebviewPanel = sinon.spy(vscode.window, 'createWebviewPanel');
 
 			const prItem0 = await convertAzdoPullRequestToRawPullRequest(
@@ -99,12 +127,10 @@ describe('PullRequestOverview', function () {
 			);
 			const prModel0 = new PullRequestModel(telemetry, repo, remote, prItem0);
 			const resolveStub = sinon.stub(pullRequestManager, 'resolvePullRequest').resolves(prModel0);
-			// sinon.stub(prModel0, 'getReviewRequests').resolves([]);
-			// sinon.stub(prModel0, 'getTimelineEvents').resolves([]);
 			sinon.stub(prModel0, 'getStatusChecks').resolves({ state: GitStatusState.Pending, statuses: [] });
 			await PullRequestOverviewPanel.createOrShow(EXTENSION_PATH, pullRequestManager, prModel0, workItem, userManager);
 
-			const panel0 = PullRequestOverviewPanel.currentPanel;
+			const panel0 = PullRequestOverviewPanel.panels.get(1000);
 			assert.notStrictEqual(panel0, undefined);
 			assert.strictEqual(createWebviewPanel.callCount, 1);
 
@@ -114,14 +140,16 @@ describe('PullRequestOverview', function () {
 			);
 			const prModel1 = new PullRequestModel(telemetry, repo, remote, prItem1);
 			resolveStub.resolves(prModel1);
-			// sinon.stub(prModel1, 'getReviewRequests').resolves([]);
-			// sinon.stub(prModel1, 'getTimelineEvents').resolves([]);
 			sinon.stub(prModel1, 'getStatusChecks').resolves({ state: GitStatusState.Pending, statuses: [] });
 			await PullRequestOverviewPanel.createOrShow(EXTENSION_PATH, pullRequestManager, prModel1, workItem, userManager);
 
-			assert.strictEqual(panel0, PullRequestOverviewPanel.currentPanel);
-			assert.strictEqual(createWebviewPanel.callCount, 1);
-			assert.strictEqual(panel0!.getCurrentTitle(), 'Pull Request #2000');
+			const panel1 = PullRequestOverviewPanel.panels.get(2000);
+			// A different PR opens its own tab rather than repurposing the first (the old singleton bug).
+			assert.strictEqual(createWebviewPanel.callCount, 2);
+			assert.notStrictEqual(panel0, panel1);
+			assert.strictEqual(PullRequestOverviewPanel.panels.size, 2);
+			assert.strictEqual(panel0!.getCurrentTitle(), 'Pull Request #1000');
+			assert.strictEqual(panel1!.getCurrentTitle(), 'Pull Request #2000');
 		});
 	});
 });

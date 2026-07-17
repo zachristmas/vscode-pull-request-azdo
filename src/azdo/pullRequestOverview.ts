@@ -35,14 +35,18 @@ import { AzdoWorkItem } from './workItem';
 export class PullRequestOverviewPanel extends WebviewBase {
 	public static ID: string = 'PullRequestOverviewPanel';
 	/**
-	 * Track the currently panel. Only allow a single panel to exist at a time.
+	 * UX-04: one panel per PR, keyed by PR id. Opening a second PR now opens a new tab instead of
+	 * repurposing the single existing panel (which silently discarded scroll position, expanded
+	 * threads, and any in-progress vote/comment state). Users manage tab volume with the editor's
+	 * own machinery, the same as any other document.
 	 */
-	public static currentPanel?: PullRequestOverviewPanel;
+	public static panels: Map<number, PullRequestOverviewPanel> = new Map();
 
 	protected static readonly _viewType: string = 'PullRequestOverview';
 	protected readonly _panel: vscode.WebviewPanel;
 
 	protected _item: PullRequestModel;
+	private _prNumber: number;
 	private _repositoryDefaultBranch: string;
 	private _existingReviewers: ReviewState[];
 
@@ -67,32 +71,32 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			? vscode.window.activeTextEditor.viewColumn
 			: vscode.ViewColumn.One;
 
-		// If we already have a panel, show it.
-		// Otherwise, create a new panel.
-		if (PullRequestOverviewPanel.currentPanel) {
-			PullRequestOverviewPanel.currentPanel._panel.reveal(activeColumn, true);
+		const prNumber = pr.getPullRequestId();
+
+		// Reveal the existing panel for this PR if one is already open; otherwise open a new tab.
+		let panel = PullRequestOverviewPanel.panels.get(prNumber);
+		if (panel) {
+			panel._panel.reveal(activeColumn, true);
 		} else {
-			const title = `Pull Request #${pr.getPullRequestId().toString()}`;
-			PullRequestOverviewPanel.currentPanel = new PullRequestOverviewPanel(
+			const title = `Pull Request #${prNumber.toString()}`;
+			panel = new PullRequestOverviewPanel(
 				extensionPath,
 				activeColumn || vscode.ViewColumn.Active,
 				title,
 				folderRepositoryManager,
 				workItem,
 				azdoUserManager,
+				prNumber,
 			);
+			PullRequestOverviewPanel.panels.set(prNumber, panel);
 		}
 
-		await PullRequestOverviewPanel.currentPanel!.update(folderRepositoryManager, pr);
-	}
-
-	protected set _currentPanel(panel: PullRequestOverviewPanel | undefined) {
-		PullRequestOverviewPanel.currentPanel = panel;
+		await panel.update(folderRepositoryManager, pr);
 	}
 
 	public static refresh(): void {
-		if (this.currentPanel) {
-			this.currentPanel.refreshPanel();
+		for (const panel of PullRequestOverviewPanel.panels.values()) {
+			panel.refreshPanel();
 		}
 	}
 
@@ -113,9 +117,11 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		folderRepositoryManager: FolderRepositoryManager,
 		workItem: AzdoWorkItem,
 		azdoUserManager: AzdoUserManager,
+		prNumber: number,
 	) {
 		super();
 
+		this._prNumber = prNumber;
 		this._extensionPath = extensionPath;
 		this._folderRepositoryManager = folderRepositoryManager;
 		this._workItem = workItem;
@@ -1063,7 +1069,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	}
 
 	dispose() {
-		this._currentPanel = undefined;
+		PullRequestOverviewPanel.panels.delete(this._prNumber);
 
 		// Clean up our resources
 		this._panel.dispose();
