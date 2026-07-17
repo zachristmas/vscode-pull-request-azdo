@@ -958,14 +958,22 @@ export class PullRequestModel implements IPullRequestModel {
 			base.version = this.item.lastMergeTargetCommit?.commitId;
 		}
 
-		// Find mergebase to be used later.
-		this.mergeBase = (await this.getMergeBase(base.version!, target.version!))?.[0].commitId;
+		// Find mergebase to be used later. getMergeBases returns an empty array (not an error) when
+		// one commit is a direct ancestor of the other - a completely normal shape for a PR whose
+		// source branch is a fast-forward descendant of target with no divergent commits on either
+		// side. The unguarded [0].commitId here used to throw in that case, which getChildren()'s
+		// catch swallowed silently, leaving the PR's tree node with no children and no visible error.
+		this.mergeBase = (await this.getMergeBase(base.version!, target.version!))?.[0]?.commitId;
 
 		const diffBase = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('diffBase');
 		const useCommonCommit = diffBase !== DiffBaseConfig.head;
 
 		const commitDiffs = await this.getCommitDiffs(base, target, useCommonCommit);
-		const commonCommit = commitDiffs?.commonCommit ?? this.mergeBase!;
+		const commonCommit = commitDiffs?.commonCommit ?? this.mergeBase;
+		// Backfill from the diff API's own commonCommit when getMergeBases came back empty, so
+		// getDiffTarget() (used for individual file diffs) still has a usable base instead of showing
+		// "Merge Base is not set."
+		this.mergeBase = this.mergeBase ?? commonCommit;
 		Logger.debug(
 			`Fetching file changes for PR #${this.getPullRequestId()}. base: ${base.version}, mergeBase: ${
 				this.mergeBase
