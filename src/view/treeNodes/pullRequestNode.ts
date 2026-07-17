@@ -329,7 +329,10 @@ export class PRNode extends TreeNode {
 		const formattedPRNumber = number.toString();
 		const label = `${labelPrefix}#${formattedPRNumber}: ${isDraft ? '[DRAFT] ' : ''}${title}`;
 		const tooltip = `${tooltipPrefix}${title} by ${login}`;
-		const description = `#${formattedPRNumber} by ${login}`;
+		// AC-02: zero extra API calls - autoCompleteSetBy is already on every fetched PR
+		// (PullRequest extends GitPullRequest).
+		const autoCompleteSuffix = this.pullRequestModel.item.autoCompleteSetBy ? ' - auto-complete' : '';
+		const description = `#${formattedPRNumber} by ${login}${autoCompleteSuffix}`;
 
 		return {
 			label,

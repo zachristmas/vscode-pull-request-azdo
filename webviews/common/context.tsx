@@ -154,9 +154,30 @@ export class PRContext {
 		}
 	};
 
-	public complete = async (args: { deleteSourceBranch: boolean; transitionWorkItems: boolean; mergeStrategy: string }) => {
+	public complete = async (args: {
+		deleteSourceBranch: boolean;
+		transitionWorkItems: boolean;
+		mergeStrategy: string;
+		mergeCommitMessage?: string;
+	}) => {
 		const options = { ...args, mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy] };
 		const result = await this.postMessage({ command: 'pr.complete', args: options });
+		this.updatePR(result);
+	};
+
+	public setAutoComplete = async (args: {
+		deleteSourceBranch: boolean;
+		transitionWorkItems: boolean;
+		mergeStrategy: string;
+		mergeCommitMessage?: string;
+	}) => {
+		const options = { ...args, mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy] };
+		const result = await this.postMessage({ command: 'pr.set-autocomplete', args: { enable: true, options } });
+		this.updatePR(result);
+	};
+
+	public cancelAutoComplete = async () => {
+		const result = await this.postMessage({ command: 'pr.set-autocomplete', args: { enable: false } });
 		this.updatePR(result);
 	};
 

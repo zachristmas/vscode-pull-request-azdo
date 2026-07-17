@@ -18,7 +18,7 @@ import { onDidUpdatePR } from '../commands';
 import Logger from '../common/logger';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
-import { SETTINGS_NAMESPACE } from '../constants';
+import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
 import { User } from './entitlementApi';
 import { FolderRepositoryManager } from './folderRepositoryManager';
 import { MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
@@ -324,6 +324,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.votePullRequest(message);
 			case 'pr.complete':
 				return this.completePullRequest(message);
+			case 'pr.set-autocomplete':
+				return this.setAutoComplete(message);
 			case 'pr.reply-thread':
 				return this.replyThread(message);
 			case 'pr.change-thread-status':
@@ -989,6 +991,50 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
 				this._throwError(message, {});
 			});
+	}
+
+	// AC-02: same updatePullRequest call as completion, but `status` stays Active - the server
+	// completes the PR itself once every blocking policy passes.
+	private async setAutoComplete(
+		message: IRequestMessage<{ enable: boolean; options?: PullRequestCompletion }>,
+	): Promise<void> {
+		try {
+			const result = await this._item.setAutoComplete(message.args.enable ? message.args.options : undefined);
+			vscode.commands.executeCommand('azdopr.refreshList');
+
+			this._replyMessage(message, {
+				autoCompleteSetBy:
+					result.autoCompleteSetBy && result.autoCompleteSetBy.id !== AUTO_COMPLETE_CLEAR_ID
+						? convertRESTUserToAccount(result.autoCompleteSetBy)
+						: undefined,
+				autoCompleteOptions: buildCompletionSummary(result.completionOptions),
+				state: result.status ?? this._item.item.status,
+				mergeable: result.mergeStatus,
+				mergeFailureMessage: result.mergeFailureMessage,
+			});
+		} catch (e) {
+			// Race: canceling just as the server completes the PR fails the cancel PATCH (the PR is no
+			// longer Active). Re-fetch the real state and land in Completed instead of an error toast.
+			if (!message.args.enable) {
+				const fresh = await this._folderRepositoryManager.resolvePullRequest(
+					this._item.remote.owner,
+					this._item.remote.repositoryName,
+					this._item.getPullRequestId(),
+				);
+				if (fresh?.state === PullRequestStatus.Completed) {
+					vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
+					this._replyMessage(message, {
+						autoCompleteSetBy: undefined,
+						autoCompleteOptions: undefined,
+						state: fresh.state,
+						mergeable: fresh.item.mergeStatus,
+					});
+					return;
+				}
+			}
+			vscode.window.showErrorMessage(`Unable to update auto-complete. ${formatError(e)}`);
+			this._throwError(message, {});
+		}
 	}
 
 	dispose() {

@@ -9,7 +9,13 @@ import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyI
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
 import { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
-import { MergeMethod, PullRequestChecks, PullRequestMergeability, PullRequestPolicyEvaluation } from '../../src/azdo/interface';
+import {
+	MergeMethod,
+	PullRequestChecks,
+	PullRequestCompletionSummary,
+	PullRequestMergeability,
+	PullRequestPolicyEvaluation,
+} from '../../src/azdo/interface';
 import { groupBy } from '../../src/common/utils';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
@@ -110,25 +116,102 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
-			if (mergeable === PullRequestMergeability.NotSet || mergeable === PullRequestMergeability.Queued) {
+			// AC-02: keep polling mergeability while auto-complete is armed too, so the merge-status text
+			// picks up Succeeded once the server completes the PR - not just while NotSet/Queued.
+			const autoCompleteArmed = !!pr.autoCompleteSetBy && pr.state === PullRequestStatus.Active;
+			if (
+				mergeable === PullRequestMergeability.NotSet ||
+				mergeable === PullRequestMergeability.Queued ||
+				autoCompleteArmed
+			) {
 				setMergeability(await checkMergeability());
 			}
 		}, 3000);
 		return () => clearInterval(handle);
 	});
 
+	return <AutoCompleteSection pr={{ ...pr, mergeable }} isSimple={isSimple} />;
+};
+
+// AC-02: derives NONE/completable, NONE/blocked, SET_BY_ME, SET_BY_OTHER, COMPLETED per render from
+// { autoCompleteSetBy, currentUser, policies, mergeable, state } - nothing new is stored beyond what
+// the poll above already refreshes.
+const AutoCompleteSection = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
+	const { cancelAutoComplete } = useContext(PullRequestContext);
+	const [isBusy, setBusy] = useState(false);
+
+	const mergeStatus = (
+		<MergeStatus
+			mergeable={pr.mergeable}
+			isSimple={isSimple}
+			mergeFailureMessage={pr.mergeFailureMessage}
+			hasPolicySection={!!pr.policies?.length}
+		/>
+	);
+
+	if (pr.state === PullRequestStatus.Completed) {
+		return <span>{mergeStatus}</span>;
+	}
+
+	if (pr.autoCompleteSetBy) {
+		// currentUser is absent from the activity-bar sidebar's init payload (isAuthor-only) - treat
+		// missing currentUser as "show the name, never assume it's me" rather than erroring.
+		const isMe = pr.currentUser?.id === pr.autoCompleteSetBy.id;
+		const canCancel = isMe || pr.hasWritePermission;
+		const label = isMe ? 'you' : pr.autoCompleteSetBy.name || 'another user';
+		const summary = summarizeCompletionOptions(pr.autoCompleteOptions);
+
+		const cancel = async () => {
+			try {
+				setBusy(true);
+				await cancelAutoComplete();
+			} finally {
+				setBusy(false);
+			}
+		};
+
+		return (
+			<span>
+				{mergeStatus}
+				<div className="status-item status-section">
+					<div>
+						Auto-complete set by {label}
+						{summary ? ` (${summary})` : ''}
+					</div>
+					{canCancel ? (
+						<button disabled={isBusy} onClick={cancel}>
+							Cancel auto-complete
+						</button>
+					) : null}
+				</div>
+			</span>
+		);
+	}
+
 	return (
 		<span>
-			<MergeStatus
-				mergeable={mergeable}
-				isSimple={isSimple}
-				mergeFailureMessage={pr.mergeFailureMessage}
-				hasPolicySection={!!pr.policies?.length}
-			/>
-			<PrActions pr={{ ...pr, mergeable }} isSimple={isSimple} />
+			{mergeStatus}
+			<PrActions pr={pr} isSimple={isSimple} />
 		</span>
 	);
 };
+
+function summarizeCompletionOptions(options?: PullRequestCompletionSummary): string {
+	if (!options) {
+		return '';
+	}
+	const parts: string[] = [];
+	if (options.mergeStrategy) {
+		parts.push(MERGE_METHODS[options.mergeStrategy] ?? options.mergeStrategy);
+	}
+	if (options.deleteSourceBranch) {
+		parts.push('delete branch');
+	}
+	if (options.transitionWorkItems) {
+		parts.push('complete work items');
+	}
+	return parts.join(', ');
+}
 
 export default StatusChecks;
 
@@ -408,18 +491,22 @@ export const Merge = (pr: PullRequest) => {
 export const PrActions = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
 	const { hasWritePermission, canEdit, isDraft, mergeable } = pr;
 
-	return isDraft ? (
+	if (isDraft) {
 		// Only PR author and users with push rights can mark draft as ready for review
-		canEdit ? (
-			<ReadyForReview />
-		) : null
-	) : mergeable === PullRequestMergeability.Succeeded && hasWritePermission ? (
-		isSimple ? (
-			<MergeSimple {...pr} />
-		) : (
-			<Merge {...pr} />
-		)
-	) : null;
+		return canEdit ? <ReadyForReview /> : null;
+	}
+
+	if (mergeable === PullRequestMergeability.Succeeded && hasWritePermission) {
+		return isSimple ? <MergeSimple {...pr} /> : <Merge {...pr} />;
+	}
+
+	// AC-02 NONE/blocked: something (policy, build) is still pending - offer to set auto-complete
+	// instead of the dead end today's Merge-button-only gate leaves when mergeable !== Succeeded.
+	if (hasWritePermission && pendingBlockingPolicies(pr.policies).length > 0) {
+		return <SetAutoComplete {...pr} />;
+	}
+
+	return null;
 };
 
 export const MergeSimple = (pr: PullRequest) => {
@@ -476,8 +563,41 @@ export const DeleteBranch = (pr: PullRequest) => {
 	}
 };
 
+export const SetAutoComplete = (pr: PullRequest) => {
+	const select = useRef<HTMLSelectElement>();
+	const [selectedMethod, selectMethod] = useState<MergeMethod | null>(null);
+
+	if (selectedMethod) {
+		return <ConfirmComplete pr={pr} method={selectedMethod} mode="autocomplete" cancel={() => selectMethod(null)} />;
+	}
+
+	return (
+		<div className="merge-select-container">
+			<button onClick={() => selectMethod(select.current.value as MergeMethod)}>Set auto-complete</button>
+			{nbsp}using method{nbsp}
+			<MergeSelect ref={select} {...pr} />
+		</div>
+	);
+};
+
 function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMethod; cancel: () => void }) {
-	const { complete } = useContext(PullRequestContext);
+	return <ConfirmComplete pr={pr} method={method} mode="complete" cancel={cancel} />;
+}
+
+// AC-02: one form for both completion paths - `mode` picks which context call fires on submit and
+// which submit label to show. Keeps ConfirmMerge and the auto-complete form from drifting apart.
+function ConfirmComplete({
+	pr: _pr,
+	method,
+	mode,
+	cancel,
+}: {
+	pr: PullRequest;
+	method: MergeMethod;
+	mode: 'complete' | 'autocomplete';
+	cancel: () => void;
+}) {
+	const { complete, setAutoComplete } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 
 	return (
@@ -488,11 +608,16 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 				try {
 					setBusy(true);
 					const { transitionWorkItems, deleteBranch }: any = event.target;
-					await complete({
+					const args = {
 						deleteSourceBranch: deleteBranch.checked,
 						transitionWorkItems: transitionWorkItems.checked,
 						mergeStrategy: method.toString(),
-					});
+					};
+					if (mode === 'autocomplete') {
+						await setAutoComplete(args);
+					} else {
+						await complete(args);
+					}
 				} finally {
 					setBusy(false);
 				}
@@ -516,7 +641,12 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 				<button className="secondary" onClick={cancel}>
 					Cancel
 				</button>
-				<input disabled={isBusy} type="submit" id="confirm-merge" value={MERGE_METHODS[method]} />
+				<input
+					disabled={isBusy}
+					type="submit"
+					id="confirm-merge"
+					value={mode === 'autocomplete' ? 'Set auto-complete' : MERGE_METHODS[method]}
+				/>
 			</div>
 		</form>
 	);

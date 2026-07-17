@@ -37,7 +37,7 @@ import { Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { toPRUriAzdo, toReviewUri } from '../common/uri';
 import { formatError } from '../common/utils';
-import { SETTINGS_NAMESPACE } from '../constants';
+import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
 import { AzdoRepository } from './azdoRepository';
 import { FileViewedStatus, PRFileViewedState } from './fileReviewedStatusService';
 import { FolderRepositoryManager } from './folderRepositoryManager';
@@ -279,8 +279,42 @@ export class PullRequestModel implements IPullRequestModel {
 					deleteSourceBranch: options.deleteSourceBranch,
 					mergeStrategy: options.mergeStrategy,
 					transitionWorkItems: options.transitionWorkItems,
+					mergeCommitMessage: options.mergeCommitMessage,
 				},
 			},
+			repoId!,
+			this.getPullRequestId(),
+		);
+	}
+
+	/**
+	 * AC-02: set or cancel auto-complete. Same updatePullRequest call as completePullRequest - the only
+	 * difference is `status` is left untouched (server completes the PR itself once every blocking
+	 * policy passes). Cancel by patching autoCompleteSetBy to the documented zero-GUID identity.
+	 */
+	async setAutoComplete(options: PullRequestCompletion | undefined): Promise<GitPullRequest> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = await azdoRepo.getRepositoryId();
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+		const currentUserId = azdo?.authenticatedUser?.id;
+
+		if (options && !currentUserId) {
+			throw new Error('Unable to set auto-complete: no authenticated user id available.');
+		}
+
+		return await git!.updatePullRequest(
+			options
+				? {
+						autoCompleteSetBy: { id: currentUserId },
+						completionOptions: {
+							deleteSourceBranch: options.deleteSourceBranch,
+							mergeStrategy: options.mergeStrategy,
+							transitionWorkItems: options.transitionWorkItems,
+							mergeCommitMessage: options.mergeCommitMessage,
+						},
+				  }
+				: { autoCompleteSetBy: { id: AUTO_COMPLETE_CLEAR_ID } },
 			repoId!,
 			this.getPullRequestId(),
 		);

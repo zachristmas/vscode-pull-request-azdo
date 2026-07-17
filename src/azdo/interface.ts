@@ -232,6 +232,7 @@ export interface PullRequestCompletion {
 	deleteSourceBranch: boolean;
 	mergeStrategy: GitPullRequestMergeStrategy;
 	transitionWorkItems: boolean;
+	mergeCommitMessage?: string;
 }
 
 // AC-02: options summary for an armed auto-complete / a completed PR's completion options.

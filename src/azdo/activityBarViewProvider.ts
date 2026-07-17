@@ -12,9 +12,9 @@ import {
 import * as vscode from 'vscode';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
-import { SETTINGS_NAMESPACE } from '../constants';
+import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
 import { FolderRepositoryManager } from './folderRepositoryManager';
-import { MergeMethod, PullRequestVote, ReviewState } from './interface';
+import { MergeMethod, PullRequestCompletion, PullRequestVote, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { getDefaultMergeMethod } from './pullRequestOverview';
 import { buildCompletionSummary, convertIdentityRefWithVoteToReviewer, convertRESTUserToAccount } from './utils';
@@ -81,6 +81,8 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this.approvePullRequest(message);
 			case 'pr.vote':
 				return this.votePullRequest(message);
+			case 'pr.set-autocomplete':
+				return this.setAutoComplete(message);
 			case 'pr.submit':
 				return this.submitReview(message);
 			case 'pr.checkMergeability':
@@ -431,6 +433,48 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				vscode.window.showErrorMessage(`Unable to complete pull request. ${formatError(e)}`);
 				this._throwError(message, {});
 			});
+	}
+
+	// AC-02: same set/cancel-auto-complete plumbing as the overview host - see pullRequestOverview.ts
+	// for the race-handling rationale (cancel-vs-complete).
+	private async setAutoComplete(
+		message: IRequestMessage<{ enable: boolean; options?: PullRequestCompletion }>,
+	): Promise<void> {
+		try {
+			const result = await this._item.setAutoComplete(message.args.enable ? message.args.options : undefined);
+			vscode.commands.executeCommand('azdopr.refreshList');
+
+			this._replyMessage(message, {
+				autoCompleteSetBy:
+					result.autoCompleteSetBy && result.autoCompleteSetBy.id !== AUTO_COMPLETE_CLEAR_ID
+						? convertRESTUserToAccount(result.autoCompleteSetBy)
+						: undefined,
+				autoCompleteOptions: buildCompletionSummary(result.completionOptions),
+				state: result.status ?? this._item.item.status,
+				mergeable: result.mergeStatus,
+				mergeFailureMessage: result.mergeFailureMessage,
+			});
+		} catch (e) {
+			if (!message.args.enable) {
+				const fresh = await this._folderRepositoryManager.resolvePullRequest(
+					this._item.remote.owner,
+					this._item.remote.repositoryName,
+					this._item.getPullRequestId(),
+				);
+				if (fresh?.state === PullRequestStatus.Completed) {
+					vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
+					this._replyMessage(message, {
+						autoCompleteSetBy: undefined,
+						autoCompleteOptions: undefined,
+						state: fresh.state,
+						mergeable: fresh.item.mergeStatus,
+					});
+					return;
+				}
+			}
+			vscode.window.showErrorMessage(`Unable to update auto-complete. ${formatError(e)}`);
+			this._throwError(message, {});
+		}
 	}
 
 	private _getHtmlForWebview() {

@@ -12,3 +12,5 @@ export const SETTINGS_NAMESPACE = 'azdoPullRequests';
 export const URI_SCHEME_REVIEW = 'review_azdo';
 export const URI_SCHEME_PR = 'pr_azdo';
 export const URI_SCHEME_RESOURCE = 'filechange_azdo';
+// AC-02: patching autoCompleteSetBy to this identity cancels auto-complete (documented ADO REST behavior).
+export const AUTO_COMPLETE_CLEAR_ID = '00000000-0000-0000-0000-000000000000';
