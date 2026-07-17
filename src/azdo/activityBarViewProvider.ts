@@ -111,9 +111,13 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			// POL-05: pre-stage the sidebar compact policy summary here; POL-01's fetch failure must not
 			// sink the whole sidebar the way the other members here fail loudly.
 			pullRequestModel.getPolicyEvaluations().catch(() => undefined),
+			// POL-05: the checked-out-PR sidebar previously hardcoded status: { statuses: [] }, so the
+			// shared StatusChecks/PolicySection components (isSimple=true) never showed anything even
+			// though the overview side already renders both.
+			pullRequestModel.getStatusChecks(),
 		])
 			.then(result => {
-				const [pullRequest, repositoryAccess, policies] = result;
+				const [pullRequest, repositoryAccess, policies, status] = result;
 				if (!pullRequest) {
 					throw new Error(
 						`Fail to resolve Pull Request #${pullRequestModel.getPullRequestId()} in ${
@@ -165,7 +169,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 						hasWritePermission,
 						mergeable: pullRequest.item.mergeStatus,
 						isDraft: pullRequest.isDraft,
-						status: { statuses: [] },
+						status: !!status ? status : { statuses: [] },
 						events: [],
 						mergeMethodsAvailability,
 						defaultMergeMethod,
