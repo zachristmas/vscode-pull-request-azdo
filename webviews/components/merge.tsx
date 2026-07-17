@@ -252,10 +252,10 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 
 				try {
 					setBusy(true);
-					const { completeWorkitem, deleteBranch }: any = event.target;
+					const { transitionWorkItems, deleteBranch }: any = event.target;
 					await complete({
 						deleteSourceBranch: deleteBranch.checked,
-						completeWorkitem: completeWorkitem.checked,
+						transitionWorkItems: transitionWorkItems.checked,
 						mergeStrategy: method.toString(),
 					});
 				} finally {
@@ -266,7 +266,7 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 			<div className="merge-option-container">
 				<div>
 					<label>
-						<input name="completeWorkitem" type="checkbox" defaultChecked={true} />
+						<input name="transitionWorkItems" type="checkbox" defaultChecked={true} />
 						Complete associated work items after merging
 					</label>
 				</div>

@@ -148,7 +148,7 @@ export class PRContext {
 		}
 	};
 
-	public complete = async (args: { deleteSourceBranch: boolean; completeWorkitem: boolean; mergeStrategy: string }) => {
+	public complete = async (args: { deleteSourceBranch: boolean; transitionWorkItems: boolean; mergeStrategy: string }) => {
 		const options = { ...args, mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy] };
 		const result = await this.postMessage({ command: 'pr.complete', args: options });
 		this.updatePR(result);
