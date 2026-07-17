@@ -969,11 +969,15 @@ export class PullRequestModel implements IPullRequestModel {
 		const useCommonCommit = diffBase !== DiffBaseConfig.head;
 
 		const commitDiffs = await this.getCommitDiffs(base, target, useCommonCommit);
-		const commonCommit = commitDiffs?.commonCommit ?? this.mergeBase;
-		// Backfill from the diff API's own commonCommit when getMergeBases came back empty, so
-		// getDiffTarget() (used for individual file diffs) still has a usable base instead of showing
-		// "Merge Base is not set."
-		this.mergeBase = this.mergeBase ?? commonCommit;
+		// getMergeBases and the diff API's own commonCommit can BOTH come back null/empty for the same
+		// fast-forward shape (verified live: a source branch with no divergent commits from target)
+		// - an undefined value here serializes as a missing field, which the file-diff API then
+		// rejects with "An object ID must be 40 characters long..." for an empty BaseVersionCommit.
+		// In that exact fast-forward case target's own commit IS the common ancestor (the same
+		// fallback getDiffTarget() already uses for the 'head' diffBase mode), so fall all the way
+		// back to it rather than propagating undefined.
+		const commonCommit = commitDiffs?.commonCommit || this.mergeBase || base.version;
+		this.mergeBase = this.mergeBase || commonCommit;
 		Logger.debug(
 			`Fetching file changes for PR #${this.getPullRequestId()}. base: ${base.version}, mergeBase: ${
 				this.mergeBase
