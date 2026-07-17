@@ -103,7 +103,7 @@ export class AzdoRepository implements vscode.Disposable {
 			`Found ${repos?.length} repos. Searching for repo with name ${this.remote.repositoryName}`,
 			AzdoRepository.ID,
 		);
-		this._metadata = repos?.find(v => v.name === this.remote.repositoryName);
+		this._metadata = repos?.find(v => v.name?.toLowerCase() === this.remote.repositoryName?.toLowerCase());
 		if (!this._metadata) {
 			Logger.debug(`Fetch metadata ${this.remote.repositoryName} failed. No repo by that name.`, AzdoRepository.ID);
 			return this._metadata;
