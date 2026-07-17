@@ -736,7 +736,7 @@ export function registerCommands(
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.markFileAsViewed', async (treeNode: GitFileChangeNode) => {
 			try {
-				await treeNode.pullRequest.markFileAsViewed(treeNode.sha);
+				await treeNode.pullRequest.markFileAsViewed(treeNode.fileName);
 			} catch (e) {
 				vscode.window.showErrorMessage(`Marked file as viewed failed: ${e}`);
 			}
@@ -746,7 +746,7 @@ export function registerCommands(
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.unmarkFileAsViewed', async (treeNode: GitFileChangeNode) => {
 			try {
-				await treeNode.pullRequest.unmarkFileAsViewed(treeNode.sha);
+				await treeNode.pullRequest.unmarkFileAsViewed(treeNode.fileName);
 			} catch (e) {
 				vscode.window.showErrorMessage(`Marked file as not viewed failed: ${e}`);
 			}

@@ -43,7 +43,7 @@ export class RemoteFileChangeNode extends TreeNode implements vscode.TreeItem {
 		public readonly previousFileSha?: string | undefined,
 	) {
 		super();
-		const viewed = this.pullRequest.fileChangeViewedState[sha] ?? ViewedState.UNVIEWED;
+		const viewed = this.pullRequest.fileChangeViewedState[fileName] ?? ViewedState.UNVIEWED;
 		this.contextValue = `filechange:${GitChangeType[status]}:${viewed === ViewedState.VIEWED ? 'viewed' : 'unviewed'}`;
 		this.label = path.basename(fileName);
 		this.description = path.relative('.', path.dirname(fileName));
@@ -58,7 +58,7 @@ export class RemoteFileChangeNode extends TreeNode implements vscode.TreeItem {
 
 		this.childrenDisposables.push(
 			this.pullRequest.onDidChangeFileViewedState(e => {
-				const matchingChange = e.changed.find(viewStateChange => viewStateChange.fileSHA === this.sha);
+				const matchingChange = e.changed.find(viewStateChange => viewStateChange.fileName === this.fileName);
 				if (matchingChange) {
 					this.updateViewed(matchingChange.viewed);
 					this.refresh(this);
@@ -116,7 +116,7 @@ export class FileChangeNode extends TreeNode implements vscode.TreeItem {
 		public readonly previousFileSha?: string | undefined,
 	) {
 		super();
-		const viewed = this.pullRequest.fileChangeViewedState[sha] ?? ViewedState.UNVIEWED;
+		const viewed = this.pullRequest.fileChangeViewedState[fileName] ?? ViewedState.UNVIEWED;
 		this.contextValue = `filechange:${GitChangeType[status]}:${viewed === ViewedState.VIEWED ? 'viewed' : 'unviewed'}`;
 		this.label = path.basename(fileName);
 		this.description = path.relative('.', path.dirname(removeLeadingSlash(fileName)));
@@ -135,7 +135,7 @@ export class FileChangeNode extends TreeNode implements vscode.TreeItem {
 
 		this.childrenDisposables.push(
 			this.pullRequest.onDidChangeFileViewedState(e => {
-				const matchingChange = e.changed.find(viewStateChange => viewStateChange.fileSHA === this.sha);
+				const matchingChange = e.changed.find(viewStateChange => viewStateChange.fileName === this.fileName);
 				if (matchingChange) {
 					this.updateViewed(matchingChange.viewed);
 					this.refresh(this);

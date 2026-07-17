@@ -862,11 +862,11 @@ export class PullRequestModel implements IPullRequestModel {
 		const changed: FileViewedStatus[] = [];
 		const statuses = this.azdoRepository.getFileReviewedStatusForPr(this.getPullRequestId());
 		statuses.changed.forEach(n => {
-			if (this.fileChangeViewedState[n.fileSHA] !== n.fileSHA) {
-				changed.push({ fileSHA: n.fileSHA, viewed: n.viewed });
+			if (this.fileChangeViewedState[n.fileName] !== n.viewed) {
+				changed.push({ fileName: n.fileName, viewed: n.viewed });
 			}
 
-			this.fileChangeViewedState[n.fileSHA] = n.viewed;
+			this.fileChangeViewedState[n.fileName] = n.viewed;
 		});
 
 		if (changed.length) {
@@ -876,25 +876,31 @@ export class PullRequestModel implements IPullRequestModel {
 		return this.fileChangeViewedState;
 	}
 
-	async markFileAsViewed(fileSHA: string): Promise<void> {
+	async markFileAsViewed(fileName: string): Promise<void> {
+		if (!fileName) {
+			return;
+		}
 		await this.azdoRepository.ensure();
 
-		const status: FileViewedStatus = { fileSHA: fileSHA, viewed: ViewedState.VIEWED };
+		const status: FileViewedStatus = { fileName: fileName, viewed: ViewedState.VIEWED };
 
 		this.azdoRepository.setFileReviewedStatusForPr(this.getPullRequestId(), status);
 
-		this.fileChangeViewedState[status.fileSHA] = ViewedState.VIEWED;
+		this.fileChangeViewedState[status.fileName] = ViewedState.VIEWED;
 		this._onDidChangeFileViewedState.fire({ changed: [status] });
 	}
 
-	async unmarkFileAsViewed(fileSHA: string): Promise<void> {
+	async unmarkFileAsViewed(fileName: string): Promise<void> {
+		if (!fileName) {
+			return;
+		}
 		await this.azdoRepository.ensure();
 
-		const status: FileViewedStatus = { fileSHA: fileSHA, viewed: ViewedState.UNVIEWED };
+		const status: FileViewedStatus = { fileName: fileName, viewed: ViewedState.UNVIEWED };
 
 		this.azdoRepository.setFileReviewedStatusForPr(this.getPullRequestId(), status);
 
-		this.fileChangeViewedState[status.fileSHA] = ViewedState.UNVIEWED;
+		this.fileChangeViewedState[status.fileName] = ViewedState.UNVIEWED;
 		this._onDidChangeFileViewedState.fire({ changed: [status] });
 	}
 
