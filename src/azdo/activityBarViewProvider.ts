@@ -65,6 +65,8 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			// 	return this.createComment(message);
 			case 'azdopr.merge':
 				return this.mergePullRequest(message);
+			case 'azdopr.readyForReview':
+				return this.setReadyForReview(message, false);
 			case 'pr.deleteBranch':
 				return this.deleteBranch(message);
 			case 'pr.approve':
@@ -152,15 +154,13 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 	}
 
 	private close(message: IRequestMessage<string>): void {
-		vscode.commands
-			.executeCommand<GitPullRequestCommentThread>('azdopr.close', this._item, message.args)
-			.then(comment => {
-				if (comment) {
-					this._replyMessage(message, {
-						value: comment,
-					});
-				}
-			});
+		vscode.commands.executeCommand<GitPullRequestCommentThread>('azdopr.close', this._item, message.args).then(comment => {
+			if (comment) {
+				this._replyMessage(message, {
+					value: comment,
+				});
+			}
+		});
 	}
 
 	// private createComment(message: IRequestMessage<string>) {
@@ -318,6 +318,23 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				cancelled: true,
 			});
 		}
+	}
+
+	private setReadyForReview(message: IRequestMessage<any>, isDraft: boolean): void {
+		this._item
+			.setReadyForReview(isDraft)
+			.then(result => {
+				vscode.commands.executeCommand('azdopr.refreshList');
+				this._replyMessage(message, { isDraft: result.isDraft });
+			})
+			.catch(e => {
+				vscode.window.showErrorMessage(
+					`${
+						isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
+					} failed. ${formatError(e)}`,
+				);
+				this._throwError(message, `${formatError(e)}`);
+			});
 	}
 
 	private async mergePullRequest(

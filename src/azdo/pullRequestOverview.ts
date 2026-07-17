@@ -290,6 +290,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.checkoutPullRequest(message);
 			case 'azdopr.merge':
 				return this.mergePullRequest(message);
+			case 'azdopr.readyForReview':
+				return this.setReadyForReview(message, false);
 			case 'pr.deleteBranch':
 				return this.deleteBranch(message);
 			case 'pr.vote':
@@ -754,6 +756,23 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			.catch(e => {
 				vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
 				this._throwError(message, {});
+			});
+	}
+
+	private setReadyForReview(message: IRequestMessage<any>, isDraft: boolean): void {
+		this._item
+			.setReadyForReview(isDraft)
+			.then(result => {
+				vscode.commands.executeCommand('azdopr.refreshList');
+				this._replyMessage(message, { isDraft: result.isDraft });
+			})
+			.catch(e => {
+				vscode.window.showErrorMessage(
+					`${
+						isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
+					} failed. ${formatError(e)}`,
+				);
+				this._throwError(message, `${formatError(e)}`);
 			});
 	}
 

@@ -244,6 +244,22 @@ export class PullRequestModel implements IPullRequestModel {
 		return git!.updatePullRequest({ description, title }, repoId!, this.getPullRequestId());
 	}
 
+	/**
+	 * Toggle the draft state of the pull request. Passing `false` publishes a draft PR ("Ready for review");
+	 * passing `true` converts an active PR back to a draft (ADO resets reviewer votes on this transition).
+	 */
+	async setReadyForReview(isDraft: boolean): Promise<GitPullRequest> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = await azdoRepo.getRepositoryId();
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+
+		const updated = await git!.updatePullRequest({ isDraft }, repoId!, this.getPullRequestId());
+		this.item.isDraft = updated.isDraft;
+		this.isDraft = updated.isDraft;
+		return updated;
+	}
+
 	async completePullRequest(options: PullRequestCompletion): Promise<GitPullRequest> {
 		const azdoRepo = await this.azdoRepository.ensure();
 		const repoId = await azdoRepo.getRepositoryId();

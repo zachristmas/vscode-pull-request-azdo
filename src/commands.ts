@@ -74,6 +74,28 @@ async function chooseItem<T>(
 	return (await vscode.window.showQuickPick(items, { placeHolder }))?.itemValue;
 }
 
+/**
+ * Resolve the target pull request for a command that may be invoked from the tree (PRNode arg),
+ * directly (PullRequestModel arg), or from the command palette with no arg (falls back to the
+ * checked-out PR across all folder managers).
+ */
+async function resolveTargetPullRequest(
+	reposManager: RepositoriesManager,
+	pr?: PRNode | PullRequestModel,
+): Promise<PullRequestModel | undefined> {
+	if (pr) {
+		return pr instanceof PRNode ? pr.pullRequestModel : pr;
+	}
+	const activePullRequests: PullRequestModel[] = reposManager.folderManagers
+		.map(folderManager => folderManager.activePullRequest!)
+		.filter(activePR => !!activePR);
+	return chooseItem<PullRequestModel>(
+		activePullRequests,
+		itemValue => `${itemValue.getPullRequestId()}: ${itemValue.item.title}`,
+		'Pull request',
+	);
+}
+
 export function registerCommands(
 	context: vscode.ExtensionContext,
 	reposManager: RepositoriesManager,
@@ -389,6 +411,23 @@ export function registerCommands(
 						}
 					}
 				});
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.readyForReview', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
+				return;
+			}
+			try {
+				await pullRequestModel.setReadyForReview(false);
+				vscode.commands.executeCommand('azdopr.refreshList');
+				PullRequestOverviewPanel.refresh();
+				_onDidUpdatePR.fire();
+			} catch (e) {
+				vscode.window.showErrorMessage(`Marking pull request ready for review failed. ${formatError(e)}`);
+			}
 		}),
 	);
 
@@ -786,16 +825,18 @@ export function registerCommands(
 			telemetry.sendTelemetryEvent('azdopr.applySuggestionWithCopilot');
 
 			commentThread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
-			const messages = commentThread.comments.map(comment => {
-				const body = comment.body instanceof vscode.MarkdownString ? comment.body.value : comment.body;
-				return `- ${comment.author.name}: ${body}`;
-			}).join('\n');
+			const messages = commentThread.comments
+				.map(comment => {
+					const body = comment.body instanceof vscode.MarkdownString ? comment.body.value : comment.body;
+					return `- ${comment.author.name}: ${body}`;
+				})
+				.join('\n');
 
 			await vscode.commands.executeCommand('vscode.editorChat.start', {
 				initialRange: commentThread.range,
 				message: messages,
 				autoSend: true,
 			});
-		})
+		}),
 	);
 }
