@@ -534,12 +534,20 @@ export class PullRequestModel implements IPullRequestModel {
 		const repoId = (await azdoRepo.getRepositoryId()) || '';
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
+		const currentUserId = azdo?.authenticatedUser?.id || '';
+
+		// createPullRequestReviewer is a full-replace PUT: omitting isRequired resets it to null
+		// server-side on every vote, even when a required-reviewer policy still requires this person
+		// (verified live against dev.azure.com - the policy evaluation itself stays correct, but the
+		// reviewer's isRequired flag the UI reads for the POL-10 badge gets wiped). Preserve whatever
+		// we already know about this reviewer from the last fetch.
+		const existingIsRequired = this.item.reviewers?.find(r => r.id === currentUserId)?.isRequired;
 
 		return await git?.createPullRequestReviewer(
-			{ vote: vote },
+			{ vote: vote, isRequired: existingIsRequired },
 			repoId,
 			this.getPullRequestId(),
-			azdo?.authenticatedUser?.id || '',
+			currentUserId,
 		);
 	}
 
