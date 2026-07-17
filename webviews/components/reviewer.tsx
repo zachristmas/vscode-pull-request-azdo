@@ -38,10 +38,10 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 			) : null}
 			{/* VOTE-07: five distinct glyphs/colors (not just gray check/dot/X with a tooltip-only
 			    difference), with the vote text inline so it doesn't require a hover to see. */}
-			<span className="push-right vote-status" title={VoteText[voteKey]}>
+			<span className="push-right vote-status" title={VOTE_STATE_TEXT[voteKey]}>
 				{REVIEW_STATE_ICON[voteKey]}
 				{nbsp}
-				<span className="vote-status-text">{VoteText[voteKey]}</span>
+				<span className="vote-status-text">{VOTE_STATE_TEXT[voteKey]}</span>
 			</span>
 		</div>
 	);
@@ -53,4 +53,13 @@ const REVIEW_STATE_ICON: { [state: string]: React.ReactElement } = {
 	'-5': waitingForAuthorIcon,
 	'-10': rejectedIcon,
 	'0': noVoteIcon,
+};
+
+// sidebar.tsx's VoteText labels the vote-select dropdown's ACTIONS ('0' = "Reset Vote", the action of
+// clearing your vote). Reusing it here for STATE display read oddly - "Reset Vote" next to a reviewer
+// who simply hasn't voted yet looks like a stray action prompt, not a status. Every other vote value
+// reads fine as both an action and a state; only '0' needs its own label here.
+const VOTE_STATE_TEXT: { [state: string]: string } = {
+	...VoteText,
+	'0': 'No vote',
 };
