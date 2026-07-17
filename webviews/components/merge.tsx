@@ -587,7 +587,7 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 // AC-02: one form for both completion paths - `mode` picks which context call fires on submit and
 // which submit label to show. Keeps ConfirmMerge and the auto-complete form from drifting apart.
 function ConfirmComplete({
-	pr: _pr,
+	pr,
 	method,
 	mode,
 	cancel,
@@ -599,6 +599,7 @@ function ConfirmComplete({
 }) {
 	const { complete, setAutoComplete } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
+	const defaultCommitMessage = `Merged PR ${pr.number}: ${pr.title}`;
 
 	return (
 		<form
@@ -607,11 +608,12 @@ function ConfirmComplete({
 
 				try {
 					setBusy(true);
-					const { transitionWorkItems, deleteBranch }: any = event.target;
+					const { transitionWorkItems, deleteBranch, mergeCommitMessage }: any = event.target;
 					const args = {
 						deleteSourceBranch: deleteBranch.checked,
 						transitionWorkItems: transitionWorkItems.checked,
 						mergeStrategy: method.toString(),
+						mergeCommitMessage: mergeCommitMessage.value.trim() || undefined,
 					};
 					if (mode === 'autocomplete') {
 						await setAutoComplete(args);
@@ -635,6 +637,10 @@ function ConfirmComplete({
 						<input name="deleteBranch" type="checkbox" defaultChecked={true} />
 						Delete branch after merging
 					</label>
+				</div>
+				<div>
+					<label htmlFor="mergeCommitMessage">Merge commit message</label>
+					<textarea name="mergeCommitMessage" defaultValue={defaultCommitMessage} rows={2} />
 				</div>
 			</div>
 			<div className="form-actions">
