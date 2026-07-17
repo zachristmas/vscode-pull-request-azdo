@@ -1281,10 +1281,13 @@ code {
 	fill: currentColor;
 }
 
-/* ghost reply field: full-width, looks like an input, swaps to the real composer on click. */
+/* ghost reply field: full-width, looks like an input, swaps to the real composer on click.
+   A <button> is a form control, so display:block still shrink-wraps to its label in Chromium;
+   an explicit width (minus the inset margins) is what actually makes it span the thread footer. */
 .reply-ghost {
 	display: block;
-	width: auto;
+	box-sizing: border-box;
+	width: calc(100% - var(--azdo-space-3) * 2);
 	margin: var(--azdo-space-3);
 	padding: var(--azdo-space-2);
 	text-align: left;
