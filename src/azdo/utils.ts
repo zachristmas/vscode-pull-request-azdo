@@ -14,7 +14,11 @@ import {
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
-import { PolicyEvaluationRecord, PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
+import {
+	PolicyConfiguration,
+	PolicyEvaluationRecord,
+	PolicyEvaluationStatus,
+} from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as vscode from 'vscode';
 import { Repository } from '../api/api';
 import { GitApiImpl } from '../api/api1';
@@ -28,6 +32,8 @@ import {
 	IFileChangeNode,
 	IGitHubRef,
 	IRawFileChange,
+	MergeMethod,
+	MergeMethodsAvailability,
 	PullRequest,
 	PullRequestCompletionSummary,
 	PullRequestPolicyEvaluation,
@@ -41,6 +47,7 @@ import {
 	isRequiredReviewersSettings,
 	MergeStrategyPolicySettings,
 	MinimumReviewersPolicySettings,
+	PolicyScopeEntry,
 	RequiredReviewersPolicySettings,
 	WellKnownPolicyTypeIds,
 } from './policyTypes';
@@ -192,6 +199,80 @@ export function buildCompletionSummary(
 		transitionWorkItems: options.transitionWorkItems,
 		mergeCommitMessage: options.mergeCommitMessage,
 	};
+}
+
+const ALL_MERGE_METHODS_ENABLED: MergeMethodsAvailability = {
+	NoFastForward: true,
+	Squash: true,
+	Rebase: true,
+	RebaseMerge: true,
+};
+
+/**
+ * AC-04: fold zero-or-more "Limit merge types" policy configurations into a single availability map.
+ * No matching policy -> all four enabled (current behavior preserved). One or more matching, enabled,
+ * blocking policies -> AND-composition of each policy's allow* flags (conservative - a strategy is
+ * offered only if every applicable policy allows it), mirroring server enforcement. Legacy
+ * `useSquashMerge: true` settings map to Squash-only. An all-false composition is pathological but
+ * possible with overlapping policies - keep all four enabled and let the server reject with a real
+ * error rather than rendering a form with zero options.
+ */
+export function computeMergeMethodsAvailability(configurations: PolicyConfiguration[]): MergeMethodsAvailability {
+	const relevant = configurations.filter(c => c.isEnabled && c.isBlocking && isMergeStrategySettings(c.settings ?? {}));
+
+	if (relevant.length === 0) {
+		return { ...ALL_MERGE_METHODS_ENABLED };
+	}
+
+	const availability: MergeMethodsAvailability = { ...ALL_MERGE_METHODS_ENABLED };
+	relevant.forEach(config => {
+		const settings = config.settings as MergeStrategyPolicySettings;
+		const allowed: MergeMethodsAvailability = settings.useSquashMerge
+			? { NoFastForward: false, Squash: true, Rebase: false, RebaseMerge: false }
+			: {
+					NoFastForward: !!settings.allowNoFastForward,
+					Squash: !!settings.allowSquash,
+					Rebase: !!settings.allowRebase,
+					RebaseMerge: !!settings.allowRebaseMerge,
+			  };
+		(Object.keys(availability) as MergeMethod[]).forEach(method => {
+			availability[method] = availability[method] && allowed[method];
+		});
+	});
+
+	if (!Object.values(availability).some(Boolean)) {
+		return { ...ALL_MERGE_METHODS_ENABLED };
+	}
+
+	return availability;
+}
+
+/**
+ * AC-04 fallback path: PolicyApi.getPolicyConfigurations(project) returns every policy in the project
+ * with no server-side ref filtering, so match settings.scope[] client-side the same way the server's
+ * branch-scoped route would (repositoryId null = all repos; Exact/Prefix/DefaultBranch ref matching).
+ */
+export function matchesRefScope(
+	config: PolicyConfiguration,
+	repositoryId: string,
+	targetRefName: string,
+	defaultBranchRefName: string,
+): boolean {
+	const scope: PolicyScopeEntry[] = (config.settings ?? {}).scope ?? [];
+	return scope.some(entry => {
+		if (entry.repositoryId && entry.repositoryId !== repositoryId) {
+			return false;
+		}
+		switch (entry.matchKind) {
+			case 'Prefix':
+				return !!entry.refName && targetRefName.startsWith(entry.refName);
+			case 'DefaultBranch':
+				return targetRefName === defaultBranchRefName;
+			case 'Exact':
+			default:
+				return !!entry.refName && entry.refName.toLowerCase() === targetRefName.toLowerCase();
+		}
+	});
 }
 
 export function convertRESTIdentityToAccount(user: Identity): IAccount {
