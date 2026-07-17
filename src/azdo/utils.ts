@@ -340,30 +340,34 @@ export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repo
 	return undefined;
 }
 
+// ITER-01: threadContext holds the server-tracked (current) position of a thread; trackingCriteria.orig*
+// is the creation-time location. The presence of trackingCriteria means the thread HAS been tracked from
+// its original spot, so threadContext is the current position. Prefer threadContext so comments stay glued
+// to the code across pushes; fall back to orig* only when there is no threadContext.
 export function getPositionFromThread(comment: GitPullRequestCommentThread) {
-	if (comment.pullRequestThreadContext?.trackingCriteria !== undefined) {
-		return comment.pullRequestThreadContext?.trackingCriteria?.origRightFileStart === undefined
-			? comment.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart?.line
-			: comment.pullRequestThreadContext?.trackingCriteria?.origRightFileStart.line;
+	if (comment.threadContext !== undefined) {
+		return comment.threadContext.rightFileStart === undefined
+			? comment.threadContext.leftFileStart?.line
+			: comment.threadContext.rightFileStart.line;
 	}
-	return comment.threadContext?.rightFileStart === undefined
-		? comment.threadContext?.leftFileStart?.line
-		: comment.threadContext.rightFileStart.line;
+	const trackingCriteria = comment.pullRequestThreadContext?.trackingCriteria;
+	return trackingCriteria?.origRightFileStart === undefined
+		? trackingCriteria?.origLeftFileStart?.line
+		: trackingCriteria?.origRightFileStart.line;
 }
 
 export function getDiffSide(thread: GitPullRequestCommentThread): DiffSide | undefined {
-	if (thread.pullRequestThreadContext?.trackingCriteria !== undefined || thread.threadContext !== undefined) {
-		if (thread.pullRequestThreadContext?.trackingCriteria?.origRightFileStart !== undefined) {
-			return DiffSide.RIGHT;
-		} else if (thread.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart !== undefined) {
-			return DiffSide.LEFT;
-		} else if (thread.threadContext?.rightFileStart !== undefined) {
-			// Check on threadContext needs to happen after trackingCriteria
-			return DiffSide.RIGHT;
-		} else if (thread.threadContext?.leftFileStart !== undefined) {
-			return DiffSide.LEFT;
-		}
+	// Prefer the tracked threadContext side; fall back to the creation-time trackingCriteria side.
+	if (thread.threadContext?.rightFileStart !== undefined) {
+		return DiffSide.RIGHT;
+	} else if (thread.threadContext?.leftFileStart !== undefined) {
+		return DiffSide.LEFT;
+	} else if (thread.pullRequestThreadContext?.trackingCriteria?.origRightFileStart !== undefined) {
+		return DiffSide.RIGHT;
+	} else if (thread.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart !== undefined) {
+		return DiffSide.LEFT;
 	}
+	return undefined;
 }
 
 export function updateCommentReviewState(thread: GHPRCommentThread, newDraftMode: boolean) {
