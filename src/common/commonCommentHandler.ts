@@ -236,11 +236,25 @@ export class CommonCommentHandler {
 		fileChange: IFileChangeNodeWithUri,
 		isLeft: boolean,
 	): Promise<GitPullRequestCommentThread | undefined> {
+		// VS Code ranges are 0-based; ADO thread offsets are 1-based. An empty
+		// selection (gutter click) anchors the whole line so ADO renders the
+		// thread on the line instead of a zero-width selection (#43).
+		const range = thread.range;
+		let startOffset = range.start.character + 1;
+		let endOffset = range.end.character + 1;
+		let endLine = range.end.line + 1;
+		if (range.start.isEqual(range.end)) {
+			const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === thread.uri.toString());
+			startOffset = 1;
+			endOffset = document ? document.lineAt(range.start.line).text.length + 1 : 1;
+			endLine = range.start.line + 1;
+		}
 		const rawComment = await this.pullRequestModel.createThread(input, {
 			filePath: fileChange.fileName,
-			line: thread.range.start.line + 1,
-			endOffset: 1,
-			startOffset: 1,
+			line: range.start.line + 1,
+			endLine: endLine,
+			startOffset: startOffset,
+			endOffset: endOffset,
 			isLeft: isLeft,
 		});
 

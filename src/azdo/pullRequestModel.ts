@@ -277,7 +277,14 @@ export class PullRequestModel implements IPullRequestModel {
 
 	async createThread(
 		message?: string,
-		threadContext?: { filePath: string; line: number; startOffset: number; endOffset: number; isLeft: boolean },
+		threadContext?: {
+			filePath: string;
+			line: number;
+			startOffset: number;
+			endOffset: number;
+			isLeft: boolean;
+			endLine?: number;
+		},
 		prCommentThreadContext?: GitPullRequestCommentThreadContext,
 	): Promise<GitPullRequestCommentThread | undefined> {
 		const azdoRepo = await this.azdoRepository.ensure();
@@ -287,17 +294,18 @@ export class PullRequestModel implements IPullRequestModel {
 
 		let tc: CommentThreadContext = undefined;
 
+		const endLine = threadContext?.endLine ?? threadContext?.line;
 		if (threadContext?.isLeft) {
 			tc = {
 				filePath: threadContext?.filePath,
 				leftFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
-				leftFileEnd: { line: threadContext?.line, offset: threadContext?.endOffset },
+				leftFileEnd: { line: endLine, offset: threadContext?.endOffset },
 			};
 		} else {
 			tc = {
 				filePath: threadContext?.filePath,
 				rightFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
-				rightFileEnd: { line: threadContext?.line, offset: threadContext?.endOffset },
+				rightFileEnd: { line: endLine, offset: threadContext?.endOffset },
 			};
 		}
 
