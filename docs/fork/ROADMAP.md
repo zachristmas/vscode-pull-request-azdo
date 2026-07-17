@@ -10,6 +10,7 @@ Generated 2026-07-16. Companion to [UPSTREAM-SCOPING.md](UPSTREAM-SCOPING.md) (d
 - Section 2, ADO-native gap reference (Half 2): per area, how ADO models it, what the fork does today, and gaps with IDs (`VOTE-*`, `POL-*`, `AC-*`, `ITER-*`, `THR-*`, `WI-*`, `DLA-*`, `REST-*`, `ADD-*`).
 - Section 3, Upstream inventory (Half 1): the complete portable/partial catalog (`U-*` IDs), then the not-portable / already-in-fork / superseded lists.
 - Section 4, Cross-cutting engineering notes: node-api 10.2.2 limitations with REST fallbacks, throttling, authenticated media, taxonomy.
+- Section 5, Execution guide: per-item workflow, verification gates, dependency order, and model/delegation routing.
 
 **Size scale**: XS <0.5 day, S ~1 day, M 2-4 days, L 1-2 weeks, XL >2 weeks. Sized for *this* fork, including ADO data-layer work.
 
@@ -2862,3 +2863,58 @@ Totals after reclassification: 201 portable, 79 partial, 65 not-portable, 33 alr
 - ITER-06's "untrackable thread" signal is not spelled out by the typings; needs one live-PR experiment.
 - ADO vote-reset behavior on convert-to-draft (DLA-02 prompt copy) needs a live check.
 - The 0.25.1 CVE-2021-28470 fix could not be located in public history (chunk K1); treat as unverifiable rather than unpatched.
+
+---
+
+## 5. Execution guide
+
+The backlog above is research; this section is the operating manual for burning it down. Items are scoped so that most of v1.4 and much of v1.5/v1.7 can be implemented by a cheaper model or a delegated coding agent working from the item entry alone. Reserve the strongest model for the design-heavy items flagged below.
+
+### 5.1 Per-item workflow
+
+1. Branch from master: `fix/<id>-<slug>` or `feat/<id>-<slug>` (e.g. `fix/dla-01-ready-for-review`).
+2. Read the item entry (Section 2 or 3) and every file in its "Key files" list before editing. The current-state refs are the spec of what exists; the Desired line is the acceptance criterion.
+3. Implement. When adding a webview message, add the case to BOTH hosts (`src/azdo/pullRequestOverview.ts` and `src/azdo/activityBarViewProvider.ts`) or reply-with-error on unknown messages; silent message drops are how the v1.4 bugs shipped.
+4. Verify, in order:
+   - `npx tsc --noEmit -p tsconfig.json` (esbuild bundling skips type checks; tsc is the real gate)
+   - `yarn run bundle`
+   - Smoke in the Extension Development Host (F5) against a real ADO PR in a test repo. Items touching votes/policies/completion need a PR on a branch with at least one policy configured to see the ADO-native behavior.
+   - For release candidates: `npx @vscode/vsce package --no-dependencies` and install the .vsix locally.
+5. One item = one commit, message referencing the roadmap ID (`fix(votes): map Request Changes to -5 vote (VOTE-02)`); update `CHANGELOG.md` under the pending version heading.
+6. Mark the milestone-table row done (strike-through) in this file in the same commit.
+
+### 5.2 Dependency order (do not reorder past these edges)
+
+- v1.4: VOTE-03 (reviewer shape fix) before VOTE-02 (sidebar vote actions). AC-03 (merge stub reroute) before deleting any stub code paths.
+- v1.5: POL-01 (evaluations fetch + panel) before POL-04 (build click-through), POL-05 (sidebar summary), WI-03 and THR-03 (policy-specific rows). AC-02 (auto-complete) reuses POL-01's "pending blocking policies" signal for its show/hide logic; build POL-01 first.
+- v1.6: ITER-08 (cache iterations) first; then ITER-03 (iteration change source); ITER-02/04/05/06/07 all consume ITER-03's changeTrackingId/iteration plumbing. Run the two live-PR experiments in Section 4 "Verification debt" BEFORE building ITER-01-adjacent work into ITER-02.
+- v1.7: DLA-06 (render images) before DLA-07 (paste upload), or pasted images upload but never render.
+- v1.8: DLA-03 (create MVP) before WI-04 and REST-11.
+
+### 5.3 Routing: mechanical vs design-heavy
+
+Mechanical (spec is complete in the item entry; suitable for a cheaper model or delegated agent, review the diff after):
+
+- All of v1.4 except AC-03 (three call sites, needs judgment on the simple-view UX).
+- v1.5: AC-05, POL-10, VOTE-07, POL-08, AC-07.
+- v1.7: THR-01, THR-02, THR-05, WI-01, WI-05, WI-06, DLA-04, REST-08 display half.
+- v1.8: REST-12, REST-13, REST-14, VOTE-06.
+- Section 3 XS/S polish items generally.
+
+Design-heavy (do the design pass with the strongest model or by hand; then implementation can be delegated):
+
+- POL-01 (panel information architecture; local interfaces for untyped policy settings/context)
+- AC-02 (auto-complete UX states: none / set-by-me / set-by-other / policy-satisfied race)
+- ITER-02/03/04 (URI scheme changes, thread anchoring semantics, tree restructure)
+- THR-06 (product decision: drop Pending or build batching)
+- DLA-03 (create-flow UX, plus ADD-05 constraints)
+- ADD-01/ADD-02 (exploratory, API behavior unverified against a live org)
+
+Delegation note: each gap entry maps 1:1 onto a delegation spec (Task = title, Context = area preamble, Requirements = Desired, Files = Key files, Acceptance = Desired + tsc/bundle gates, DO NOT = files outside Key files). Paste-ready as-is.
+
+### 5.4 Session hygiene for agent-driven implementation
+
+- Work in this repo directly (`~/src/vscode-pull-request-azdo`), one milestone table as the session's task list; do not load the whole roadmap into context, load Section 5 plus the specific item entries being worked.
+- The `ms` remote is a blob-less partial clone: `git show ms/main:<path>` fetches single blobs on demand; never run wholesale diffs/merges against ms/main (known result: 202 conflicts).
+- After each landed item, re-run the v1.4 smoke set (vote from sidebar, complete a PR, publish a draft) since these surfaces share the webview message plumbing.
+- Release cadence: version bump + CHANGELOG + `vsce package` once per completed milestone, not per item; tag `v1.x.0` on master.
