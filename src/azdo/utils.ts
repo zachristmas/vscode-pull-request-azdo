@@ -558,7 +558,10 @@ export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repo
 // its original spot, so threadContext is the current position. Prefer threadContext so comments stay glued
 // to the code across pushes; fall back to orig* only when there is no threadContext.
 export function getPositionFromThread(comment: GitPullRequestCommentThread) {
-	if (comment.threadContext !== undefined) {
+	// General/system comment threads (verified live: e.g. vote-change system comments) come back with
+	// threadContext: null, not undefined - the `!== undefined` check let null through to an unguarded
+	// property access below.
+	if (comment.threadContext !== undefined && comment.threadContext !== null) {
 		return comment.threadContext.rightFileStart === undefined
 			? comment.threadContext.leftFileStart?.line
 			: comment.threadContext.rightFileStart.line;
