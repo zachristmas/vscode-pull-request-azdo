@@ -216,6 +216,11 @@
 				"icon": "$(arrow-right)"
 			},
 			{
+				"command": "azdopr.checkoutById",
+				"title": "Checkout Pull Request by ID...",
+				"category": "AzDO Pull Requests"
+			},
+			{
 				"command": "azdopr.exit",
 				"title": "Exit Review Mode",
 				"category": "AzDO Pull Requests"

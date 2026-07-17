@@ -278,6 +278,31 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.checkoutById', async () => {
+			const input = await vscode.window.showInputBox({
+				prompt: vscode.l10n.t('Pull request ID to checkout'),
+				placeHolder: vscode.l10n.t('e.g. 5994'),
+				validateInput: v => (/^\d+$/.test(v.trim()) ? undefined : vscode.l10n.t('Enter a numeric pull request ID')),
+			});
+			if (!input) {
+				return;
+			}
+			const id = Number(input.trim());
+			for (const folderManager of reposManager.folderManagers) {
+				for (const azdoRepo of folderManager.azdoRepositories) {
+					const pullRequestModel = await azdoRepo.getPullRequest(id);
+					if (pullRequestModel) {
+						return vscode.commands.executeCommand('azdopr.pick', pullRequestModel);
+					}
+				}
+			}
+			vscode.window.showErrorMessage(
+				vscode.l10n.t('Pull request {0} was not found in any repository in this workspace.', id),
+			);
+		}),
+	);
+
+	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.pick', async (pr: PRNode | DescriptionNode | PullRequestModel) => {
 			let pullRequestModel: PullRequestModel;
 
