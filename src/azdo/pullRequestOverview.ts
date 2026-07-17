@@ -346,6 +346,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this._replyMessage(message, await this._item.getStatusChecks());
 			case 'pr.checkPolicies':
 				return this._replyMessage(message, await this._item.getPolicyEvaluations());
+			case 'pr.requeue-policy':
+				return this._replyMessage(message, await this._item.requeuePolicyEvaluation(message.args.evaluationId));
 			case 'pr.add-reviewers':
 				return this.addReviewerToPr(message);
 			case 'pr.remove-reviewer':

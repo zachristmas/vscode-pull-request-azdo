@@ -22,6 +22,8 @@ import {
 	PullRequestStatus,
 	VersionControlChangeType,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { Build } from 'azure-devops-node-api/interfaces/BuildInterfaces';
+import { PolicyEvaluationRecord } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import equals from 'fast-deep-equal';
 import * as vscode from 'vscode';
 import * as diff from 'diff';
@@ -50,6 +52,7 @@ import {
 	PullRequestVote,
 } from './interface';
 import { resolveAvatarsDeep } from './avatarCache';
+import { BuildPolicyEvaluationContext } from './policyTypes';
 import {
 	convertAzdoPullRequestToRawPullRequest,
 	convertPolicyEvaluation,
@@ -803,13 +806,64 @@ export class PullRequestModel implements IPullRequestModel {
 			const records = (await policyApi?.getPolicyEvaluations(projectId, artifactId)) ?? [];
 
 			const typeMap = await azdoRepo.getPolicyTypeMap();
-			return records
+			const evaluations = records
 				.map(record => convertPolicyEvaluation(record, typeMap))
 				.filter((p): p is PullRequestPolicyEvaluation => !!p);
+
+			await this.enrichBuildPolicyEvaluations(records, evaluations, projectId);
+
+			return evaluations;
 		} catch (e) {
 			Logger.appendLine(`Fetch policy evaluations for PR #${this.getPullRequestId()} failed: ${e}`, PullRequestModel.ID);
 			return [];
 		}
+	}
+
+	/**
+	 * POL-04: enrich build-validation rows with build number/result/web URL so a reviewer never has to
+	 * open the ADO web UI to see why validation failed. context.buildId is absent until a build has
+	 * been queued (e.g. manualQueueOnly policies before first queue) - those rows keep isExpired only.
+	 * One dead build (.catch) must never sink the rest of the list.
+	 */
+	private async enrichBuildPolicyEvaluations(
+		records: PolicyEvaluationRecord[],
+		evaluations: PullRequestPolicyEvaluation[],
+		projectId: string,
+	): Promise<void> {
+		const buildEvaluations = evaluations.filter(e => e.kind === 'build');
+		if (buildEvaluations.length === 0) {
+			return;
+		}
+
+		const azdoRepo = await this.azdoRepository.ensure();
+		const buildApi = await azdoRepo.azdo?.connection.getBuildApi();
+
+		const contextByEvaluationId = new Map<string, BuildPolicyEvaluationContext>();
+		records.forEach(record => {
+			if (record.evaluationId && buildEvaluations.some(e => e.evaluationId === record.evaluationId)) {
+				contextByEvaluationId.set(record.evaluationId, (record.context ?? {}) as BuildPolicyEvaluationContext);
+			}
+		});
+
+		const buildIds = [
+			...new Set([...contextByEvaluationId.values()].map(c => c.buildId).filter((id): id is number => !!id)),
+		];
+		const builds = buildApi
+			? await Promise.all(buildIds.map(id => buildApi.getBuild(projectId, id).catch(() => undefined)))
+			: [];
+		const buildById = new Map(builds.filter((b): b is Build => !!b).map(b => [b.id!, b]));
+
+		buildEvaluations.forEach(evaluation => {
+			const context = contextByEvaluationId.get(evaluation.evaluationId);
+			const build = context?.buildId ? buildById.get(context.buildId) : undefined;
+			evaluation.build = {
+				buildId: context?.buildId,
+				buildNumber: build?.buildNumber,
+				result: build?.result,
+				webUrl: (build?._links as any)?.web?.href,
+				isExpired: context?.isExpired,
+			};
+		});
 	}
 
 	/**

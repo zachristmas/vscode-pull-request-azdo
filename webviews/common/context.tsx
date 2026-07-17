@@ -52,6 +52,8 @@ export class PRContext {
 
 	public checkPolicies = () => this.postMessage({ command: 'pr.checkPolicies' });
 
+	public requeuePolicy = (evaluationId: string) => this.postMessage({ command: 'pr.requeue-policy', args: { evaluationId } });
+
 	public merge = (args: { title: string; description: string; method: MergeMethod }) =>
 		this.postMessage({ command: 'azdopr.merge', args });
 

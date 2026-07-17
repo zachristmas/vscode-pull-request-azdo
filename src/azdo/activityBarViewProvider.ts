@@ -89,6 +89,8 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				return this._replyMessage(message, await this._item.getStatusChecks());
 			case 'pr.checkPolicies':
 				return this._replyMessage(message, await this._item.getPolicyEvaluations());
+			case 'pr.requeue-policy':
+				return this._replyMessage(message, await this._item.requeuePolicyEvaluation(message.args.evaluationId));
 			default:
 				// Never drop a message silently: an unhandled command leaves the webview's awaited
 				// postMessage promise pending forever (how the v1.4 sidebar bugs shipped).

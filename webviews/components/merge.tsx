@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { BuildResult } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { GitStatusState, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as React from 'react';
@@ -205,27 +206,99 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 					{showDetails ? 'Hide' : 'Show'}
 				</a>
 			</div>
-			{showDetails ? <PolicyDetails policies={policies} /> : null}
+			{showDetails ? <PolicyDetails policies={policies} onRequeue={setPolicies} /> : null}
 		</div>
 	);
 };
 
-const PolicyDetails = ({ policies }: { policies: PullRequestPolicyEvaluation[] }) => (
+const PolicyDetails = ({
+	policies,
+	onRequeue,
+}: {
+	policies: PullRequestPolicyEvaluation[];
+	onRequeue: (fresh: PullRequestPolicyEvaluation[]) => void;
+}) => (
 	<div>
 		{policies.map(p => (
-			<div key={p.evaluationId} className="status-check">
-				<div>
-					<PolicyStatusIcon status={p.status} />
-					<span className="status-check-detail-text">
-						{p.displayName}
-						{p.detail ? `: ${p.detail}` : ''}
-						{!p.isBlocking ? ' (optional)' : ''}
-					</span>
-				</div>
-			</div>
+			<PolicyRow key={p.evaluationId} policy={p} onRequeue={onRequeue} />
 		))}
 	</div>
 );
+
+// POL-04: build-validation rows get number/result text, a Details link to the build's web UI, and a
+// requeue button. The button label covers all three states the same requeuePolicyEvaluation call
+// serves: Re-run (has a build), Re-queue (build expired), Queue (manual-queue policy, no build yet).
+const PolicyRow = ({
+	policy,
+	onRequeue,
+}: {
+	policy: PullRequestPolicyEvaluation;
+	onRequeue: (fresh: PullRequestPolicyEvaluation[]) => void;
+}) => {
+	const { requeuePolicy } = useContext(PullRequestContext);
+	const [isBusy, setBusy] = useState(false);
+
+	const requeue = useCallback(async () => {
+		try {
+			setBusy(true);
+			const fresh = await requeuePolicy(policy.evaluationId);
+			if (fresh) {
+				onRequeue(fresh);
+			}
+		} finally {
+			setBusy(false);
+		}
+	}, [requeuePolicy, policy.evaluationId, onRequeue]);
+
+	const buildLabel = policy.build?.isExpired ? 'Re-queue' : !policy.build?.buildId ? 'Queue' : 'Re-run';
+
+	return (
+		<div className="status-check">
+			<div>
+				<PolicyStatusIcon status={policy.status} />
+				<span className="status-check-detail-text">
+					{policy.displayName}
+					{policy.detail ? `: ${policy.detail}` : ''}
+					{policy.kind === 'build' ? `${buildDetailSuffix(policy)}` : ''}
+					{!policy.isBlocking ? ' (optional)' : ''}
+				</span>
+			</div>
+			{policy.kind === 'build' ? (
+				<div className="policy-build-actions">
+					{policy.build?.webUrl ? <a href={policy.build.webUrl}>Details</a> : null}
+					{nbsp}
+					<button disabled={isBusy} onClick={requeue}>
+						{buildLabel}
+					</button>
+				</div>
+			) : null}
+		</div>
+	);
+};
+
+function buildDetailSuffix(policy: PullRequestPolicyEvaluation): string {
+	if (!policy.build?.buildId) {
+		return ' (build not queued)';
+	}
+	const resultText = buildResultText(policy.build.result);
+	const expiredText = policy.build.isExpired ? ', expired' : '';
+	return ` (Build ${policy.build.buildNumber ?? policy.build.buildId}${expiredText}${resultText ? `: ${resultText}` : ''})`;
+}
+
+function buildResultText(result?: number): string {
+	switch (result) {
+		case BuildResult.Succeeded:
+			return 'succeeded';
+		case BuildResult.PartiallySucceeded:
+			return 'partially succeeded';
+		case BuildResult.Failed:
+			return 'failed';
+		case BuildResult.Canceled:
+			return 'canceled';
+		default:
+			return '';
+	}
+}
 
 function PolicyStatusIcon({ status }: { status: PolicyEvaluationStatus }) {
 	switch (status) {
