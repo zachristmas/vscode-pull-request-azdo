@@ -13,7 +13,7 @@ import { nbsp } from './space';
 import { AuthorLink, Avatar } from './user';
 
 export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
-	const { reviewer, state, canDelete } = reviewState;
+	const { reviewer, state, isRequired, canDelete } = reviewState;
 	const [showDelete, setShowDelete] = useState(false);
 	const { removeReviewer } = useContext(PullRequestContext);
 	return (
@@ -24,6 +24,9 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 		>
 			<Avatar url={reviewer.url} avatarUrl={reviewer.avatarUrl} />
 			<AuthorLink url={reviewer.url} text={reviewer.name} />
+			{/* POL-10: required reviewers (min-reviewer/required-reviewer policies) were indistinguishable
+			    from optional ones - data was already flowing to the webview, just never rendered. */}
+			{isRequired ? <span className="required-badge">Required</span> : null}
 			{canDelete && showDelete ? (
 				<>
 					{nbsp}

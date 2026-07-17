@@ -133,6 +133,19 @@ body img.avatar {
 	color: var(--vscode-editor-foreground);
 }
 
+/* POL-10: required-reviewer badge, matching the ADO web UI's reviewer row. */
+.required-badge {
+	box-sizing: border-box;
+	line-height: 14px;
+	font-size: 11px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	border-radius: 4px;
+	padding: 1px 6px;
+	margin-left: 6px;
+	flex-shrink: 0;
+}
+
 .section-item {
 	margin-right: 8px;
 }
