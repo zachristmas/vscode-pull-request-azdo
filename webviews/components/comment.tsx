@@ -41,7 +41,6 @@ export function CommentView(comment: Props) {
 	const { editComment, setDescription, pr } = useContext(PullRequestContext);
 	const currentDraft = pr.pendingCommentDrafts && pr.pendingCommentDrafts[id];
 	const [inEditMode, setEditMode] = useState(!!currentDraft);
-	const [showActionBar, setShowActionBar] = useState(false);
 	const statusProps = !!isFirstCommentInThread
 		? { threadStatus: threadStatus, changeThreadStatus: changeThreadStatus }
 		: null;
@@ -74,25 +73,20 @@ export function CommentView(comment: Props) {
 	}
 
 	return (
-		<CommentBox
-			for={comment}
-			onMouseEnter={() => setShowActionBar(true)}
-			onMouseLeave={() => setShowActionBar(false)}
-			{...statusProps}
-		>
-			{showActionBar ? (
-				<div className="action-bar comment-actions">
-					<button title="Quote reply" onClick={() => emitter.emit('quoteReply', bodyMd)}>
-						{commentIcon}
+		<CommentBox for={comment} {...statusProps}>
+			{/* UX-03: always rendered, shown by CSS on hover AND :focus-within so keyboard users can
+			    reach quote/edit (the old showActionBar state was mouse-only). */}
+			<div className="action-bar comment-actions">
+				<button title="Quote reply" onClick={() => emitter.emit('quoteReply', bodyMd)}>
+					{commentIcon}
+				</button>
+				{canEdit ? (
+					<button title="Edit comment" onClick={() => setEditMode(true)}>
+						{editIcon}
 					</button>
-					{canEdit ? (
-						<button title="Edit comment" onClick={() => setEditMode(true)}>
-							{editIcon}
-						</button>
-					) : null}
-					{/* {canDelete ? <button title='Delete comment' onClick={() => deleteComment({ id, pullRequestReviewId })} >{deleteIcon}</button> : null} */}
-				</div>
-			) : null}
+				) : null}
+				{/* {canDelete ? <button title='Delete comment' onClick={() => deleteComment({ id, pullRequestReviewId })} >{deleteIcon}</button> : null} */}
+			</div>
 			<CommentBody
 				commentContent={comment.content}
 				commentId={comment.id}
@@ -179,6 +173,10 @@ type EditCommentProps = {
 	onSave: (body: string) => Promise<any>;
 };
 
+// UX-03: surface the composer affordances. The Cmd/Ctrl+Enter submit handler already exists on every
+// composer; this just makes it (and markdown support) discoverable.
+const ComposerHint = () => <div className="composer-hint">Markdown supported · Cmd/Ctrl+Enter to submit</div>;
+
 function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 	const { updateDraft } = useContext(PullRequestContext);
 	const draftComment = useRef<{ body: string; dirty: boolean }>({ body, dirty: false });
@@ -233,6 +231,7 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 	return (
 		<form ref={form} onSubmit={onSubmit}>
 			<textarea name="markdown" defaultValue={body} onKeyDown={onKeyDown} onInput={onInput} />
+			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
 					Cancel
@@ -331,6 +330,7 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 	return (
 		<form ref={form} onSubmit={onSubmit}>
 			<textarea name="markdown" onKeyDown={onKeyDown} />
+			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
 					Cancel
@@ -404,6 +404,7 @@ export function AddComment({ pendingCommentText, hasWritePermission, isIssue, is
 				value={pendingCommentText}
 				placeholder="Leave a comment"
 			/>
+			<ComposerHint />
 			<div className="form-actions">
 				{/* UX-02: drop the Close button entirely on a finished PR (§2.2) rather than rendering it
 				    disabled. The comment box itself stays - ADO allows commenting on completed PRs. */}

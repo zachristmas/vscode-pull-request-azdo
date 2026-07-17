@@ -325,7 +325,8 @@ body .hidden-focusable {
 
 .comment-actions button:hover:enabled,
 .comment-actions button:focus:enabled {
-	background-color: transparent;
+	background-color: var(--vscode-toolbar-hoverBackground);
+	border-radius: var(--azdo-radius-sm);
 }
 
 body button.checkedOut {
@@ -567,6 +568,13 @@ body .overview-title .button-group button {
 
 body .comment-form {
 	padding: var(--azdo-space-5) 0 var(--azdo-space-3);
+}
+
+/* UX-03: composer discoverability hint under the textarea. */
+.composer-hint {
+	font-size: 11px;
+	color: var(--azdo-muted);
+	margin: var(--azdo-space-1) 0 var(--azdo-space-2);
 }
 
 .review-comment-container .comment-form {
@@ -945,6 +953,17 @@ code {
 	z-index: 100;
 	top: 9px;
 	right: 9px;
+}
+
+/* UX-03: reveal comment actions on hover AND keyboard focus, not mouse-only. The action bar is now
+   always in the DOM (see comment.tsx) so :focus-within can surface it for keyboard users. */
+.comment-container .action-bar {
+	display: none;
+}
+
+.comment-container:hover .action-bar,
+.comment-container:focus-within .action-bar {
+	display: flex;
 }
 
 .flex-action-bar {
