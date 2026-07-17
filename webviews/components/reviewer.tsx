@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
-import { useContext, useState } from 'react';
+import { useContext } from 'react';
 import { PullRequestVote, ReviewState } from '../../src/azdo/interface';
 import PullRequestContext from '../common/context';
 import { approveIcon, approveSuggestionIcon, deleteIcon, noVoteIcon, rejectedIcon, waitingForAuthorIcon } from './icon';
@@ -14,26 +14,32 @@ import { AuthorLink, Avatar } from './user';
 
 export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 	const { reviewer, state, isRequired, canDelete } = reviewState;
-	const [showDelete, setShowDelete] = useState(false);
 	const { removeReviewer } = useContext(PullRequestContext);
 	const voteKey = state?.toString() ?? PullRequestVote.NO_VOTE.toString();
+	// Only a not-yet-voted reviewer can be removed. (Preserves the prior gate, which lived on the
+	// mouse-enter handler.)
+	const canRemove = canDelete && state === PullRequestVote.NO_VOTE;
 	return (
-		<div
-			className="section-item reviewer"
-			onMouseEnter={state === PullRequestVote.NO_VOTE ? () => setShowDelete(true) : null}
-			onMouseLeave={state === PullRequestVote.NO_VOTE ? () => setShowDelete(false) : null}
-		>
+		<div className="section-item reviewer">
 			<Avatar url={reviewer.url} avatarUrl={reviewer.avatarUrl} />
 			<AuthorLink url={reviewer.url} text={reviewer.name} />
 			{/* POL-10: required reviewers (min-reviewer/required-reviewer policies) were indistinguishable
 			    from optional ones - data was already flowing to the webview, just never rendered. */}
 			{isRequired ? <span className="required-badge">Required</span> : null}
-			{canDelete && showDelete ? (
+			{/* item 2: keyboard-reachable remove - a real button always in the DOM, revealed on row
+			    hover/focus-within by CSS instead of the old mouse-only showDelete state. */}
+			{canRemove ? (
 				<>
 					{nbsp}
-					<a className="remove-item" onClick={() => removeReviewer(reviewState.reviewer.id)}>
-						{deleteIcon}️
-					</a>
+					<button
+						type="button"
+						className="remove-item"
+						title="Remove reviewer"
+						aria-label={`Remove reviewer ${reviewer.name}`}
+						onClick={() => removeReviewer(reviewState.reviewer.id)}
+					>
+						{deleteIcon}
+					</button>
 				</>
 			) : null}
 			{/* VOTE-07: five distinct glyphs/colors (not just gray check/dot/X with a tooltip-only

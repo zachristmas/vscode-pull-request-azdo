@@ -1123,9 +1123,41 @@ code {
 	margin-right: var(--azdo-space-1);
 }
 
+/* item 2: now a real <button> for keyboard access - strip the filled button chrome so the delete
+   glyph reads inline like before. */
 .remove-item {
 	height: 12px;
 	cursor: pointer;
+	background: transparent;
+	border: none;
+	padding: 0;
+	color: inherit;
+	align-items: center;
+}
+
+/* item 2: reveal the reviewer/work-item remove affordance on row hover AND keyboard focus-within,
+   instead of the old mouse-only JS showDelete state (which was unreachable by keyboard). */
+.section-item.reviewer .remove-item,
+.section-item.work-item .remove-item {
+	display: none;
+}
+
+.section-item.reviewer:hover .remove-item,
+.section-item.reviewer:focus-within .remove-item,
+.section-item.work-item:hover .remove-item,
+.section-item.work-item:focus-within .remove-item {
+	display: inline-flex;
+}
+
+/* item 2: the title action bar (Edit / Copy Link / Convert to draft) is always rendered now; reveal
+   it on hover OR keyboard focus-within so it is reachable without a mouse. */
+.overview-title .title-action-bar {
+	display: none;
+}
+
+.overview-title:hover .title-action-bar,
+.overview-title:focus-within .title-action-bar {
+	display: flex;
 }
 
 .title-editing-form {
@@ -1177,6 +1209,8 @@ code {
 	background: var(--azdo-surface-header);
 }
 
+/* item 2: now a real <button> for keyboard access - strip the filled button chrome so it still reads
+   as an inline path chip. */
 .thread-header .thread-file-chip {
 	font-family: var(--vscode-editor-font-family);
 	font-size: 12px;
@@ -1184,9 +1218,16 @@ code {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	background: transparent;
+	border: none;
+	padding: 0;
+	color: inherit;
+	text-align: left;
+	min-width: 0;
 }
 
-.thread-header .thread-file-chip:hover {
+.thread-header .thread-file-chip:hover,
+.thread-header .thread-file-chip:focus {
 	text-decoration: underline;
 	color: var(--vscode-textLink-activeForeground);
 }

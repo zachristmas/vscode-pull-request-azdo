@@ -97,9 +97,11 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 								<div className="status-item">
 									<StateIcon state={status.state} />
 									<div className={statusStateTextClass(status.state)}>{getSummaryLabel(status.statuses)}</div>
-									<a aria-role="button" onClick={toggleDetails}>
+									{/* item 2: real button so it's keyboard-operable (was <a aria-role> - not focusable,
+									    and aria-role is not a valid attribute). */}
+									<button type="button" className="link-button" onClick={toggleDetails}>
 										{showDetails ? 'Hide' : 'Show'}
-									</a>
+									</button>
 								</div>
 								{showDetails ? <StatusCheckDetails statuses={status.statuses} /> : null}
 							</div>
@@ -298,9 +300,10 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 					status={pending.length > 0 ? PolicyEvaluationStatus.Rejected : PolicyEvaluationStatus.Approved}
 				/>
 				<div className={pending.length > 0 ? 'text-danger' : 'text-success'}>{summaryLabel}</div>
-				<a aria-role="button" onClick={toggleDetails}>
+				{/* item 2: real button so it's keyboard-operable (was <a aria-role>). */}
+				<button type="button" className="link-button" onClick={toggleDetails}>
 					{showDetails ? 'Hide' : 'Show'}
-				</a>
+				</button>
 			</div>
 			{showDetails ? <PolicyDetails policies={policies} onRequeue={setPolicies} /> : null}
 		</div>

@@ -281,9 +281,10 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 			{hasFile || hasStatus ? (
 				<div className="thread-header">
 					{hasFile ? (
-						<a className="thread-file-chip" onClick={() => openDiff(thread)}>
+						// item 2: real button so the diff opens via keyboard too (was a click-only <a>).
+						<button type="button" className="thread-file-chip" onClick={() => openDiff(thread)}>
 							{thread.threadContext.filePath}
-						</a>
+						</button>
 					) : null}
 					{hasStatus ? <ThreadStatusPill status={status} onChange={onThreadStatusChange} /> : null}
 				</div>

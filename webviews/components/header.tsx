@@ -76,7 +76,6 @@ function Title({
 	isActive,
 }: Partial<PullRequest> & { isActive?: boolean }) {
 	const [inEditMode, setEditMode] = useState(false);
-	const [showActionBar, setShowActionBar] = useState(false);
 	const [currentTitle, setCurrentTitle] = useStateProp(title);
 	const { setTitle, refresh, copyPrLink, convertToDraft, updatePR } = useContext(PullRequestContext);
 	const canConvertToDraft = !isIssue && !isDraft && state === PullRequestStatus.Active;
@@ -109,11 +108,7 @@ function Title({
 	);
 
 	return (
-		<div
-			className="overview-title"
-			onMouseEnter={() => setShowActionBar(true)}
-			onMouseLeave={() => setShowActionBar(false)}
-		>
+		<div className="overview-title">
 			{editableTitle}
 			<div className="block-select">
 				{/*
@@ -121,8 +116,11 @@ function Title({
 			  Add an empty selectable div here to block triple click on title from selecting the following buttons. Issue #628.
 			*/}
 			</div>
-			{canEdit && showActionBar && !inEditMode ? (
-				<div className="flex-action-bar comment-actions">
+			{/* item 2: the title actions (Edit / Copy Link / Convert to draft) are always in the DOM now
+			    and revealed on hover OR focus-within (see index.css .title-action-bar), so keyboard users
+			    can reach them - they were previously gated on an onMouseEnter-only showActionBar state. */}
+			{canEdit && !inEditMode ? (
+				<div className="flex-action-bar comment-actions title-action-bar">
 					{isActive ? (
 						<button title="Edit" onClick={() => setEditMode(true)}>
 							{editIcon}
@@ -148,7 +146,7 @@ function Title({
 					) : null}
 				</div>
 			) : (
-				<div className="flex-action-bar comment-actons"></div>
+				<div className="flex-action-bar comment-actions title-action-bar"></div>
 			)}
 			<div className="button-group">
 				<CheckoutButtons {...{ isCurrentlyCheckedOut, isIssue, isActive }} />

@@ -73,21 +73,24 @@ export default function Sidebar({ reviewers, workItems, hasWritePermission, isAc
 
 function WorkItem(workItem: WorkItem & { canDelete: boolean }) {
 	const canDelete = workItem.canDelete;
-	const [showDelete, setShowDelete] = useState(false);
 	const { removeWorkItemFromPR } = useContext(PullRequestContext);
 	return (
-		<div
-			className="section-item work-item"
-			onMouseEnter={() => setShowDelete(true)}
-			onMouseLeave={() => setShowDelete(false)}
-		>
+		<div className="section-item work-item">
 			<WorkItemDetails {...workItem} />
-			{canDelete && showDelete ? (
+			{/* item 2: keyboard-reachable remove - a real button always in the DOM, revealed on row
+			    hover/focus-within by CSS instead of the old mouse-only showDelete state. */}
+			{canDelete ? (
 				<>
 					{nbsp}
-					<a className="push-right remove-item" onClick={() => removeWorkItemFromPR(workItem.id!)}>
-						{deleteIcon}️
-					</a>
+					<button
+						type="button"
+						className="push-right remove-item"
+						title="Remove work item"
+						aria-label={`Remove work item ${workItem.id}`}
+						onClick={() => removeWorkItemFromPR(workItem.id!)}
+					>
+						{deleteIcon}
+					</button>
 					{nbsp}
 				</>
 			) : null}
