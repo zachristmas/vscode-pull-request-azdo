@@ -45,13 +45,19 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
+			// Only re-fetch while checks are actively running (mirrors the mergeability poll, which stops
+			// once resolved). Avoids an unbounded 3s API poll when statuses are terminal or absent; the
+			// manual Refresh button covers later re-runs.
+			if (status.state !== GitStatusState.Pending) {
+				return;
+			}
 			const fresh = await checkStatus();
 			if (fresh) {
 				setStatus(fresh);
 			}
 		}, 3000);
 		return () => clearInterval(handle);
-	}, []);
+	});
 
 	return (
 		<div id="status-checks">
