@@ -1117,32 +1117,181 @@ code {
 	margin-left: 0;
 }
 
-.thread-container .comment-container {
-	padding-top: 0px;
-}
-
-.thread-container .comment-container ~ .comment-container {
-	padding-left: var(--azdo-space-5);
-	width: auto;
-}
-
-.thread-container .reply-thread {
-	text-align: left;
-	padding-top: var(--azdo-space-2);
-}
-
-.thread-container .diff-container {
-	margin-top: var(--azdo-space-3);
-	border: 1px solid var(--azdo-border-subtle);
-}
-
-body .comment-container .review-comment-header > select {
-	margin-left: var(--azdo-space-1);
-	margin-right: var(--azdo-space-1);
-}
-
+/* UX-03: the THREAD owns one card (border + radius + surface). The 1380eaf5 per-comment card still
+   applies to the standalone description, but inside a thread the comments go borderless so we don't
+   nest card-in-card; they're separated by rules and replies get a 2px left rail. */
 .thread-container {
-	padding-top: var(--azdo-space-4);
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
+	background: var(--azdo-surface);
+	margin-top: var(--azdo-space-4);
+	overflow: hidden;
+}
+
+.thread-container > .comment-container.review-comment > .review-comment-container {
+	border: none;
+	border-radius: 0;
+	background: transparent;
+}
+
+.thread-container .comment-container {
+	padding-top: 0;
+}
+
+/* replies after the root: keep the indent, add the 2px rail + a separator rule so depth survives a
+   page fold. */
+.thread-container .comment-container ~ .comment-container {
+	width: auto;
+	margin-left: var(--azdo-space-5);
+	padding-left: var(--azdo-space-3);
+	border-left: 2px solid var(--azdo-border-subtle);
+	border-top: 1px solid var(--azdo-border-subtle);
+}
+
+/* thread header: file chip (opens the diff) on the left, status pill on the right. */
+.thread-header {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+	padding: var(--azdo-space-2) var(--azdo-space-3);
+	border-bottom: 1px solid var(--azdo-border-subtle);
+	background: var(--azdo-surface-header);
+}
+
+.thread-header .thread-file-chip {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.thread-header .thread-file-chip:hover {
+	text-decoration: underline;
+	color: var(--vscode-textLink-activeForeground);
+}
+
+.thread-header .thread-status-pill {
+	margin-left: auto;
+	flex-shrink: 0;
+}
+
+/* status pill: a native <select> dressed as a chip - colored dot + label + the select's chevron. */
+.thread-status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--azdo-space-1);
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: 999px;
+	padding: 1px var(--azdo-space-2);
+}
+
+.thread-status-pill .status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	background: var(--azdo-muted);
+}
+
+.thread-status-pill select {
+	border: none;
+	background: transparent;
+	border-radius: 0;
+	padding: 0 var(--azdo-space-1);
+	font-size: 12px;
+	color: var(--vscode-foreground);
+}
+
+.thread-status-pill.status-info {
+	border-color: var(--azdo-info);
+}
+.thread-status-pill.status-info .status-dot {
+	background: var(--azdo-info);
+}
+.thread-status-pill.status-warning {
+	border-color: var(--azdo-warning);
+}
+.thread-status-pill.status-warning .status-dot {
+	background: var(--azdo-warning);
+}
+.thread-status-pill.status-success {
+	border-color: var(--azdo-success);
+}
+.thread-status-pill.status-success .status-dot {
+	background: var(--azdo-success);
+}
+.thread-status-pill.status-muted .status-dot {
+	background: var(--azdo-muted);
+}
+
+/* resolved threads collapse to a one-line summary; this toggle expands/collapses. */
+.thread-collapse-toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-1);
+	width: 100%;
+	background: transparent;
+	color: var(--azdo-muted);
+	border: none;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
+	font-size: 12px;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.thread-collapse-toggle:hover:enabled,
+.thread-collapse-toggle:focus:enabled {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-foreground);
+}
+
+.thread-chevron {
+	display: inline-flex;
+	transform: rotate(-90deg);
+	transition: transform 0.1s ease;
+}
+
+.thread-chevron.expanded {
+	transform: rotate(0deg);
+}
+
+.thread-chevron .icon,
+.thread-chevron .icon svg {
+	width: 12px;
+	height: 12px;
+	margin-right: 0;
+}
+
+.thread-chevron .icon svg path {
+	fill: currentColor;
+}
+
+/* ghost reply field: full-width, looks like an input, swaps to the real composer on click. */
+.reply-ghost {
+	display: block;
+	width: auto;
+	margin: var(--azdo-space-3);
+	padding: var(--azdo-space-2);
+	text-align: left;
+	font-size: 13px;
+	background: var(--vscode-input-background);
+	color: var(--azdo-muted);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: var(--azdo-radius-md);
+}
+
+.reply-ghost:hover:enabled,
+.reply-ghost:focus:enabled {
+	background: var(--vscode-input-background);
+	color: var(--vscode-foreground);
+	border-color: var(--vscode-focusBorder);
+}
+
+/* the real composer, once swapped in, inset inside the thread card. */
+.thread-container > form {
+	padding: 0 var(--azdo-space-3) var(--azdo-space-3);
 }
 
 .system-timestamp {

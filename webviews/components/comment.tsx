@@ -28,22 +28,16 @@ export type Props = Partial<Comment> & {
 	isPRDescription?: boolean;
 	threadId: number;
 	canEdit?: boolean;
-	isFirstCommentInThread?: boolean;
-	threadStatus?: number;
-	changeThreadStatus?: (string) => void;
 };
 
 export function CommentView(comment: Props) {
-	const { threadId, content, canEdit, isPRDescription, threadStatus, isFirstCommentInThread, changeThreadStatus } = comment;
+	const { threadId, content, canEdit, isPRDescription } = comment;
 	const id = threadId * 1000 + comment.id;
 	const [bodyMd, setBodyMd] = useStateProp(content);
 	const [bodyHTMLState, setBodyHtml] = useStateProp(content);
 	const { editComment, setDescription, pr } = useContext(PullRequestContext);
 	const currentDraft = pr.pendingCommentDrafts && pr.pendingCommentDrafts[id];
 	const [inEditMode, setEditMode] = useState(!!currentDraft);
-	const statusProps = !!isFirstCommentInThread
-		? { threadStatus: threadStatus, changeThreadStatus: changeThreadStatus }
-		: null;
 
 	if (inEditMode) {
 		return React.cloneElement(comment.headerInEditMode ? <CommentBox for={comment} /> : <></>, {}, [
@@ -73,7 +67,7 @@ export function CommentView(comment: Props) {
 	}
 
 	return (
-		<CommentBox for={comment} {...statusProps}>
+		<CommentBox for={comment}>
 			{/* UX-03: always rendered, shown by CSS on hover AND :focus-within so keyboard users can
 			    reach quote/edit (the old showActionBar state was mouse-only). */}
 			<div className="action-bar comment-actions">
@@ -98,29 +92,15 @@ export function CommentView(comment: Props) {
 	);
 }
 
-export const ThreadStatus = {
-	'0': 'UNKNOWN',
-	'1': 'Active',
-	'2': 'Fixed',
-	'3': 'WontFix',
-	'4': 'Closed',
-	// '5': 'ByDesign',
-	'6': 'Pending',
-};
-
-const ThreadStatusOrder = ['1', '6', '2', '3', '4'];
-
 type CommentBoxProps = {
 	for: Partial<Comment>;
 	header?: React.ReactChild;
 	onMouseEnter?: any;
 	onMouseLeave?: any;
 	children?: any;
-	threadStatus?: number;
-	changeThreadStatus?: (string) => void;
 };
 
-function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children, threadStatus, changeThreadStatus }: CommentBoxProps) {
+function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children }: CommentBoxProps) {
 	const { author, publishedDate, _links } = comment;
 	const htmlUrl = _links.self.href;
 	return (
@@ -145,15 +125,8 @@ function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children, thread
 							</>
 							: null
 					} */}
-						{!!threadStatus ? (
-							<select onChange={e => changeThreadStatus(e.target.value)} defaultValue={threadStatus.toString()}>
-								{ThreadStatusOrder.map(status => (
-									<option key={status} value={status}>
-										{ThreadStatus[status]}
-									</option>
-								))}
-							</select>
-						) : null}
+						{/* UX-03: the thread status control moved to the thread header (CommentEventView in
+						    timeline.tsx), which owns thread.status - no more per-comment c.id===1 guessing. */}
 					</Spaced>
 				</div>
 				{children}
