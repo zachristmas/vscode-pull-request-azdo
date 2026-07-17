@@ -3,6 +3,36 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/* UX-05: design tokens. Every token aliases a --vscode-* theme variable so light/dark/high-contrast
+   come for free; no hardcoded hex outside the .vscode-high-contrast blocks. */
+:root {
+	/* -- radius -- */
+	--azdo-radius-sm: 2px; /* chips, inline badges, code spans */
+	--azdo-radius-md: 4px; /* buttons, inputs, selects, badges */
+	--azdo-radius-lg: 6px; /* cards: comment containers, status panel, sidebar cards */
+
+	/* -- spacing (4px base) -- */
+	--azdo-space-1: 4px;
+	--azdo-space-2: 8px;
+	--azdo-space-3: 12px;
+	--azdo-space-4: 16px;
+	--azdo-space-5: 20px;
+	--azdo-space-6: 24px;
+
+	/* -- surfaces & borders -- */
+	--azdo-surface: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+	--azdo-surface-header: var(--vscode-sideBarSectionHeader-background, transparent);
+	--azdo-border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
+	--azdo-border-subtle: var(--vscode-editorWidget-border, var(--azdo-border));
+
+	/* -- semantic status -- */
+	--azdo-success: var(--vscode-charts-green, var(--vscode-testing-iconPassed));
+	--azdo-danger: var(--vscode-errorForeground);
+	--azdo-warning: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
+	--azdo-info: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+	--azdo-muted: var(--vscode-descriptionForeground);
+}
+
 body a {
 	text-decoration: none;
 }
@@ -14,7 +44,7 @@ button,
 input[type='submit'] {
 	background-color: var(--vscode-button-background);
 	color: var(--vscode-button-foreground);
-	border-radius: 0px;
+	border-radius: var(--azdo-radius-md);
 	border: 1px solid transparent;
 	outline: none;
 	padding: 4px 12px;
@@ -65,7 +95,7 @@ select {
 	display: block;
 	box-sizing: border-box;
 	padding: 4px 12px;
-	border-radius: 0;
+	border-radius: var(--azdo-radius-md);
 	font-size: 13px;
 	border: 1px solid var(--vscode-dropdown-border);
 	background-color: var(--vscode-dropdown-background);

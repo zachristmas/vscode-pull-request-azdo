@@ -5,7 +5,8 @@
 
 #app {
 	display: grid;
-	grid-template-columns: 670px auto;
+	grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+	column-gap: var(--azdo-space-5);
 }
 
 #title {
@@ -22,15 +23,14 @@
 #sidebar {
 	grid-column: 2;
 	grid-row: 2;
-	padding-left: 20px;
 }
 
 #sidebar .vote {
-	margin-bottom: 20px;
+	margin-bottom: var(--azdo-space-5);
 }
 
 #sidebar .vote .vote-select {
-	margin-bottom: 5px;
+	margin-bottom: var(--azdo-space-1);
 }
 
 .vote .vote-button {
@@ -48,19 +48,19 @@ textarea:focus,
 }
 
 .title-text {
-	margin-right: 5px;
+	margin-right: var(--azdo-space-1);
 }
 
 .title {
 	display: flex;
 	align-items: flex-start;
-	margin: 20px 0;
-	padding-bottom: 10px;
-	border-bottom: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	margin: var(--azdo-space-5) 0;
+	padding-bottom: var(--azdo-space-3);
+	border-bottom: 1px solid var(--azdo-border-subtle);
 }
 
 .title .pr-number {
-	margin-left: 5px;
+	margin-left: var(--azdo-space-1);
 }
 
 .loading-indicator {
@@ -92,13 +92,13 @@ body hr {
 	display: block;
 	height: 1px;
 	border: 0;
-	border-top: 1px solid #555;
+	border-top: 1px solid var(--azdo-border-subtle);
 	margin: 0 !important;
 	padding: 0;
 }
 
 body .comment-container .avatar-container {
-	margin-right: 12px;
+	margin-right: var(--azdo-space-3);
 }
 
 body .comment-container .avatar-container a {
@@ -135,12 +135,12 @@ body .comment-container .review-comment-header {
 	display: flex;
 	width: 100%;
 	box-sizing: border-box;
-	padding: 6px;
+	padding: var(--azdo-space-2);
 	font-size: 12px;
 	color: var(--vscode-foreground);
 	align-items: center;
 	background: var(--vscode-list-inactiveSelectionBackground);
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	border: 1px solid var(--azdo-border-subtle);
 }
 
 .description-header {
@@ -173,8 +173,8 @@ body .comment-container .review-comment-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-top: 5px;
-	margin-left: 15px;
+	margin-top: var(--azdo-space-1);
+	margin-left: var(--azdo-space-4);
 }
 
 .status-item,
@@ -192,7 +192,7 @@ body .comment-container .review-comment-header {
 
 .ready-for-review-container {
 	border-top: 1px solid;
-	padding-top: 10px;
+	padding-top: var(--azdo-space-3);
 }
 
 .ready-for-review-button {
@@ -217,18 +217,18 @@ body .comment-container .review-comment-header {
 }
 
 .status-section {
-	padding-bottom: 12px;
+	padding-bottom: var(--azdo-space-3);
 }
 
 #status-checks a {
-	margin-left: 10px;
+	margin-left: var(--azdo-space-3);
 	cursor: pointer;
 }
 
 #status-checks {
-	padding: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
-	margin-bottom: 20px;
+	padding: var(--azdo-space-3);
+	border: 1px solid var(--azdo-border-subtle);
+	margin-bottom: var(--azdo-space-5);
 }
 
 #status-checks summary {
@@ -237,7 +237,7 @@ body .comment-container .review-comment-header {
 }
 
 #status-checks svg {
-	margin-right: 6px;
+	margin-right: var(--azdo-space-2);
 	width: 16px;
 }
 
@@ -247,7 +247,7 @@ body .comment-container .review-comment-header {
 }
 
 #status-checks .merge-select-container > * {
-	margin-right: 5px;
+	margin-right: var(--azdo-space-1);
 }
 
 #status-checks .branch-status-container {
@@ -257,18 +257,18 @@ body .comment-container .review-comment-header {
 #status-checks .branch-status-message {
 	display: inline-block;
 	line-height: 100%;
-	padding: 0 10px;
+	padding: 0 var(--azdo-space-3);
 }
 #status-checks .merge-option-container {
-	padding: 5px;
-	margin-top: 5px;
+	padding: var(--azdo-space-1);
+	margin-top: var(--azdo-space-1);
 }
 
 body .comment-container .review-comment-header > span,
 body .comment-container .review-comment-header > a,
 body .commit .commit-message > a,
 body .merged .merged-message > a {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 	white-space: nowrap;
 }
 
@@ -278,17 +278,17 @@ body .diff .diffHeader .outdatedLabel {
 	border-radius: 2px 2px 2px 2px;
 	padding: 0.1rem 0.3rem;
 	font-style: italic;
-	margin-left: 5px;
+	margin-left: var(--azdo-space-1);
 }
 
 body .diff .diffPath {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 }
 
 body .comment-container .comment-body,
 .review-body {
-	padding: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	padding: var(--azdo-space-3);
+	border: 1px solid var(--azdo-border-subtle);
 	border-top: none;
 }
 
@@ -338,13 +338,13 @@ body button.checkedOut {
 body button .icon {
 	width: 1em;
 	height: 1em;
-	margin-right: 6px;
+	margin-right: var(--azdo-space-2);
 }
 
 .prIcon {
 	display: flex;
 	border-radius: 10px;
-	margin-right: 5px;
+	margin-right: var(--azdo-space-1);
 	margin-top: 18px;
 }
 
@@ -393,7 +393,7 @@ body button .icon {
 }
 
 body .overview-title .button-group button {
-	margin-left: 10px;
+	margin-left: var(--azdo-space-3);
 	display: flex;
 }
 
@@ -403,16 +403,16 @@ body .overview-title .button-group button {
 	background: var(--vscode-badge-background);
 	color: var(--vscode-badge-foreground);
 	border-radius: 4px;
-	padding: 2px 8px;
-	margin-right: 12px;
+	padding: 2px var(--azdo-space-2);
+	margin-right: var(--azdo-space-3);
 }
 
 .section {
-	padding-bottom: 20px;
+	padding-bottom: var(--azdo-space-5);
 }
 
 .section-header {
-	padding-bottom: 8px;
+	padding-bottom: var(--azdo-space-2);
 	display: flex;
 }
 
@@ -442,13 +442,13 @@ body .overview-title .button-group button {
 .commit svg {
 	width: 16px;
 	height: auto;
-	margin-right: 8px;
+	margin-right: var(--azdo-space-2);
 	flex-shrink: 0;
 }
 
 .comment-container.commit,
 .comment-container.merged {
-	padding: 16px 0 0 12px;
+	padding: var(--azdo-space-4) 0 0 var(--azdo-space-3);
 	box-sizing: border-box;
 }
 
@@ -463,8 +463,8 @@ body .overview-title .button-group button {
 }
 
 .review {
-	margin: 0px 8px;
-	padding: 4px 0;
+	margin: 0px var(--azdo-space-2);
+	padding: var(--azdo-space-1) 0;
 }
 
 .commit .commit-message,
@@ -477,7 +477,7 @@ body .overview-title .button-group button {
 
 .commit .commit-message .avatar-container,
 .merged .merged-message .avatar-container {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 	flex-shrink: 0;
 }
 
@@ -505,13 +505,13 @@ body .overview-title .button-group button {
 
 .merged .merged-message .message,
 .merged .inline-sha {
-	margin: 0 4px 0 0;
+	margin: 0 var(--azdo-space-1) 0 0;
 }
 
 .merged svg {
 	width: 14px;
 	height: auto;
-	margin-right: 8px;
+	margin-right: var(--azdo-space-2);
 	flex-shrink: 0;
 }
 
@@ -527,14 +527,14 @@ body .overview-title .button-group button {
 
 .comment-container {
 	position: relative;
-	padding-top: 20px;
+	padding-top: var(--azdo-space-5);
 	width: 100%;
 	display: flex;
 	margin: 0;
 }
 
 .comment-container[data-type='commit'] {
-	padding: 8px 0;
+	padding: var(--azdo-space-2) 0;
 }
 
 .comment-container[data-type='commit'] + .comment-container[data-type='commit'],
@@ -545,7 +545,7 @@ body .overview-title .button-group button {
 .comment-body .review-comment {
 	padding: 3px;
 	box-sizing: border-box;
-	border-top: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	border-top: 1px solid var(--azdo-border-subtle);
 }
 
 .review-comment-container .review-comment .review-comment-header {
@@ -555,23 +555,23 @@ body .overview-title .button-group button {
 
 .review-comment-container .review-comment .comment-body {
 	border: none;
-	padding: 4px 12px 8px 12px;
+	padding: var(--azdo-space-1) var(--azdo-space-3) var(--azdo-space-2) var(--azdo-space-3);
 }
 
 .comment-body .line {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	margin-bottom: 8px;
+	margin-bottom: var(--azdo-space-2);
 }
 
 body .comment-form {
-	padding: 20px 0 10px;
+	padding: var(--azdo-space-5) 0 var(--azdo-space-3);
 }
 
 .review-comment-container .comment-form {
 	margin: 0 0 0 36px;
-	padding: 10px 0;
+	padding: var(--azdo-space-3) 0;
 }
 
 .task-list-item {
@@ -579,7 +579,7 @@ body .comment-form {
 }
 
 #status-checks textarea {
-	margin: 10px 0;
+	margin: var(--azdo-space-3) 0;
 }
 
 textarea {
@@ -588,14 +588,14 @@ textarea {
 }
 
 .editing-form {
-	padding: 5px 0;
+	padding: var(--azdo-space-1) 0;
 	display: flex;
 	flex-direction: column;
 }
 
 .editing-form .form-actions {
 	margin-left: auto;
-	padding: 5px 0;
+	padding: var(--azdo-space-1) 0;
 }
 
 .comment-form .form-actions > button,
@@ -615,33 +615,33 @@ textarea {
 
 .form-actions {
 	display: flex;
-	padding-top: 10px;
-	padding-bottom: 10px;
+	padding-top: var(--azdo-space-3);
+	padding-bottom: var(--azdo-space-3);
 }
 
 .main-comment-form > .form-actions {
-	margin-bottom: 10px;
+	margin-bottom: var(--azdo-space-3);
 }
 
 body .comment-form .form-actions button {
-	margin-right: 10px;
+	margin-right: var(--azdo-space-3);
 }
 
 .details .comment-body {
-	padding: 19px 0;
+	padding: var(--azdo-space-5) 0;
 }
 
 blockquote {
 	display: block;
 	flex-direction: column;
-	margin: 8px 0;
-	padding: 8px 12px;
+	margin: var(--azdo-space-2) 0;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
 	border-left-width: 5px;
 	border-left-style: solid;
 }
 
 blockquote p {
-	margin: 8px 0;
+	margin: var(--azdo-space-2) 0;
 }
 
 blockquote p:first-child {
@@ -701,7 +701,7 @@ h3 {
 .comment-body table > thead > tr > td,
 .comment-body table > tbody > tr > th,
 .comment-body table > tbody > tr > td {
-	padding: 5px 10px;
+	padding: var(--azdo-space-1) var(--azdo-space-3);
 }
 
 .comment-body table > tbody > tr + tr > td {
@@ -723,7 +723,7 @@ code {
 
 .comment-body pre:not(.hljs),
 .comment-body pre.hljs code > div {
-	padding: 16px;
+	padding: var(--azdo-space-4);
 	border-radius: 3px;
 	overflow: auto;
 }
@@ -739,14 +739,9 @@ code {
 	color: var(--vscode-editor-foreground);
 }
 
-.vscode-light .comment-body pre:not(.hljs),
-.vscode-light .comment-body code > div {
-	background-color: rgba(220, 220, 220, 0.4);
-}
-
-.vscode-dark .comment-body pre:not(.hljs),
-.vscode-dark .comment-body code > div {
-	background-color: rgba(10, 10, 10, 0.4);
+.comment-body pre:not(.hljs),
+.comment-body code > div {
+	background-color: var(--vscode-textCodeBlock-background);
 }
 
 .vscode-high-contrast .comment-body pre:not(.hljs),
@@ -769,29 +764,19 @@ code {
 	border: 1px solid var(--vscode-panel-border);
 }
 
-.vscode-light .comment-body table > thead > tr > th {
-	border-color: rgba(0, 0, 0, 0.69);
+.comment-body table > thead > tr > th {
+	border-color: var(--azdo-border-subtle);
 }
 
-.vscode-dark .comment-body table > thead > tr > th {
-	border-color: rgba(255, 255, 255, 0.69);
-}
-
-.vscode-light .comment-body h1,
-.vscode-light .comment-body hr,
-.vscode-light .comment-body table > tbody > tr + tr > td {
-	border-color: rgba(0, 0, 0, 0.18);
-}
-
-.vscode-dark .comment-body h1,
-.vscode-dark .comment-body hr,
-.vscode-dark .comment-body table > tbody > tr + tr > td {
-	border-color: rgba(255, 255, 255, 0.18);
+.comment-body h1,
+.comment-body hr,
+.comment-body table > tbody > tr + tr > td {
+	border-color: var(--azdo-border-subtle);
 }
 
 .review-comment-body .diff-container {
-	margin-top: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	margin-top: var(--azdo-space-3);
+	border: 1px solid var(--azdo-border-subtle);
 }
 
 .review-comment-body .diff-container .review-comment-container .comment-container {
@@ -799,7 +784,7 @@ code {
 }
 
 .review-comment-body .diff-container .review-comment-container .review-comment-header .avatar-container {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 }
 
 .review-comment-body .diff-container .review-comment-container .review-comment-header .avatar {
@@ -808,7 +793,7 @@ code {
 }
 
 .diff .diffHeader {
-	padding: 6px 12px;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
 	line-height: 1.5;
 	background: var(--vscode-editorGroupHeader-tabsBackground);
 }
@@ -841,14 +826,14 @@ code {
 
 .diff .diffLine .diffTypeSign {
 	user-select: none;
-	padding-right: 5px;
+	padding-right: var(--azdo-space-1);
 }
 
 .diff .diffLine .lineNumber {
 	width: 1%;
 	min-width: 50px;
-	padding-right: 10px;
-	padding-left: 10px;
+	padding-right: var(--azdo-space-3);
+	padding-left: var(--azdo-space-3);
 	font-size: 12px;
 	line-height: 20px;
 	text-align: right;
@@ -906,7 +891,7 @@ code {
 
 	#sidebar {
 		display: grid;
-		column-gap: 20px;
+		column-gap: var(--azdo-space-5);
 		grid-template-columns: 50% 50%;
 		padding: 0;
 	}
@@ -917,7 +902,7 @@ code {
 	}
 
 	.section-item {
-		margin-right: 8px;
+		margin-right: var(--azdo-space-2);
 	}
 
 	body .hidden-focusable {
@@ -926,14 +911,14 @@ code {
 	}
 
 	.section-header button {
-		margin-left: 8px;
+		margin-left: var(--azdo-space-2);
 		display: flex;
 	}
 
 	.section-item.reviewer {
 		border: 1px solid var(--vscode-badge-background);
 		border-radius: 3px;
-		padding: 2px 6px;
+		padding: 2px var(--azdo-space-2);
 	}
 
 	.section-item .avatar {
@@ -942,7 +927,7 @@ code {
 
 	.section-item .login {
 		width: auto;
-		margin-right: 4px;
+		margin-right: var(--azdo-space-1);
 	}
 }
 
@@ -972,8 +957,8 @@ code {
 
 .action-bar > button,
 .flex-action-bar > button {
-	margin-left: 4px;
-	margin-right: 4px;
+	margin-left: var(--azdo-space-1);
+	margin-right: var(--azdo-space-1);
 }
 
 .remove-item {
@@ -994,7 +979,7 @@ code {
 }
 
 .thread-container .comment-container ~ .comment-container {
-	padding-left: 20px;
+	padding-left: var(--azdo-space-5);
 	width: auto;
 }
 
@@ -1003,17 +988,17 @@ code {
 }
 
 .thread-container .diff-container {
-	margin-top: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	margin-top: var(--azdo-space-3);
+	border: 1px solid var(--azdo-border-subtle);
 }
 
 body .comment-container .review-comment-header > select {
-	margin-left: 5px;
-	margin-right: 5px;
+	margin-left: var(--azdo-space-1);
+	margin-right: var(--azdo-space-1);
 }
 
 .thread-container {
-	padding-top: 16px;
+	padding-top: var(--azdo-space-4);
 }
 
 .system-timestamp {
@@ -1031,7 +1016,7 @@ body .comment-container .review-comment-header > select {
 }
 
 .work-item {
-	padding: 2px 0 2px 6px;
+	padding: 2px 0 2px var(--azdo-space-2);
 	/* height: 16px; */
 	border-radius: 2px;
 	/* background: var(--vscode-badge-background); */
@@ -1040,8 +1025,8 @@ body .comment-container .review-comment-header > select {
 }
 
 .work-item-body-container .work-item:not(:first-child) {
-	margin-top: 5px;
-	padding-top: 5px;
+	margin-top: var(--azdo-space-1);
+	padding-top: var(--azdo-space-1);
 	border-top: 1px solid var(--vscode-foreground);
 }
 
