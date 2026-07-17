@@ -5,7 +5,7 @@
 'use strict';
 
 import * as pathLib from 'path';
-import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { GitPullRequestCommentThread, GitPullRequestMergeStrategy } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { Repository } from './api/api';
 import { GitErrorCodes } from './api/api1';
@@ -391,26 +391,42 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('azdopr.merge', async (pr?: PRNode) => {
-			const folderManager = reposManager.getManagerForPullRequestModel(pr?.pullRequestModel);
-			if (!folderManager) {
+		// AC-03: FolderRepositoryManager.mergePullRequest is a commented-out stub. Complete the PR via
+		// the working PullRequestModel.completePullRequest path; the strategy quick-pick doubles as the
+		// confirmation step.
+		vscode.commands.registerCommand('azdopr.merge', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
 				return;
 			}
-			const pullRequest = ensurePR(folderManager, pr);
-			return vscode.window
-				.showWarningMessage(`Are you sure you want to merge this pull request on Azure Devops?`, { modal: true }, 'Yes')
-				.then(async value => {
-					let newPR;
-					if (value === 'Yes') {
-						try {
-							newPR = await folderManager.mergePullRequest(pullRequest);
-							return newPR;
-						} catch (e) {
-							vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
-							return newPR;
-						}
-					}
+			const strategyItems: (vscode.QuickPickItem & { strategy: GitPullRequestMergeStrategy })[] = [
+				{ label: 'Create Merge Commit', strategy: GitPullRequestMergeStrategy.NoFastForward },
+				{ label: 'Squash Commit', strategy: GitPullRequestMergeStrategy.Squash },
+				{ label: 'Rebase and Fast Forward', strategy: GitPullRequestMergeStrategy.Rebase },
+				{ label: 'Semi-Linear Merge', strategy: GitPullRequestMergeStrategy.RebaseMerge },
+			];
+			const picked = await vscode.window.showQuickPick(strategyItems, {
+				placeHolder: `Select a merge strategy to complete pull request #${pullRequestModel.getPullRequestId()}`,
+			});
+			if (!picked) {
+				return;
+			}
+			try {
+				const result = await pullRequestModel.completePullRequest({
+					deleteSourceBranch: true,
+					transitionWorkItems: true,
+					mergeStrategy: picked.strategy,
 				});
+				if (result.closedBy === undefined) {
+					vscode.window.showErrorMessage(`Completing pull request failed. ${result.mergeFailureMessage ?? ''}`);
+					return;
+				}
+				vscode.commands.executeCommand('azdopr.refreshList');
+				PullRequestOverviewPanel.refresh();
+				_onDidUpdatePR.fire();
+			} catch (e) {
+				vscode.window.showErrorMessage(`Unable to complete pull request. ${formatError(e)}`);
+			}
 		}),
 	);
 

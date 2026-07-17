@@ -3,13 +3,18 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { GitPullRequestCommentThread, IdentityRefWithVote } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import {
+	GitPullRequestCommentThread,
+	GitPullRequestMergeStrategy,
+	IdentityRefWithVote,
+	PullRequestStatus,
+} from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
 import { SETTINGS_NAMESPACE } from '../constants';
 import { FolderRepositoryManager } from './folderRepositoryManager';
-import { GithubItemStateEnum, MergeMethod, PullRequestVote, ReviewState } from './interface';
+import { MergeMethod, PullRequestVote, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { getDefaultMergeMethod } from './pullRequestOverview';
 import { convertIdentityRefWithVoteToReviewer } from './utils';
@@ -375,31 +380,37 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 		}
 	}
 
+	// AC-03: complete the PR from the checked-out-PR sidebar instead of calling the commented-out
+	// FolderRepositoryManager.mergePullRequest stub. The MergeSimple dropdown supplies the strategy.
 	private async mergePullRequest(
-		message: IRequestMessage<{ title: string; description: string; method: 'merge' | 'squash' | 'rebase' }>,
+		message: IRequestMessage<{ title: string; description: string; method: MergeMethod }>,
 	): Promise<void> {
-		const { title, description, method } = message.args;
-		const confirmation = await vscode.window.showInformationMessage('Merge this pull request?', { modal: true }, 'Yes');
-		if (confirmation !== 'Yes') {
-			this._replyMessage(message, { state: GithubItemStateEnum.Open });
+		const confirmation = await vscode.window.showInformationMessage(
+			'Complete this pull request?',
+			{ modal: true },
+			'Complete',
+		);
+		if (confirmation !== 'Complete') {
+			this._replyMessage(message, { state: PullRequestStatus.Active });
 			return;
 		}
 
-		this._folderRepositoryManager
-			.mergePullRequest(this._item, title, description, method)
+		const mergeStrategy = GitPullRequestMergeStrategy[message.args.method] ?? GitPullRequestMergeStrategy.NoFastForward;
+		this._item
+			.completePullRequest({ deleteSourceBranch: true, transitionWorkItems: true, mergeStrategy })
 			.then(result => {
 				vscode.commands.executeCommand('azdopr.refreshList');
 
-				if (!result.merged) {
-					vscode.window.showErrorMessage(`Merging PR failed: ${result.message}`);
+				if (result.closedBy === undefined) {
+					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage}`);
+					this._replyMessage(message, { state: PullRequestStatus.Active });
+					return;
 				}
 
-				this._replyMessage(message, {
-					state: result.merged ? GithubItemStateEnum.Merged : GithubItemStateEnum.Open,
-				});
+				this._replyMessage(message, { state: PullRequestStatus.Completed });
 			})
 			.catch(e => {
-				vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
+				vscode.window.showErrorMessage(`Unable to complete pull request. ${formatError(e)}`);
 				this._throwError(message, {});
 			});
 	}

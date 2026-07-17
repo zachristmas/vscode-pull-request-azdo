@@ -8,6 +8,7 @@ import * as path from 'path';
 import {
 	Comment,
 	GitPullRequestCommentThread,
+	GitPullRequestMergeStrategy,
 	IdentityRefWithVote,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
@@ -20,7 +21,7 @@ import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
 import { SETTINGS_NAMESPACE } from '../constants';
 import { User } from './entitlementApi';
 import { FolderRepositoryManager } from './folderRepositoryManager';
-import { GithubItemStateEnum, MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
+import { MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { AzdoUserManager } from './userManager';
 import { convertIdentityRefWithVoteToReviewer } from './utils';
@@ -739,22 +740,22 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		);
 	}
 
-	private mergePullRequest(
-		message: IRequestMessage<{ title: string; description: string; method: 'merge' | 'squash' | 'rebase' }>,
-	): void {
-		const { title, description, method } = message.args;
-		this._folderRepositoryManager
-			.mergePullRequest(this._item, title, description, method)
+	// AC-03: the legacy FolderRepositoryManager.mergePullRequest is a commented-out stub; route every
+	// merge entry point through the working completePullRequest path instead.
+	private mergePullRequest(message: IRequestMessage<{ title: string; description: string; method: MergeMethod }>): void {
+		const mergeStrategy = GitPullRequestMergeStrategy[message.args.method] ?? GitPullRequestMergeStrategy.NoFastForward;
+		this._item
+			.completePullRequest({ deleteSourceBranch: true, transitionWorkItems: true, mergeStrategy })
 			.then(result => {
 				vscode.commands.executeCommand('azdopr.refreshList');
 
-				if (!result.merged) {
-					vscode.window.showErrorMessage(`Merging PR failed: ${result.message}`);
+				if (result.closedBy === undefined) {
+					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage}`);
+					this._replyMessage(message, { state: PullRequestStatus.Active });
+					return;
 				}
 
-				this._replyMessage(message, {
-					state: result.merged ? GithubItemStateEnum.Merged : GithubItemStateEnum.Open,
-				});
+				this._replyMessage(message, { state: PullRequestStatus.Completed, mergeable: result.mergeStatus });
 			})
 			.catch(e => {
 				vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
