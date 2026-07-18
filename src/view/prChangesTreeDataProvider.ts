@@ -36,11 +36,13 @@ export class PullRequestChangesTreeDataProvider
 
 		this._disposables.push(
 			vscode.workspace.onDidChangeConfiguration(async e => {
-				if (e.affectsConfiguration(`${SETTINGS_NAMESPACE}.fileListLayout`)) {
-					this._onDidChangeTreeData.fire();
-					const layout = vscode.workspace.getConfiguration(`${SETTINGS_NAMESPACE}`).get<string>('fileListLayout');
-					await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
+				if (!e.affectsConfiguration(`${SETTINGS_NAMESPACE}.fileListLayout`)) {
+					return;
 				}
+
+				this._onDidChangeTreeData.fire();
+				const layout = vscode.workspace.getConfiguration(`${SETTINGS_NAMESPACE}`).get<string>('fileListLayout');
+				await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 			}),
 		);
 	}

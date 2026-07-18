@@ -27,7 +27,7 @@ class Log {
 			case LogLevel.Off:
 				return;
 			case LogLevel.Debug:
-				const hrtime = new Date().getTime() / 1000;
+				const hrtime = Date.now() / 1000;
 				const timeStamp = `${hrtime}s`;
 				const info = component ? `${component}> ${message}` : `${message}`;
 				this._outputChannel.appendLine(`[Debug ${timeStamp}] ${info}`);

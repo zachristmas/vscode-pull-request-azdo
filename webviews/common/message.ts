@@ -22,7 +22,7 @@ export const vscode = acquireVsCodeApi();
 // retained but disconnected). The host now guarantees a reply on the failure path, so in practice this
 // only fires when the host is truly unreachable; it must be generous enough not to reject a legitimately
 // slow merge/complete round-trip. (item 1e)
-const REPLY_TIMEOUT_MS = 60000;
+const REPLY_TIMEOUT_MS = 60_000;
 
 export class MessageHandler {
 	private _commandHandler: ((message: any) => void) | null;
@@ -46,10 +46,12 @@ export class MessageHandler {
 			// UI) pending forever, and the 3s status/policy polls grow pendingReplies unboundedly in
 			// every retained tab during an outage.
 			const timeout = setTimeout(() => {
-				if (this.pendingReplies[req]) {
-					delete this.pendingReplies[req];
-					reject(new Error(`Timed out waiting for a reply to '${message.command}'.`));
+				if (!this.pendingReplies[req]) {
+					return;
 				}
+
+				delete this.pendingReplies[req];
+				reject(new Error(`Timed out waiting for a reply to '${message.command}'.`));
 			}, REPLY_TIMEOUT_MS);
 			this.pendingReplies[req] = {
 				resolve: resolve,

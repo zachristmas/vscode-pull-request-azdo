@@ -94,7 +94,7 @@ export class GitApiImpl implements API, IGit, vscode.Disposable {
 	}
 
 	private _updateReposContext() {
-		const reposCount = Array.from(this._providers.values()).reduce((prev, current) => {
+		const reposCount = [...this._providers.values()].reduce((prev, current) => {
 			return prev + current.repositories.length;
 		}, 0);
 		vscode.commands.executeCommand('setContext', 'azdoOpenRepositoryCount', reposCount);
@@ -141,12 +141,14 @@ export class GitApiImpl implements API, IGit, vscode.Disposable {
 		const foldersMap = TernarySearchTree.forPaths<IGit>();
 
 		this._providers.forEach(provider => {
-			if (provider.repositories) {
-				const repositories = provider.repositories;
+			if (!provider.repositories) {
+				return;
+			}
 
-				for (const repository of repositories) {
-					foldersMap.set(repository.rootUri.toString(), provider);
-				}
+			const repositories = provider.repositories;
+
+			for (const repository of repositories) {
+				foldersMap.set(repository.rootUri.toString(), provider);
 			}
 		});
 
@@ -154,7 +156,7 @@ export class GitApiImpl implements API, IGit, vscode.Disposable {
 	}
 
 	registerPostCommitCommandsProvider(provider: PostCommitCommandsProvider): vscode.Disposable {
-		const disposables = Array.from(this._providers.values()).map(gitProvider => {
+		const disposables = [...this._providers.values()].map(gitProvider => {
 			if (gitProvider.registerPostCommitCommandsProvider) {
 				return gitProvider.registerPostCommitCommandsProvider(provider);
 			}

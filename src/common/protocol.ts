@@ -46,7 +46,7 @@ export class Protocol {
 				this.owner = this.getOwnerName(this.url.path) || '';
 				this.org = this.getOrg(this.url.path, this.owner, this.repositoryName) || '';
 			}
-		} catch (e) {
+		} catch {
 			Logger.appendLine(`Failed to parse '${uriString}'`);
 			vscode.window.showWarningMessage(
 				`Unable to parse remote '${uriString}'. Please check that it is correctly formatted.`,
@@ -55,9 +55,9 @@ export class Protocol {
 	}
 
 	private getOrg(path: string, ownerName: string, repositoryName: string) {
-		let normalized = path.replace(/\\/g, '/');
+		let normalized = path.replaceAll('\\', '/');
 		if (normalized.endsWith('/')) {
-			normalized = normalized.substr(0, normalized.length - 1);
+			normalized = normalized.slice(0, -1);
 		}
 
 		const fragments = normalized.split('/');
@@ -112,12 +112,12 @@ export class Protocol {
 	}
 
 	getRepositoryName(path: string) {
-		let normalized = path.replace(/\\/g, '/');
+		let normalized = path.replaceAll('\\', '/');
 		if (normalized.endsWith('/')) {
-			normalized = normalized.substr(0, normalized.length - 1);
+			normalized = normalized.slice(0, -1);
 		}
 		const lastIndex = normalized.lastIndexOf('/');
-		const lastSegment = normalized.substr(lastIndex + 1);
+		const lastSegment = normalized.slice(lastIndex + 1);
 		if (lastSegment === '' || lastSegment === '/') {
 			return;
 		}
@@ -126,14 +126,14 @@ export class Protocol {
 	}
 
 	getOwnerName(path: string) {
-		let normalized = path.replace(/\\/g, '/');
+		let normalized = path.replaceAll('\\', '/');
 		if (normalized.endsWith('/')) {
-			normalized = normalized.substr(0, normalized.length - 1);
+			normalized = normalized.slice(0, -1);
 		}
 
 		const fragments = normalized.split('/');
 		if (fragments.length > 1) {
-			return fragments[fragments.length - 2];
+			return fragments.at(-2);
 		}
 
 		return;
@@ -155,7 +155,7 @@ export class Protocol {
 
 		try {
 			return vscode.Uri.parse(`${scheme}://${this.host.toLocaleLowerCase()}/${this.nameWithOwner.toLocaleLowerCase()}`);
-		} catch (e) {
+		} catch {
 			return;
 		}
 	}

@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 function done<T>(promise: Promise<T>): Promise<void> {
-	return promise.then<void>(() => undefined);
+	return promise.then<void>(() => {});
 }
 
 export function throttle<T>(fn: () => Promise<T>): () => Promise<T> {

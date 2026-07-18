@@ -17,8 +17,7 @@ import { getZeroBased } from './diffPositionMapping';
 export function getCommentingRanges(diffHunks: DiffHunk[], isBase: boolean): vscode.Range[] {
 	const ranges: vscode.Range[] = [];
 
-	for (let i = 0; i < diffHunks.length; i++) {
-		const diffHunk = diffHunks[i];
+	for (const diffHunk of diffHunks) {
 		let startingLine: number | undefined;
 		let length: number;
 		if (isBase) {

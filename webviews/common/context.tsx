@@ -149,7 +149,7 @@ export class PRContext {
 	public close = async (body?: string) => {
 		try {
 			this.appendReview(await this.postMessage({ command: 'azdopr.close', args: body }));
-		} catch (_) {
+		} catch {
 			// Ignore
 		}
 	};

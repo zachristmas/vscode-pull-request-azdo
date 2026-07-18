@@ -43,7 +43,7 @@ export interface PRUriParams {
 export function fromPRUri(uri: Uri): PRUriParams | undefined {
 	try {
 		return JSON.parse(uri.query) as PRUriParams;
-	} catch (e) {}
+	} catch {}
 }
 
 export interface GitUriOptions {
@@ -52,9 +52,9 @@ export interface GitUriOptions {
 	base: boolean;
 }
 
-const ImageMimetypes = ['image/png', 'image/gif', 'image/jpeg', 'image/webp', 'image/tiff', 'image/bmp'];
+const ImageMimetypes = new Set(['image/png', 'image/gif', 'image/jpeg', 'image/webp', 'image/tiff', 'image/bmp']);
 
-// a 1x1 pixel transparent gif, from http://png-pixel.com/
+// a 1x1 pixel transparent gif, from https://png-pixel.com/
 export const EMPTY_IMAGE_URI = Uri.parse(`data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==`);
 
 export async function asImageDataURI(uri: Uri, repository: Repository): Promise<Uri | undefined> {
@@ -68,7 +68,7 @@ export async function asImageDataURI(uri: Uri, repository: Repository): Promise<
 			return;
 		}
 
-		if (ImageMimetypes.indexOf(mimetype) > -1) {
+		if (ImageMimetypes.has(mimetype)) {
 			const contents = await repository.buffer(ref, uri.fsPath);
 			return Uri.parse(
 				`data:${mimetype};label:${pathUtils.basename(
@@ -76,7 +76,7 @@ export async function asImageDataURI(uri: Uri, repository: Repository): Promise<
 				)};description:${ref};size:${size};base64,${contents.toString('base64')}`,
 			);
 		}
-	} catch (err) {
+	} catch {
 		return;
 	}
 }
@@ -134,7 +134,7 @@ export function toResourceUri(uri: Uri, prNumber: number, fileName: string, stat
 export function fromFileChangeNodeUri(uri: Uri): FileChangeNodeUriParams | undefined {
 	try {
 		return JSON.parse(uri.query) as FileChangeNodeUriParams;
-	} catch (e) {}
+	} catch {}
 }
 
 export function toPRUriAzdo(

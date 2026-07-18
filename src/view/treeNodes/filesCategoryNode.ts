@@ -37,11 +37,7 @@ export class FilesCategoryNode extends TreeNode implements vscode.TreeItem {
 	async getChildren(): Promise<TreeNode[]> {
 		let nodes: TreeNode[];
 		const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
-		if (layout === 'tree') {
-			nodes = this.directories;
-		} else {
-			nodes = this._fileChanges;
-		}
-		return Promise.resolve(nodes);
+		nodes = layout === 'tree' ? this.directories : this._fileChanges;
+		return nodes;
 	}
 }

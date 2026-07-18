@@ -67,7 +67,7 @@ describe('PullRequestOverview', function () {
 	afterEach(function () {
 		// UX-04: dispose every open panel (one per PR now, not a singleton). Snapshot the values
 		// first since dispose() mutates the map.
-		for (const panel of [...PullRequestOverviewPanel.panels.values()]) {
+		for (const panel of PullRequestOverviewPanel.panels.values()) {
 			panel.dispose();
 		}
 
@@ -89,7 +89,7 @@ describe('PullRequestOverview', function () {
 
 			await PullRequestOverviewPanel.createOrShow(EXTENSION_PATH, pullRequestManager, prModel, workItem, userManager);
 
-			assert(
+			assert.ok(
 				createWebviewPanel.calledWith(sinonMatch.string, 'Pull Request #1000', vscode.ViewColumn.One, {
 					enableScripts: true,
 					retainContextWhenHidden: true,
@@ -97,7 +97,7 @@ describe('PullRequestOverview', function () {
 				}),
 			);
 			assert.strictEqual(PullRequestOverviewPanel.panels.size, 1);
-			assert(PullRequestOverviewPanel.panels.has(1000));
+			assert.ok(PullRequestOverviewPanel.panels.has(1000));
 		});
 
 		it('reveals the existing tab when the same PR is reopened', async function () {

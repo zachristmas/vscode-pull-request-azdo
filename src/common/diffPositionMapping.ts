@@ -49,13 +49,13 @@ export function getAbsolutePosition(comment: IComment, fileDiffHunks: DiffHunk[]
 }
 
 export function getLastDiffLine(prPatch: string): DiffLine | undefined {
-	let lastDiffLine = undefined;
+	let lastDiffLine;
 	const prDiffReader = parseDiffHunk(prPatch);
 	let prDiffIter = prDiffReader.next();
 
 	while (!prDiffIter.done) {
 		const diffHunk = prDiffIter.value;
-		lastDiffLine = diffHunk.diffLines[diffHunk.diffLines.length - 1];
+		lastDiffLine = diffHunk.diffLines.at(-1);
 
 		prDiffIter = prDiffReader.next();
 	}
@@ -64,8 +64,7 @@ export function getLastDiffLine(prPatch: string): DiffLine | undefined {
 }
 
 export function getDiffLineByPosition(diffHunks: DiffHunk[], diffLineNumber: number): DiffLine | undefined {
-	for (let i = 0; i < diffHunks.length; i++) {
-		const diffHunk = diffHunks[i];
+	for (const diffHunk of diffHunks) {
 		for (let j = 0; j < diffHunk.diffLines.length; j++) {
 			if (diffHunk.diffLines[j].positionInHunk === diffLineNumber) {
 				return diffHunk.diffLines[j];
@@ -122,8 +121,7 @@ export function mapHeadLineToDiffHunkPosition(
 
 	const positionInDiffHunk = -1;
 
-	for (let i = 0; i < diffHunks.length; i++) {
-		const diffHunk = diffHunks[i];
+	for (const diffHunk of diffHunks) {
 
 		for (let j = 0; j < diffHunk.diffLines.length; j++) {
 			if (isBase) {
@@ -165,8 +163,7 @@ export function mapOldPositionToNew(patch: string, line: number): number {
 }
 
 export function mapCommentsToHead(diffHunks: DiffHunk[], localDiff: string, comments: IComment[]) {
-	for (let i = 0; i < comments.length; i++) {
-		const comment = comments[i];
+	for (const comment of comments) {
 
 		// Ignore outdated comments
 		if (comment.position === null || comment.position === undefined) {

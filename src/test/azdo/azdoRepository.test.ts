@@ -21,7 +21,7 @@ describe('AzdoRepository', function () {
 	let telemetry: MockTelemetry;
 	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 
-	this.timeout(1000000);
+	this.timeout(1_000_000);
 
 	before(function () {
 		dotenv.config({ path: path.resolve(__dirname, '../../../.env') });

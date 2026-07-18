@@ -12,7 +12,7 @@ import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
 
 export function main() {
-	render(<Root>{pr => <Overview {...pr} />}</Root>, document.getElementById('app'));
+	render(<Root>{pr => <Overview {...pr} />}</Root>, document.querySelector('#app'));
 }
 
 export function Root({ children }: { children: (pr: PullRequest) => JSX.Element }) {

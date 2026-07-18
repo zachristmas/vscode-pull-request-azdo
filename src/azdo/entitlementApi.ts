@@ -96,6 +96,6 @@ export const getEntitlementApi = async (
 		serverUrl || webApi.serverUrl,
 		'68ddce18-2501-45f1-a17b-7931a9922690',
 	);
-	handlers = handlers || [webApi.authHandler];
+	handlers ||= [webApi.authHandler];
 	return new UserEntitlementApi(serverUrl!, handlers, webApi.options);
 };

@@ -222,11 +222,7 @@ export function getStatus(state: PullRequestStatus, isDraft: boolean) {
 }
 
 function getActionText(state: PullRequestStatus) {
-	if (state === PullRequestStatus.Completed) {
-		return 'merged changes';
-	} else {
-		return 'wants to merge changes';
-	}
+	return state === PullRequestStatus.Completed ? 'merged changes' : 'wants to merge changes';
 }
 
 export function getClosedCommentDescription(threads: GitPullRequestCommentThread[]) {

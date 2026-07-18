@@ -142,8 +142,8 @@ class LiveShareRepositoryState implements RepositoryState {
 	mergeChanges: Change[] = [];
 	indexChanges: Change[] = [];
 	workingTreeChanges: Change[] = [];
-	_onDidChange = new vscode.EventEmitter<void>();
-	onDidChange = this._onDidChange.event;
+	#onDidChange = new vscode.EventEmitter<void>();
+	onDidChange = this.#onDidChange.event;
 
 	constructor(state: RepositoryState) {
 		this.HEAD = state.HEAD;
@@ -156,7 +156,7 @@ class LiveShareRepositoryState implements RepositoryState {
 		this.remotes = state.remotes;
 		this.refs = state.refs;
 
-		this._onDidChange.fire();
+		this.#onDidChange.fire();
 	}
 }
 

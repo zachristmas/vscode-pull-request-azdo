@@ -10,7 +10,7 @@ const diff_hunk_0 = [
 	`         "node_modules{,/**}"`,
 	`-    ]`,
 	`-}`,
-	`\\ No newline at end of file`,
+	String.raw`\ No newline at end of file`,
 	`+    ],`,
 	`+    "editor.insertSpaces": false`,
 	`+}`,
@@ -199,7 +199,7 @@ describe('diff hunk parsing', () => {
 			);
 
 			const mappedComments = mapCommentsToHead([diffHunk], '', comments as any);
-			assert(mappedComments.length === 1);
+			assert.ok(mappedComments.length === 1);
 			assert.equal(mappedComments[0].absolutePosition, undefined);
 		});
 
@@ -216,7 +216,7 @@ describe('diff hunk parsing', () => {
 			);
 
 			const mappedComments = mapCommentsToHead([diffHunk], '', comments as any);
-			assert(mappedComments.length === 1);
+			assert.ok(mappedComments.length === 1);
 			assert.equal(mappedComments[0].absolutePosition, 482);
 		});
 	});

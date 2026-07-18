@@ -157,10 +157,12 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		// shows current data instead of a stale snapshot (item 3).
 		this._panel.onDidChangeViewState(
 			() => {
-				if (this._panel.visible && this._refreshWhenVisible) {
-					this._refreshWhenVisible = false;
-					this.update(this._folderRepositoryManager, this._item);
+				if (!(this._panel.visible && this._refreshWhenVisible)) {
+					return;
 				}
+
+				this._refreshWhenVisible = false;
+				this.update(this._folderRepositoryManager, this._item);
 			},
 			null,
 			this._disposables,
@@ -168,13 +170,15 @@ export class PullRequestOverviewPanel extends WebviewBase {
 
 		this._folderRepositoryManager.onDidChangeActiveIssue(
 			_ => {
-				if (this._folderRepositoryManager && this._item) {
-					const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
-					this._postMessage({
-						command: 'pr.update-checkout-status',
-						isCurrentlyCheckedOut: isCurrentlyCheckedOut,
-					});
+				if (!(this._folderRepositoryManager && this._item)) {
+					return;
 				}
+
+				const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
+				this._postMessage({
+					command: 'pr.update-checkout-status',
+					isCurrentlyCheckedOut: isCurrentlyCheckedOut,
+				});
 			},
 			null,
 			this._disposables,
@@ -200,13 +204,15 @@ export class PullRequestOverviewPanel extends WebviewBase {
 
 	registerFolderRepositoryListener() {
 		this._changeActivePullRequestListener = this._folderRepositoryManager.onDidChangeActivePullRequest(_ => {
-			if (this._folderRepositoryManager && this._item) {
-				const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
-				this._postMessage({
-					command: 'pr.update-checkout-status',
-					isCurrentlyCheckedOut,
-				});
+			if (!(this._folderRepositoryManager && this._item)) {
+				return;
 			}
+
+			const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
+			this._postMessage({
+				command: 'pr.update-checkout-status',
+				isCurrentlyCheckedOut,
+			});
 		});
 	}
 
@@ -227,7 +233,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				this.getWorkItemsWithPr(pullRequestModel),
 				// POL-01: policy data is progressive enhancement - a fetch failure must not sink the
 				// whole panel the way the other members here fail loudly.
-				pullRequestModel.getPolicyEvaluations().catch(() => undefined),
+				pullRequestModel.getPolicyEvaluations().catch(() => {}),
 			]);
 			const [
 				pullRequest,
@@ -616,16 +622,14 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				disposables.push(
 					quickpick.onDidChangeValue(async value => {
 						const id = Number.parseInt(value);
-						if (Number.isInteger(id)) {
-							if (!quickpick.items.some(w => w.label === value)) {
+						if (Number.isInteger(id) && quickpick.items.every(w => w.label !== value)) {
 								quickpick.busy = true;
 								const wt = await this._workItem.getWorkItemById(id);
 								if (!!wt) {
-									quickpick.items = quickpick.items.concat([new WorkItemPick(wt)]);
+									quickpick.items = [...quickpick.items, new WorkItemPick(wt)];
 								}
 								quickpick.busy = false;
 							}
-						}
 					}),
 					quickpick.onDidChangeSelection(value => {
 						resolve(Number.parseInt(value[0].label));
@@ -913,14 +917,16 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	}
 
 	private updateReviewers(review?: IdentityRefWithVote): void {
-		if (review) {
-			const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
-			if (existingReviewer) {
-				existingReviewer.state = review.vote ?? 0;
-				existingReviewer.isRequired = review.isRequired ?? false;
-			} else {
-				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
-			}
+		if (!review) {
+			return;
+		}
+
+		const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
+		if (existingReviewer) {
+			existingReviewer.state = review.vote ?? 0;
+			existingReviewer.isRequired = review.isRequired ?? false;
+		} else {
+			this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 		}
 	}
 

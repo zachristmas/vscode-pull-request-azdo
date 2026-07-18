@@ -239,7 +239,7 @@ describe('ReviewCommentController', function () {
 
 			sinon.stub(vscode.workspace, 'asRelativePath').callsFake((pathOrUri: string | vscode.Uri): string => {
 				const path = pathOrUri.toString();
-				return path.substring('/root/'.length);
+				return path.slice('/root/'.length);
 			});
 
 			sinon.stub(repository, 'diffWithHEAD').returns(Promise.resolve(''));
@@ -257,7 +257,7 @@ describe('ReviewCommentController', function () {
 			await reviewCommentController.createOrReplyComment(thread, 'hello world');
 
 			assert.strictEqual(thread.comments.length, 1);
-			assert(replaceCommentSpy.calledOnce);
+			assert.ok(replaceCommentSpy.calledOnce);
 			assert.strictEqual(thread.comments[0].parent, thread);
 
 			assert.strictEqual(Object.keys(workspaceFileChangeCommentThreads).length, 1);

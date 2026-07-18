@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
 
 export type GlobalStateContext = { globalState: vscode.Memento };
 
-let defaultStorage: vscode.Memento | undefined = undefined;
+let defaultStorage: vscode.Memento | undefined;
 
 export const MISSING = {} as const;
 

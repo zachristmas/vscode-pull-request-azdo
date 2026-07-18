@@ -187,11 +187,11 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 		if (!remotesSetting) {
 			Logger.appendLine(`Unable to read remotes setting`, FolderRepositoryManager.ID);
-			return Promise.resolve([]);
+			return [];
 		}
 
 		remotesSetting.forEach(remote => {
-			if (!allGitHubRemotes.some(repo => repo.remoteName === remote)) {
+			if (allGitHubRemotes.every(repo => repo.remoteName !== remote)) {
 				Logger.appendLine(
 					`No remote with name '${remote}' found. All other remotes: ${allGitHubRemotes
 						.map(r => r.remoteName)
@@ -209,7 +209,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	}
 
 	public setUpCompletionItemProvider() {
-		let lastPullRequest: PullRequestModel | undefined = undefined;
+		let lastPullRequest: PullRequestModel | undefined;
 		const lastPullRequestTimelineEvents: TimelineEvent[] = [];
 		let cachedUsers: UserCompletion[] = [];
 
@@ -338,34 +338,36 @@ export class FolderRepositoryManager implements vscode.Disposable {
 						for (const mentionableUserGroup in mentionableUsers) {
 							// eslint-disable-next-line no-loop-func
 							mentionableUsers[mentionableUserGroup].forEach(user => {
-								if (!prRelatedUsersMap[user.id!] && !secondMap[user.id!]) {
-									secondMap[user.id!] = true;
-
-									let priority = 2;
-									if (fileRelatedUsersNames[user.id!] || (user.name && fileRelatedUsersNames[user.name])) {
-										priority = 1;
-									}
-
-									if (prRelatedUsersMap[user.id!]) {
-										priority = 0;
-									}
-
-									cachedUsers.push({
-										label: user.id!,
-										email: user.email,
-										insertText: user.id!,
-										filterText:
-											`${user.id!}` +
-											(user.name && user.name !== user.id!
-												? `_${user.name.toLowerCase().replace(' ', '_')}`
-												: ''),
-										sortText: `${priority}_${user.id!}`,
-										detail: user.name,
-										kind: vscode.CompletionItemKind.User,
-										login: user.id!,
-										uri: this.repository.rootUri,
-									});
+								if (prRelatedUsersMap[user.id!] || secondMap[user.id!]) {
+									return;
 								}
+
+								secondMap[user.id!] = true;
+
+								let priority = 2;
+								if (fileRelatedUsersNames[user.id!] || (user.name && fileRelatedUsersNames[user.name])) {
+									priority = 1;
+								}
+
+								if (prRelatedUsersMap[user.id!]) {
+									priority = 0;
+								}
+
+								cachedUsers.push({
+									label: user.id!,
+									email: user.email,
+									insertText: user.id!,
+									filterText:
+										`${user.id!}` +
+										(user.name && user.name !== user.id!
+											? `_${user.name.toLowerCase().replace(' ', '_')}`
+											: ''),
+									sortText: `${priority}_${user.id!}`,
+									detail: user.name,
+									kind: vscode.CompletionItemKind.User,
+									login: user.id!,
+									uri: this.repository.rootUri,
+								});
 							});
 						}
 
@@ -393,7 +395,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 						Logger.debug('done', FolderRepositoryManager.ID);
 						return cachedUsers;
-					} catch (e) {
+					} catch {
 						return [];
 					}
 				},
@@ -490,8 +492,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 			const repositoriesChanged =
 				oldRepositories.length !== this._azdoRepositories.length ||
-				!oldRepositories.every(oldRepo =>
-					this._azdoRepositories.some(newRepo => newRepo.remote.equals(oldRepo.remote)),
+				oldRepositories.some(oldRepo =>
+					this._azdoRepositories.every(newRepo => !newRepo.remote.equals(oldRepo.remote)),
 				);
 
 			this.getMentionableUsers(repositoriesChanged);
@@ -504,19 +506,21 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			if (!silent) {
 				this._onDidChangeRepositories.fire();
 			}
-			return Promise.resolve();
+			return;
 		});
 	}
 
 	getAllAssignableUsers(): IAccount[] | undefined {
-		if (this._assignableUsers) {
-			const allAssignableUsers: IAccount[] = [];
-			Object.keys(this._assignableUsers).forEach(k => {
-				allAssignableUsers.push(...this._assignableUsers![k]);
-			});
-
-			return allAssignableUsers;
+		if (!this._assignableUsers) {
+			return;
 		}
+
+		const allAssignableUsers: IAccount[] = [];
+		Object.keys(this._assignableUsers).forEach(k => {
+			allAssignableUsers.push(...this._assignableUsers![k]);
+		});
+
+		return allAssignableUsers;
 	}
 
 	async getMentionableUsers(clearCache?: boolean): Promise<{ [key: string]: IAccount[] }> {
@@ -635,7 +639,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 				}
 			}
 
-			return Promise.resolve(null);
+			return null;
 		});
 
 		return Promise.all(promises).then(values => {
@@ -692,10 +696,10 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		}
 		await this.repository.deleteBranch(pullRequest.localBranchName, force);
 
-		let remoteName: string | undefined = undefined;
+		let remoteName: string | undefined;
 		try {
 			remoteName = await this.repository.getConfig(`branch.${pullRequest.localBranchName}.remote`);
-		} catch (e) {}
+		} catch {}
 
 		if (!remoteName) {
 			return;
@@ -754,7 +758,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		const setTotalFetchedPages = (numPages: number) => this.totalFetchedPages.set(queryId, numPages);
 
 		for (const repository of this._azdoRepositories) {
-			const remoteId = repository.remote.url.toString() + queryId;
+			const remoteId = repository.remote.url + queryId;
 			if (!this._repositoryPageInformation.get(remoteId)) {
 				this._repositoryPageInformation.set(remoteId, {
 					pullRequestPage: 0,
@@ -774,22 +778,24 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		};
 
 		const azdoRepositories = this._azdoRepositories.filter(repo => {
-			const info = this._repositoryPageInformation.get(repo.remote.url.toString() + queryId);
+			const info = this._repositoryPageInformation.get(repo.remote.url + queryId);
 			// If we are in case 1 or 3, don't filter out repos that are out of pages, as we will be querying from the start.
-			return info && (options.fetchNextPage === false || info.hasMorePages !== false);
+			return info && (!options.fetchNextPage || info.hasMorePages !== false);
 		});
 
 		for (let i = 0; i < azdoRepositories.length; i++) {
 			const azdoRepository = azdoRepositories[i];
-			const remoteId = azdoRepository.remote.url.toString() + queryId;
+			const remoteId = azdoRepository.remote.url + queryId;
 			const pageInformation = this._repositoryPageInformation.get(remoteId)!;
 
 			const fetchPage = async (_pageNumber: number): Promise<{ items: any[]; hasMorePages: boolean } | undefined> => {
 				switch (pagedDataType) {
 					case PagedDataType.PullRequest: {
-						if (type === PRType.AllActive) {
+						switch (type) {
+						case PRType.AllActive: {
 							return { items: await azdoRepository.getAllActivePullRequests(), hasMorePages: false };
-						} else if (type === PRType.CreatedByMe) {
+						}
+						case PRType.CreatedByMe: {
 							return {
 								items: await azdoRepository.getPullRequests({
 									creatorId: this.getCurrentUser()?.id,
@@ -797,7 +803,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								}),
 								hasMorePages: false,
 							};
-						} else if (type === PRType.AssignedToMe) {
+						}
+						case PRType.AssignedToMe: {
 							return {
 								items: await azdoRepository.getPullRequests({
 									reviewerId: this.getCurrentUser()?.id,
@@ -805,7 +812,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								}),
 								hasMorePages: false,
 							};
-						} else if (type === PRType.AllStatuses) {
+						}
+						case PRType.AllStatuses: {
 							// Every other category here hardcodes status: Active, so a completed or
 							// abandoned PR has no tree category to browse back to at all - the PR panel
 							// itself still refreshes to show the completed state if left open, but there
@@ -819,8 +827,10 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								}),
 								hasMorePages: false,
 							};
-						} else {
+						}
+						default: {
 							return { items: await azdoRepository.getPullRequests(prSearchCriteria!), hasMorePages: false };
+						}
 						}
 					}
 				}
@@ -853,7 +863,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			//    OR we're fetching all (cases 1&3), and we've fetched as far as we had previously (or further, in case 1).
 			if (
 				itemData.items.length &&
-				(options.fetchNextPage === true || (options.fetchNextPage === false && pagesFetched >= getTotalFetchedPages()))
+				(options.fetchNextPage || (!options.fetchNextPage && pagesFetched >= getTotalFetchedPages()))
 			) {
 				if (getTotalFetchedPages() === 0) {
 					// We're in case 1, manually set number of pages we looked through until we found first results.
@@ -862,7 +872,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 				return {
 					items: itemData.items,
-					hasMorePages: pageInformation.hasMorePages || false,
+					hasMorePages: pageInformation.hasMorePages,
 					hasUnsearchedRepositories: i < azdoRepositories.length - 1,
 				};
 			}
@@ -991,7 +1001,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	}
 
 	findRepo(where: Predicate<AzdoRepository>): AzdoRepository | undefined {
-		return this._azdoRepositories.filter(where)[0];
+		return this._azdoRepositories.find(where);
 	}
 
 	get upstreamRef(): UpstreamRef | undefined {
@@ -1158,23 +1168,25 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 		const actions: (vscode.QuickPickItem & { metadata: PullRequestMetadata; legacy?: boolean })[] = [];
 		branchInfos.forEach((value, key) => {
-			if (value.metadata) {
-				const activePRUrl = this.activePullRequest && this.activePullRequest.base.repositoryCloneUrl;
-				const matchesActiveBranch = activePRUrl
-					? activePRUrl.owner === value.metadata.owner &&
-					  activePRUrl.repositoryName === value.metadata.repositoryName &&
-					  this.activePullRequest &&
-					  this.activePullRequest.getPullRequestId() === value.metadata.prNumber
-					: false;
+			if (!value.metadata) {
+				return;
+			}
 
-				if (!matchesActiveBranch) {
-					actions.push({
-						label: `${key}`,
-						description: `${value.metadata!.repositoryName}/${value.metadata!.owner} #${value.metadata.prNumber}`,
-						picked: false,
-						metadata: value.metadata!,
-					});
-				}
+			const activePRUrl = this.activePullRequest && this.activePullRequest.base.repositoryCloneUrl;
+			const matchesActiveBranch = activePRUrl
+				? activePRUrl.owner === value.metadata.owner &&
+				  activePRUrl.repositoryName === value.metadata.repositoryName &&
+				  this.activePullRequest &&
+				  this.activePullRequest.getPullRequestId() === value.metadata.prNumber
+				: false;
+
+			if (!matchesActiveBranch) {
+				actions.push({
+					label: `${key}`,
+					description: `${value.metadata!.repositoryName}/${value.metadata!.owner} #${value.metadata.prNumber}`,
+					picked: false,
+					metadata: value.metadata!,
+				});
 			}
 		});
 
@@ -1262,19 +1274,21 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		const remoteItems: (vscode.QuickPickItem & { remote: string })[] = [];
 
 		remoteInfos.forEach((value, key) => {
-			if (value.branches.size === 0) {
-				let description = value.createdForPullRequest ? '' : 'Not created by GitHub Pull Request extension';
-				if (value.url) {
-					description = description ? description + ' ' + value.url : value.url;
-				}
-
-				remoteItems.push({
-					label: key,
-					description: description,
-					picked: value.createdForPullRequest,
-					remote: key,
-				});
+			if (value.branches.size !== 0) {
+				return;
 			}
+
+			let description = value.createdForPullRequest ? '' : 'Not created by GitHub Pull Request extension';
+			if (value.url) {
+				description = description ? description + ' ' + value.url : value.url;
+			}
+
+			remoteItems.push({
+				label: key,
+				description: description,
+				picked: value.createdForPullRequest,
+				remote: key,
+			});
 		});
 
 		return remoteItems;
@@ -1538,15 +1552,13 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			}
 		} catch (e) {
 			const errCode = gitErrorCode(e);
-			if (errCode) {
-				// for known git errors, we should provide actions for users to continue.
-				if (errCode === GitErrorCodes.DirtyWorkTree) {
+			// for known git errors, we should provide actions for users to continue.
+				if (errCode && errCode === GitErrorCodes.DirtyWorkTree) {
 					vscode.window.showErrorMessage(
 						'Your local changes would be overwritten by checkout, please commit your changes or stash them before you switch branches',
 					);
 					return;
 				}
-			}
 
 			vscode.window.showErrorMessage(`Exiting failed: ${e}`);
 		}
@@ -1617,7 +1629,7 @@ const byRemoteName = (name: string): Predicate<AzdoRepository> => ({ remote: { r
 export const titleAndBodyFrom = (message: string): { title: string; body: string } => {
 	const idxLineBreak = message.indexOf('\n');
 	return {
-		title: idxLineBreak === -1 ? message : message.substr(0, idxLineBreak),
+		title: idxLineBreak === -1 ? message : message.slice(0, Math.max(0, idxLineBreak)),
 
 		body: idxLineBreak === -1 ? '' : message.slice(idxLineBreak + 1).trim(),
 	};

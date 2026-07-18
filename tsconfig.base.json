@@ -4,7 +4,8 @@
 		"forceConsistentCasingInFileNames": true,
 		"incremental": true,
 		"isolatedModules": false,
-		"lib": ["es2019"],
+		// Runtime is VS Code >=1.97 (Node 20 / Chrome 128); es2022 lib matches what actually ships.
+		"lib": ["es2022"],
 		"module": "esnext",
 		// node10 resolution is deprecated and gone in TS 7; moving to "bundler" (extension/webviews)
 		// + "node16" (tests) is its own migration, deferred until the TS 7 jump.

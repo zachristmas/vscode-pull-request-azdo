@@ -23,7 +23,7 @@ import { TreeNode, TreeNodeParent } from './treeNode';
  */
 export class RemoteFileChangeNode extends TreeNode implements vscode.TreeItem {
 	public description: string;
-	public iconPath?: string | vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon;
+	public iconPath?: string | vscode.Uri | vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri };
 	public command: vscode.Command;
 	public resourceUri: vscode.Uri;
 	public contextValue: string;
@@ -92,7 +92,7 @@ export class RemoteFileChangeNode extends TreeNode implements vscode.TreeItem {
  */
 export class FileChangeNode extends TreeNode implements vscode.TreeItem {
 	public description: string;
-	public iconPath?: string | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon;
+	public iconPath?: string | vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri };
 	public resourceUri: vscode.Uri;
 	public parentSha: string | undefined;
 	public contextValue: string;
@@ -214,7 +214,7 @@ export class FileChangeNode extends TreeNode implements vscode.TreeItem {
 			'vscode.diff',
 			parentURI,
 			headURI,
-			`${pathSegments[pathSegments.length - 1]} (Pull Request)`,
+			`${pathSegments.at(-1)} (Pull Request)`,
 			opts,
 		);
 	}

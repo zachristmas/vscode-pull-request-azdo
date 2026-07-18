@@ -37,14 +37,14 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
 			return '';
 		}
 
-		const absolutePath = pathLib.join(repository.rootUri.fsPath, path).replace(/\\/g, '/');
+		const absolutePath = pathLib.join(repository.rootUri.fsPath, path).replaceAll('\\', '/');
 		let content: string;
 		try {
 			content = await repository.show(commit, absolutePath);
 			if (!content) {
 				throw new Error();
 			}
-		} catch (_) {
+		} catch {
 			content = await this._fallback(uri);
 			if (!content) {
 				// Content does not exist for the base or modified file for a file deletion or addition.
@@ -52,7 +52,7 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
 
 				try {
 					await repository.getCommit(commit);
-				} catch (err) {
+				} catch {
 					vscode.window.showErrorMessage(
 						`We couldn't find commit ${commit} locally. You may want to sync the branch with remote. Sometimes commits can disappear after a force-push`,
 					);

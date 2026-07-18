@@ -11,7 +11,7 @@ async function runAllExtensionTests(testsRoot: string, clb: (error: Error | null
 	// Ensure the dev-mode extension is activated
 	await vscode.extensions.getExtension(EXTENSION_ID)!.activate();
 
-	mockWebviewEnvironment.install(global);
+	mockWebviewEnvironment.install(globalThis);
 
 	mocha.setup({
 		ui: 'bdd',

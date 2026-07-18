@@ -147,15 +147,11 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 
 	async getChildren(element?: TreeNode): Promise<TreeNode[]> {
 		if (!this._reposManager) {
-			if (!vscode.workspace.workspaceFolders) {
-				return Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoOpenFolder)]);
-			} else {
-				return Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoGitRepositories)]);
-			}
+			return !vscode.workspace.workspaceFolders ? Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoOpenFolder)]) : Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoGitRepositories)]);
 		}
 
 		if (this._reposManager.state === ReposManagerState.Initializing) {
-			return Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.Initializing)]);
+			return [new PRCategoryActionNode(this, PRCategoryActionType.Initializing)];
 		}
 
 		if (this._reposManager.folderManagers.filter(manager => manager.getGitHubRemotes().length > 0).length === 0) {
@@ -178,11 +174,11 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 			}
 
 			this._childrenDisposables = result;
-			return Promise.resolve(result);
+			return result;
 		}
 
 		if (this._reposManager.folderManagers.filter(manager => manager.repository.state.remotes.length > 0).length === 0) {
-			return Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.Empty)]);
+			return [new PRCategoryActionNode(this, PRCategoryActionType.Empty)];
 		}
 
 		return element.getChildren();

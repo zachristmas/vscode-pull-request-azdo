@@ -112,7 +112,7 @@ export function convertPolicyEvaluation(
 	typeMap: Map<string, string>,
 ): PullRequestPolicyEvaluation | undefined {
 	const configuration = record.configuration;
-	if (!configuration || configuration.isEnabled === false) {
+	if (!configuration || !configuration.isEnabled) {
 		return undefined;
 	}
 
@@ -305,9 +305,9 @@ export function convertBranchRefToBranchName(branchRef: string): string {
 		return branchRef;
 	}
 	if (splitref[1] === 'heads' || splitref[1] === 'tags' || splitref[1] === 'remotes') {
-		return splitref.slice(2, splitref.length).join('/');
+		return splitref.slice(2).join('/');
 	}
-	return splitref.slice(1, splitref.length).join('/');
+	return splitref.slice(1).join('/');
 }
 
 export async function readableToString(readable?: NodeJS.ReadableStream): Promise<string | undefined> {
@@ -369,17 +369,24 @@ export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 		// 	positionInHunk++;
 		// }
 
-		if (block.changeType === LineDiffBlockChangeType.Add) {
+		switch (block.changeType) {
+		case LineDiffBlockChangeType.Add: {
 			for (let i = 0; i < block.modifiedLinesCount!; i++) {
 				hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
 				positionInHunk++;
 			}
-		} else if (block.changeType === LineDiffBlockChangeType.Delete) {
+		
+		break;
+		}
+		case LineDiffBlockChangeType.Delete: {
 			for (let i = 0; i < block.originalLinesCount!; i++) {
 				hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
 				positionInHunk++;
 			}
-		} else if (block.changeType === LineDiffBlockChangeType.Edit) {
+		
+		break;
+		}
+		case LineDiffBlockChangeType.Edit: {
 			// Add no change lines for overflow BEFORE the actual change
 			for (let i = overflowStartLineNumber; i < newLineNumber; i++) {
 				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
@@ -418,6 +425,10 @@ export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
 				positionInHunk++;
 			}
+		
+		break;
+		}
+		// No default
 		}
 
 		diff.push(hunk);
@@ -443,13 +454,12 @@ export function getRelatedUsersFromPullrequest(
 		commits = pr.commits;
 	}
 
-	const related_users: { login: string; name?: string; email?: string }[] = [];
-
-	related_users.push({
+	const related_users: { login: string; name?: string; email?: string }[] = [ {
 		login: pr.createdBy?.uniqueName ?? pr.createdBy?.id ?? '',
 		email: pr.createdBy?.uniqueName,
 		name: pr.createdBy?.displayName,
-	});
+	}];
+
 
 	related_users.push(
 		...(pr.reviewers ?? []).map(r => {
@@ -524,16 +534,12 @@ export function generateCommentReactions(reactions: Reaction[] | undefined) {
 
 		const matchedReaction = reactions.find(re => re.label === reaction.label);
 
-		if (matchedReaction) {
-			return {
+		return matchedReaction ? {
 				label: matchedReaction.label,
 				authorHasReacted: matchedReaction.viewerHasReacted,
 				count: matchedReaction.count,
 				iconPath: reaction.icon || '',
-			};
-		} else {
-			return { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
-		}
+			} : { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
 	});
 }
 export function updateCommentReactions(comment: vscode.Comment, reactions: Reaction[] | undefined) {
@@ -545,7 +551,7 @@ export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repo
 		if (
 			file.path.toLowerCase() === repository.rootUri.path.toLowerCase() ||
 			(file.path.toLowerCase().startsWith(repository.rootUri.path.toLowerCase()) &&
-				file.path.substring(repository.rootUri.path.length).startsWith('/'))
+				file.path.slice(repository.rootUri.path.length).startsWith('/'))
 		) {
 			return repository;
 		}
@@ -599,11 +605,7 @@ export function updateCommentReviewState(thread: GHPRCommentThread, newDraftMode
 }
 
 export function updateCommentThreadLabel(thread: GHPRCommentThread) {
-	if (thread.comments.length) {
-		thread.label = `Status: ${CommentThreadStatus[thread.rawThread?.status ?? 0].toString()}`;
-	} else {
-		thread.label = 'Start discussion';
-	}
+	thread.label = thread.comments.length ? `Status: ${CommentThreadStatus[thread.rawThread?.status ?? 0]}` : 'Start discussion';
 }
 
 export function createVSCodeCommentThread(thread: ThreadData, commentController: vscode.CommentController): GHPRCommentThread {
@@ -627,7 +629,7 @@ export function updateThread(vscodeThread: GHPRCommentThread, comments: GHPRComm
 }
 
 export function removeLeadingSlash(path: string) {
-	return path.replace(/^\//g, '');
+	return path.replaceAll(/^\//g, '');
 }
 
 export function getCommentThreadStatusKeys(): string[] {
@@ -635,7 +637,7 @@ export function getCommentThreadStatusKeys(): string[] {
 		.filter(value => typeof value === 'string')
 		.filter(f => f !== CommentThreadStatus[CommentThreadStatus.Unknown])
 		.filter(f => f !== CommentThreadStatus[CommentThreadStatus.ByDesign]) // ByDesign is not shown in the Azdo UI
-		.map(f => f.toString());
+		.map(f => f);
 }
 
 export class UserCompletion extends vscode.CompletionItem {

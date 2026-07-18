@@ -163,14 +163,16 @@ abstract class BaseBuilder<R> {
 	build(): R {
 		// Populate any missing fields.
 		for (const fieldName in this._template) {
-			if (!(fieldName in this._underConstruction)) {
-				const fieldTemplate: FieldTemplate<any, any> = this._template[fieldName];
-				if (isLinked(fieldTemplate)) {
-					const builder = new fieldTemplate.linked();
-					this._underConstruction[fieldName] = builder.build();
-				} else {
-					this._underConstruction[fieldName] = fieldTemplate.default;
-				}
+			if ((fieldName in this._underConstruction)) {
+				continue;
+			}
+
+			const fieldTemplate: FieldTemplate<any, any> = this._template[fieldName];
+			if (isLinked(fieldTemplate)) {
+				const builder = new fieldTemplate.linked();
+				this._underConstruction[fieldName] = builder.build();
+			} else {
+				this._underConstruction[fieldName] = fieldTemplate.default;
 			}
 		}
 

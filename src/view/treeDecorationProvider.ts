@@ -14,14 +14,14 @@ class TreeDecorationProvider implements vscode.FileDecorationProvider {
 		const oldValue = this.fileHasComments.get(key);
 		if (oldValue !== hasComments) {
 			this.fileHasComments.set(`${prNumber}:${fileName}`, hasComments);
-			this._onDidChangeFileDecorations.fire(resourceUri);
+			this.#onDidChangeFileDecorations.fire(resourceUri);
 		}
 	}
 
-	_onDidChangeFileDecorations: vscode.EventEmitter<vscode.Uri | vscode.Uri[]> = new vscode.EventEmitter<
+	#onDidChangeFileDecorations: vscode.EventEmitter<vscode.Uri | vscode.Uri[]> = new vscode.EventEmitter<
 		vscode.Uri | vscode.Uri[]
 	>();
-	onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[]> = this._onDidChangeFileDecorations.event;
+	onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[]> = this.#onDidChangeFileDecorations.event;
 	provideFileDecoration(uri: vscode.Uri, _token: vscode.CancellationToken): vscode.ProviderResult<vscode.FileDecoration> {
 		const query = fromFileChangeNodeUri(uri);
 		if (query) {

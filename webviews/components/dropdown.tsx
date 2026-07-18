@@ -42,52 +42,54 @@ export const Dropdown = <T extends string>({
 	};
 
 	const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-		if (areOptionsVisible) {
-			// a keydown reaching this handler means something inside the dropdown has focus
-			const currentElement = document.activeElement!;
+		if (!areOptionsVisible) {
+			return;
+		}
 
-			switch (e.keyCode) {
-				case KEYCODES.esc:
-					setOptionsVisible(false);
-					const expandOptionsButton = document.getElementById(EXPAND_OPTIONS_BUTTON);
-					expandOptionsButton?.focus();
-					break;
+		// a keydown reaching this handler means something inside the dropdown has focus
+		const currentElement = document.activeElement!;
 
-				case KEYCODES.down:
-					if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
-						const firstOptionButton = document.getElementById(`${dropdownId}option0`);
-						firstOptionButton?.focus();
-					} else {
-						const regex = new RegExp(`${dropdownId}option([0-9])`);
-						const result = currentElement.id.match(regex);
-						if (result?.length) {
-							const index = parseInt(result[1]);
-							if (index < Object.entries(options).length - 1) {
-								const nextOption = document.getElementById(`${dropdownId}option${index + 1}`);
-								nextOption?.focus();
-							}
+		switch (e.keyCode) {
+			case KEYCODES.esc:
+				setOptionsVisible(false);
+				const expandOptionsButton = document.getElementById(EXPAND_OPTIONS_BUTTON);
+				expandOptionsButton?.focus();
+				break;
+
+			case KEYCODES.down:
+				if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
+					const firstOptionButton = document.getElementById(`${dropdownId}option0`);
+					firstOptionButton?.focus();
+				} else {
+					const regex = new RegExp(`${dropdownId}option([0-9])`);
+					const result = currentElement.id.match(regex);
+					if (result?.length) {
+						const index = parseInt(result[1]);
+						if (index < Object.entries(options).length - 1) {
+							const nextOption = document.getElementById(`${dropdownId}option${index + 1}`);
+							nextOption?.focus();
 						}
 					}
-					break;
+				}
+				break;
 
-				case KEYCODES.up:
-					if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
-						const lastIndex = Object.entries(options).length - 1;
-						const lastOptionButton = document.getElementById(`${dropdownId}option${lastIndex}`);
-						lastOptionButton?.focus();
-					} else {
-						const regex = new RegExp(`${dropdownId}option([0-9])`);
-						const result = currentElement.id.match(regex);
-						if (result?.length) {
-							const index = parseInt(result[1]);
-							if (index > 0) {
-								const nextOption = document.getElementById(`${dropdownId}option${index - 1}`);
-								nextOption?.focus();
-							}
+			case KEYCODES.up:
+				if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
+					const lastIndex = Object.entries(options).length - 1;
+					const lastOptionButton = document.getElementById(`${dropdownId}option${lastIndex}`);
+					lastOptionButton?.focus();
+				} else {
+					const regex = new RegExp(`${dropdownId}option([0-9])`);
+					const result = currentElement.id.match(regex);
+					if (result?.length) {
+						const index = parseInt(result[1]);
+						if (index > 0) {
+							const nextOption = document.getElementById(`${dropdownId}option${index - 1}`);
+							nextOption?.focus();
 						}
 					}
-					break;
-			}
+				}
+				break;
 		}
 	};
 

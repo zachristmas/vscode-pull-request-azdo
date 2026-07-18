@@ -74,11 +74,13 @@ async function init(
 	const fileReviewedStatusService = new FileReviewedStatusService(localStorageService);
 
 	vscode.authentication.onDidChangeSessions(async e => {
-		if (e.provider.id === 'microsoft') {
-			await reposManager.clearCredentialCache();
-			if (reviewManagers) {
-				reviewManagers.forEach(reviewManager => reviewManager.updateState());
-			}
+		if (e.provider.id !== 'microsoft') {
+			return;
+		}
+
+		await reposManager.clearCredentialCache();
+		if (reviewManagers) {
+			reviewManagers.forEach(reviewManager => reviewManager.updateState());
 		}
 	});
 

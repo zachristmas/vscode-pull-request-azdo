@@ -34,11 +34,7 @@ export class Azdo {
 		private token: string,
 		private isPatTokenAuth: boolean = false,
 	) {
-		if (isPatTokenAuth) {
-			this._authHandler = azdev.getPersonalAccessTokenHandler(token, true);
-		} else {
-			this._authHandler = azdev.getBearerHandler(token, true);
-		}
+		this._authHandler = isPatTokenAuth ? azdev.getPersonalAccessTokenHandler(token, true) : azdev.getBearerHandler(token, true);
 		this.connection = this.getNewWebApiClient(this.orgUrl);
 	}
 
@@ -61,7 +57,7 @@ export class Azdo {
 			const bufferTime = 60 * 1000; // 1 minute in milliseconds
 
 			return currentTime >= expirationTime - bufferTime;
-		} catch (error) {
+		} catch {
 			// If there's an error decoding the token, consider it expired
 			return true;
 		}
@@ -164,7 +160,7 @@ export class CredentialStore implements vscode.Disposable {
 				.filter((c): c is AzdoOrgConfig => !!c && !!c.orgUrl && !!c.projectName);
 
 			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
-			if ([...new Set(inferredConfigs.map(a => a.orgUrl))].length !== 1) {
+			if (new Set(inferredConfigs.map(a => a.orgUrl)).size !== 1) {
 				Logger.appendLine(
 					`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${JSON.stringify(inferredConfigs)}`,
 					CredentialStore.ID,

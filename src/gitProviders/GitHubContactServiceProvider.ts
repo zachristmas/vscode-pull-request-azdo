@@ -75,7 +75,7 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 					}
 				}
 				if (allAssignableUsers.size > 0) {
-					this.notifySuggestedAccounts(Array.from(allAssignableUsers.values()));
+					this.notifySuggestedAccounts([...allAssignableUsers.values()]);
 				}
 
 				break;
@@ -90,14 +90,13 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 		let currentLoginUser: string | undefined;
 		try {
 			currentLoginUser = await this.getCurrentUserLogin();
-		} catch (e) {
+		} catch {
 			// If there are no GitHub repositories at the time of the above call, then we can get an error here.
 			// Since we don't care about the error and are just trying to nofity accounts and not responding to user action,
 			// it is safe to ignore and leave currentLoginUser undefined.
 		}
-		if (currentLoginUser) {
-			// Note: only suggest if the current user is part of the aggregated mentionable users
-			if (accounts.findIndex(u => u.id === currentLoginUser) !== -1) {
+		// Note: only suggest if the current user is part of the aggregated mentionable users
+			if (currentLoginUser && accounts.some(u => u.id === currentLoginUser) ) {
 				this.notifySuggestedUsers(
 					accounts
 						.filter(u => u.email && u.id)
@@ -111,7 +110,6 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 					true,
 				);
 			}
-		}
 	}
 
 	private async getCurrentUserLogin(): Promise<string | undefined> {

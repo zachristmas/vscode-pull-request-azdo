@@ -182,7 +182,7 @@ const VotePanel = ({ vote }: { vote: number }) => {
 			await votePullRequest(parseInt(value));
 			setCastState('success');
 			successTimer.current = setTimeout(() => setCastState('idle'), 2500);
-		} catch (_) {
+		} catch {
 			// postMessage rejections used to vanish (votePullRequest never caught); surface them instead.
 			setCastState('error');
 		}

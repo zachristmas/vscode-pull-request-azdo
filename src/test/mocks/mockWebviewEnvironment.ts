@@ -77,7 +77,7 @@ class MockWebviewEnvironment {
 	 * });
 	 */
 	use(suite: Suite) {
-		suite.beforeAll(() => this.install(global));
+		suite.beforeAll(() => this.install(globalThis));
 		suite.afterAll(() => this.uninstall());
 	}
 

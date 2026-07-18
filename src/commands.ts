@@ -510,7 +510,8 @@ export function registerCommands(
 			const input = await vscode.window.showInputBox({
 				prompt: vscode.l10n.t('Pull request ID to checkout'),
 				placeHolder: vscode.l10n.t('e.g. 5994'),
-				validateInput: (v: string) => (/^\d+$/.test(v.trim()) ? undefined : vscode.l10n.t('Enter a numeric pull request ID')),
+				validateInput: (v: string) =>
+					/^\d+$/.test(v.trim()) ? undefined : vscode.l10n.t('Enter a numeric pull request ID'),
 			});
 			if (!input) {
 				return;
@@ -534,11 +535,7 @@ export function registerCommands(
 		vscode.commands.registerCommand('azdopr.pick', async (pr: PRNode | DescriptionNode | PullRequestModel) => {
 			let pullRequestModel: PullRequestModel;
 
-			if (pr instanceof PRNode || pr instanceof DescriptionNode) {
-				pullRequestModel = pr.pullRequestModel;
-			} else {
-				pullRequestModel = pr;
-			}
+			pullRequestModel = pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
 
 			const fromDescriptionPage = pr instanceof PullRequestModel;
 			/* __GDPR__
@@ -566,11 +563,7 @@ export function registerCommands(
 		vscode.commands.registerCommand('azdopr.exit', async (pr: PRNode | DescriptionNode | PullRequestModel) => {
 			let pullRequestModel: PullRequestModel;
 
-			if (pr instanceof PRNode || pr instanceof DescriptionNode) {
-				pullRequestModel = pr.pullRequestModel;
-			} else {
-				pullRequestModel = pr;
-			}
+			pullRequestModel = pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
 
 			const fromDescriptionPage = pr instanceof PullRequestModel;
 			/* __GDPR__
@@ -767,7 +760,7 @@ export function registerCommands(
 				.then(async value => {
 					if (value === 'Yes') {
 						try {
-							let newComment: GitPullRequestCommentThread | undefined = undefined;
+							let newComment: GitPullRequestCommentThread | undefined;
 							if (message) {
 								newComment = await pullRequest.createThread(message);
 							}
@@ -909,7 +902,7 @@ export function registerCommands(
 				if (sortedOutdatedComments.length) {
 					const lastHunk = fileChange.diffHunks[fileChange.diffHunks.length - 1];
 					// const diffLine =  getDiffLineByPosition(fileChange.diffHunks, sortedOutdatedComments[0].originalPosition!);
-					const diffLine = lastHunk.diffLines[lastHunk.diffLines.length - 1];
+					const diffLine = lastHunk.diffLines.at(-1);
 
 					if (diffLine) {
 						const lineNumber = Math.max(
@@ -927,7 +920,7 @@ export function registerCommands(
 				'vscode.diff',
 				previousFileUri,
 				fileChange.filePath,
-				`${fileChange.fileName} from ${(commit || '').substr(0, 8)}`,
+				`${fileChange.fileName} from ${(commit || '').slice(0, 8)}`,
 				options,
 			);
 		}),
@@ -956,7 +949,6 @@ export function registerCommands(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.configureRemotes', async () => {
-			 
 			const { name, publisher } = require('../package.json') as { name: string; publisher: string };
 			const extensionId = `${publisher}.${name}`;
 
@@ -1065,11 +1057,9 @@ export function registerCommands(
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.openChangedFile', (value: GitFileChangeNode) => {
 			const openDiff = vscode.workspace.getConfiguration().get('git.openDiffOnClick');
-			if (openDiff) {
-				return vscode.commands.executeCommand('azdopr.openDiffView', value);
-			} else {
-				return vscode.commands.executeCommand('azdoreview.openFile', value);
-			}
+			return openDiff
+				? vscode.commands.executeCommand('azdopr.openDiffView', value)
+				: vscode.commands.executeCommand('azdoreview.openFile', value);
 		}),
 	);
 

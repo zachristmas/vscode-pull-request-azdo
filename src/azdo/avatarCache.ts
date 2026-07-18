@@ -50,7 +50,7 @@ export async function fetchAvatarAsDataUri(url: string | undefined): Promise<str
 				const res = await connection!.rest.client.get(url);
 				if (res.message.statusCode !== 200) {
 					Logger.debug(`Avatar fetch failed (${res.message.statusCode}): ${url}`, ID);
-					return undefined;
+					return;
 				}
 				const chunks: Buffer[] = [];
 				for await (const chunk of res.message) {
@@ -62,7 +62,7 @@ export async function fetchAvatarAsDataUri(url: string | undefined): Promise<str
 				return dataUri;
 			} catch (e) {
 				Logger.debug(`Avatar fetch error for ${url}: ${e}`, ID);
-				return undefined;
+				return;
 			} finally {
 				pending.delete(url);
 			}
@@ -90,7 +90,7 @@ export async function resolveAvatarsDeep(value: any, depth: number = 12, seen?: 
 	if (!value || typeof value !== 'object' || depth <= 0) {
 		return;
 	}
-	seen = seen ?? new Set();
+	seen ??= new Set();
 	if (seen.has(value)) {
 		return;
 	}

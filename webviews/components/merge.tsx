@@ -151,7 +151,7 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 			// resolving), back off to 15s - a 3s cadence there is the refresh storm UX-04 flagged.
 			if (!activelyChecking && autoCompleteArmed) {
 				const now = Date.now();
-				if (now - lastArmedPoll.current < 15000) {
+				if (now - lastArmedPoll.current < 15_000) {
 					return;
 				}
 				lastArmedPoll.current = now;
@@ -307,7 +307,7 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 			// storm UX-04 flagged.
 			if (!stillEvaluating && autoCompleteArmed) {
 				const now = Date.now();
-				if (now - lastArmedPoll.current < 15000) {
+				if (now - lastArmedPoll.current < 15_000) {
 					return;
 				}
 				lastArmedPoll.current = now;
@@ -685,7 +685,7 @@ function ConfirmComplete({
 					const args = {
 						deleteSourceBranch: deleteBranch.checked,
 						transitionWorkItems: transitionWorkItems.checked,
-						mergeStrategy: method.toString(),
+						mergeStrategy: method,
 						mergeCommitMessage: mergeCommitMessage.value.trim() || undefined,
 					};
 					if (mode === 'autocomplete') {
@@ -792,7 +792,7 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 	const statusPhrases = [];
 	for (const statusType of Object.keys(statusTypes)) {
 		const numOfType = statusTypes[statusType].length;
-		const statusAdjective = GitStatusState[Number(statusType)].toString();
+		const statusAdjective = GitStatusState[Number(statusType)];
 
 		const status = numOfType > 1 ? `${numOfType} ${statusAdjective} checks` : `${numOfType} ${statusAdjective} check`;
 

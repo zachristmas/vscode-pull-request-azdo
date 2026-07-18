@@ -135,7 +135,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			this._folderRepositoryManager.getPullRequestRepositoryAccessAndMergeMethods(pullRequestModel),
 			// POL-05: pre-stage the sidebar compact policy summary here; POL-01's fetch failure must not
 			// sink the whole sidebar the way the other members here fail loudly.
-			pullRequestModel.getPolicyEvaluations().catch(() => undefined),
+			pullRequestModel.getPolicyEvaluations().catch(() => {}),
 			// POL-05: the checked-out-PR sidebar previously hardcoded status: { statuses: [] }, so the
 			// shared StatusChecks/PolicySection components (isSimple=true) never showed anything even
 			// though the overview side already renders both.
@@ -244,14 +244,16 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 	// }
 
 	private updateReviewers(review?: IdentityRefWithVote): void {
-		if (review) {
-			const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
-			if (existingReviewer) {
-				existingReviewer.state = review.vote ?? 0;
-				existingReviewer.isRequired = review.isRequired ?? false;
-			} else {
-				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
-			}
+		if (!review) {
+			return;
+		}
+
+		const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
+		if (existingReviewer) {
+			existingReviewer.state = review.vote ?? 0;
+			existingReviewer.isRequired = review.isRequired ?? false;
+		} else {
+			this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 		}
 	}
 

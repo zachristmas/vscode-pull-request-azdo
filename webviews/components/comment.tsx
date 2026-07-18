@@ -20,7 +20,7 @@ import { PullRequest, ReviewType } from '../common/cache';
 import PullRequestContext from '../common/context';
 import emitter from '../common/events';
 import { useStateProp } from '../common/hooks';
-// eslint-disable-next-line import-x/no-named-as-default
+ 
 
 const { useCallback, useContext, useEffect, useRef, useState } = React;
 export type Props = Partial<Comment> & {
@@ -157,10 +157,12 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 
 	useEffect(() => {
 		const interval = setInterval(() => {
-			if (draftComment.current.dirty) {
-				updateDraft(id, draftComment.current.body);
-				draftComment.current.dirty = false;
+			if (!draftComment.current.dirty) {
+				return;
 			}
+
+			updateDraft(id, draftComment.current.body);
+			draftComment.current.dirty = false;
 		}, 500);
 		return () => clearInterval(interval);
 	}, [draftComment]);
@@ -185,10 +187,12 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 
 	const onKeyDown = useCallback(
 		e => {
-			if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-				e.preventDefault();
-				submit();
+			if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) {
+				return;
 			}
+
+			e.preventDefault();
+			submit();
 		},
 		[submit],
 	);
@@ -256,7 +260,7 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 	const { applyPatch } = useContext(PullRequestContext);
 	// const renderedBody = <div dangerouslySetInnerHTML={{ __html: bodyHTML }} />;
 	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={body ?? ''} />;
-	const containsSuggestion = (body || bodyHTML || '').indexOf('```diff') > -1;
+	const containsSuggestion = (body || bodyHTML || '').includes('```diff');
 	const applyPatchButton = containsSuggestion ? (
 		<button onClick={() => applyPatch(commentContent!, commentId!, threadId)}>Apply Patch</button>
 	) : (
@@ -299,10 +303,12 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 
 	const onKeyDown = useCallback(
 		e => {
-			if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-				e.preventDefault();
-				submit();
+			if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) {
+				return;
 			}
+
+			e.preventDefault();
+			submit();
 		},
 		[submit],
 	);

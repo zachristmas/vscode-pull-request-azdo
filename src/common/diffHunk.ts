@@ -26,7 +26,7 @@ export class DiffLine {
 	}
 
 	public get text(): string {
-		return this._raw.substr(1);
+		return this._raw.slice(1);
 	}
 
 	constructor(
@@ -103,7 +103,7 @@ export function* parseDiffHunk(diffHunkPatch: string): IterableIterator<DiffHunk
 	const lineReader = LineReader(diffHunkPatch);
 
 	let itr = lineReader.next();
-	let diffHunk: DiffHunk | undefined = undefined;
+	let diffHunk: DiffHunk | undefined;
 	let positionInHunk = -1;
 	let oldLine = -1;
 	let newLine = -1;
@@ -121,7 +121,7 @@ export function* parseDiffHunk(diffHunkPatch: string): IterableIterator<DiffHunk
 
 			const matches = DIFF_HUNK_HEADER.exec(line);
 			const oriStartLine = (oldLine = Number(matches![1]));
-			// http://www.gnu.org/software/diffutils/manual/diffutils.html#Detailed-Unified
+			// https://www.gnu.org/software/diffutils/manual/diffutils.html#Detailed-Unified
 			// `count` is added when the changes have more than 1 line.
 			const oriLen = Number(matches![3]) || 1;
 			const newStartLine = (newLine = Number(matches![5]));
@@ -337,7 +337,7 @@ export async function parseSingleDiffAzdo(
 			try {
 				await repository.getObjectDetails(review.headCommit, removeLeadingSlash(review.filename));
 				localObjectExists = true;
-			} catch (err) {
+			} catch {
 				/* noop */
 			}
 			break;
@@ -345,7 +345,7 @@ export async function parseSingleDiffAzdo(
 			try {
 				await repository.getObjectDetails(parentCommit, removeLeadingSlash(review.filename));
 				localObjectExists = true;
-			} catch (err) {
+			} catch {
 				/* noop */
 			}
 			break;
@@ -354,7 +354,7 @@ export async function parseSingleDiffAzdo(
 			try {
 				await repository.getObjectDetails(parentCommit, removeLeadingSlash(review.previous_filename!));
 				localObjectExists = true;
-			} catch (err) {
+			} catch {
 				/* noop */
 			}
 			break;

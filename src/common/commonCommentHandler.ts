@@ -96,7 +96,7 @@ export class CommonCommentHandler {
 			);
 
 			const index = fileChange.comments.findIndex(c => c.id?.toString() === comment.commentId);
-			if (index > -1) {
+			if (index !== -1) {
 				fileChange.comments.splice(index, 1, rawComment);
 			}
 
@@ -213,11 +213,7 @@ export class CommonCommentHandler {
 		const fileChangesToSearch = await getFileChanges(isOutdated);
 
 		const matchedFile = fileChangesToSearch.find(fileChange => {
-			if (uri.scheme === URI_SCHEME_REVIEW || uri.scheme === URI_SCHEME_PR) {
-				return fileChange.fileName === fileName;
-			} else {
-				return fileChange.filePath.path === uri.path;
-			}
+			return uri.scheme === URI_SCHEME_REVIEW || uri.scheme === URI_SCHEME_PR ? fileChange.fileName === fileName : fileChange.filePath.path === uri.path;
 		});
 
 		if (!matchedFile) {
@@ -225,7 +221,7 @@ export class CommonCommentHandler {
 		}
 
 		if (matchedFile instanceof RemoteFileChangeNode) {
-			throw new Error('Comments not supported on remote file changes');
+			throw new TypeError('Comments not supported on remote file changes');
 		}
 
 		return matchedFile;
@@ -268,7 +264,7 @@ export class CommonCommentHandler {
 			return this.pullRequestModel.createCommentOnThread(thread.threadId, input);
 		} else {
 			// TODO can we do better?
-			throw new Error('Cannot respond to temporary comment');
+			throw new TypeError('Cannot respond to temporary comment');
 		}
 	}
 
@@ -288,22 +284,24 @@ export class CommonCommentHandler {
 		getFileChanges: () => Promise<IFileChangeNode[]>,
 		fileChanges?: IFileChangeNode[]  ,
 	): Promise<vscode.Range[] | undefined> {
-		if (document.uri.scheme === URI_SCHEME_PR) {
-			const params = fromPRUri(document.uri);
-
-			if (!params || params.prNumber !== this.pullRequestModel.getPullRequestId()) {
-				return;
-			}
-			const changes = !fileChanges ? await getFileChanges() : fileChanges;
-
-			const fileChange = changes.find(change => change.fileName === params.fileName);
-
-			if (!fileChange || fileChange instanceof RemoteFileChangeNode) {
-				return;
-			}
-
-			const range = getCommentingRanges(fileChange.diffHunks ?? [], params.isBase);
-			return range;
+		if (document.uri.scheme !== URI_SCHEME_PR) {
+			return;
 		}
+
+		const params = fromPRUri(document.uri);
+
+		if (!params || params.prNumber !== this.pullRequestModel.getPullRequestId()) {
+			return;
+		}
+		const changes = !fileChanges ? await getFileChanges() : fileChanges;
+
+		const fileChange = changes.find(change => change.fileName === params.fileName);
+
+		if (!fileChange || fileChange instanceof RemoteFileChangeNode) {
+			return;
+		}
+
+		const range = getCommentingRanges(fileChange.diffHunks ?? [], params.isBase);
+		return range;
 	}
 }

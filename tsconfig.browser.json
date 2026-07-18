@@ -7,7 +7,7 @@
 		"lib": [
 			"dom",
 			"dom.iterable",
-			"es2019"
+			"es2022"
 		],
 		"tsBuildInfoFile": "tsconfig.browser.tsbuildinfo",
 		"types": []

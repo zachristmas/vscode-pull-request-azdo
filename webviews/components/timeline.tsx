@@ -233,7 +233,7 @@ const THREAD_STATUS_TONE: { [status: number]: string } = {
 	3: 'muted', // WontFix
 };
 
-const RESOLVED_STATUSES = [2, 3, 4]; // Fixed, WontFix, Closed
+const RESOLVED_STATUSES = new Set([2, 3, 4]); // Fixed, WontFix, Closed
 
 // A native <select> dressed as a status pill: colored dot + label + the select's own chevron. Native
 // keeps the accessibility and z-index simplicity while reading as a modern chip.
@@ -259,7 +259,7 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 
 	const status = thread.status ?? 0;
 	const hasStatus = ThreadStatusOrder.includes(status.toString());
-	const isResolved = RESOLVED_STATUSES.includes(status);
+	const isResolved = RESOLVED_STATUSES.has(status);
 	// Per-render collapse state (no persistence); resolved threads start collapsed so long PRs aren't
 	// buried in settled conversations, but they stay one click away. Only ever hides content while the
 	// thread is still resolved - reopening via the (always-visible) header pill can't strand a
@@ -347,7 +347,7 @@ export const MergedEventView = (event: MergedEvent) => (
 			<div className="message">
 				merged commit{nbsp}
 				<a className="sha" href={event.commitUrl}>
-					{event.sha.substr(0, 7)}
+					{event.sha.slice(0, 7)}
 				</a>
 				{nbsp}
 				into {event.mergeRef}

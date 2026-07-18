@@ -198,6 +198,12 @@ export default tseslint.config(
 		plugins: { unicorn },
 		rules: {
 			...downgradeToWarn(unicorn.configs.recommended.rules),
+			// The extension:webworker bundle resolves node builtins through resolve.fallback
+			// keys in webpack.config.js that are keyed WITHOUT the node: scheme, and
+			// @types/node@12 has no node:* module declarations. The node: prefix breaks both.
+			// The sole webviews hit (common/events.ts) imports the npm `events` shim, not the
+			// builtin, so the rule is off globally. Revisit with the TS 7 / moduleResolution rework.
+			'unicorn/prefer-node-protocol': 'off',
 			// Churn-heavy stylistic rules that would bury the useful signal in this codebase
 			// (top offenders measured at 2283 warnings on first run; these are style-only):
 			'unicorn/prevent-abbreviations': 'off',

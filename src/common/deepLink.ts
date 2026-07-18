@@ -42,7 +42,7 @@ function parseQuery(query: string): Map<string, string> {
 		const rawKey = eq === -1 ? pair : pair.slice(0, eq);
 		const rawValue = eq === -1 ? '' : pair.slice(eq + 1);
 		try {
-			result.set(decodeURIComponent(rawKey), decodeURIComponent(rawValue.replace(/\+/g, '%20')));
+			result.set(decodeURIComponent(rawKey), decodeURIComponent(rawValue.replaceAll('+', '%20')));
 		} catch {
 			// skip malformed pairs rather than failing the whole link
 		}

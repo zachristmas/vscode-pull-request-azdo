@@ -99,7 +99,7 @@ export class PullRequestModel implements IPullRequestModel {
 
 	// Whether the pull request is currently checked out locally
 	public isActive: boolean;
-	_telemetry: ITelemetry;
+	#telemetry: ITelemetry;
 	public state: PullRequestStatus = PullRequestStatus.NotSet;
 
 	constructor(
@@ -112,7 +112,7 @@ export class PullRequestModel implements IPullRequestModel {
 		// TODO: super.update was changing state of the issue and initializing some variable.
 		// super(azdoRepository, remote, item);
 
-		this._telemetry = telemetry;
+		this.#telemetry = telemetry;
 
 		this.isActive = isActive === undefined ? item.status === PullRequestStatus.Active : false;
 		this.update(item);
@@ -131,10 +131,12 @@ export class PullRequestModel implements IPullRequestModel {
 	}
 
 	public set hasPendingReview(hasPendingReview: boolean) {
-		if (this._hasPendingReview !== hasPendingReview) {
-			this._hasPendingReview = hasPendingReview;
-			this._onDidChangePendingReviewState.fire(this._hasPendingReview);
+		if (this._hasPendingReview === hasPendingReview) {
+			return;
 		}
+
+		this._hasPendingReview = hasPendingReview;
+		this._onDidChangePendingReviewState.fire(this._hasPendingReview);
 	}
 
 	public get url(): string {
@@ -257,7 +259,7 @@ export class PullRequestModel implements IPullRequestModel {
 		/* __GDPR__
 			"azdopr.close" : {}
 		*/
-		this._telemetry.sendTelemetryEvent('azdopr.close');
+		this.#telemetry.sendTelemetryEvent('azdopr.close');
 
 		return convertAzdoPullRequestToRawPullRequest(ret, this.azdoRepository);
 	}
@@ -372,19 +374,15 @@ export class PullRequestModel implements IPullRequestModel {
 		let tc: CommentThreadContext;
 
 		const endLine = threadContext?.endLine ?? threadContext?.line;
-		if (threadContext?.isLeft) {
-			tc = {
+		tc = threadContext?.isLeft ? {
 				filePath: threadContext?.filePath,
 				leftFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
 				leftFileEnd: { line: endLine, offset: threadContext?.endOffset },
-			};
-		} else {
-			tc = {
+			} : {
 				filePath: threadContext?.filePath,
 				rightFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
 				rightFileEnd: { line: endLine, offset: threadContext?.endOffset },
 			};
-		}
 
 		const thread: GitPullRequestCommentThread = {
 			comments: [
@@ -918,7 +916,7 @@ export class PullRequestModel implements IPullRequestModel {
 			...new Set([...contextByEvaluationId.values()].map(c => c.buildId).filter((id): id is number => !!id)),
 		];
 		const builds = buildApi
-			? await Promise.all(buildIds.map(id => buildApi.getBuild(projectId, id).catch(() => undefined)))
+			? await Promise.all(buildIds.map(id => buildApi.getBuild(projectId, id).catch(() => {})))
 			: [];
 		const buildById = new Map(builds.filter((b): b is Build => !!b).map(b => [b.id!, b]));
 
@@ -1155,16 +1153,27 @@ export class PullRequestModel implements IPullRequestModel {
 					params.path = change.item!.path;
 					params.originalPath = change.sourceServerItem;
 				}
-				if (change.changeType! === VersionControlChangeType.Rename) {
+				switch (change.changeType!) {
+				case VersionControlChangeType.Rename: {
 					params.path = change.item!.path;
-				} else if (change.changeType! === VersionControlChangeType.Edit) {
+				
+				break;
+				}
+				case VersionControlChangeType.Edit: {
 					params.path = change.item!.path;
 					params.originalPath = change.item?.path;
-				} else if (change.changeType! === VersionControlChangeType.Add) {
+				
+				break;
+				}
+				case VersionControlChangeType.Add: {
 					params.path = change.item!.path;
 					// tslint:disable-next-line: no-bitwise
-				} else if (change.changeType! & VersionControlChangeType.Delete) {
+				
+				break;
+				}
+				default: if (change.changeType! & VersionControlChangeType.Delete) {
 					params.originalPath = change.item!.path;
+				}
 				}
 				return params;
 			});
@@ -1298,7 +1307,7 @@ export class PullRequestModel implements IPullRequestModel {
 			'vscode.diff',
 			baseUri,
 			headUri,
-			`${pathSegments[pathSegments.length - 1]} (Pull Request)`,
+			`${pathSegments.at(-1)} (Pull Request)`,
 			opts,
 		);
 	}

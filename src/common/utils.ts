@@ -156,11 +156,7 @@ export function formatError(e: any): string {
 	} else if (isHookError(e) && e.errors) {
 		return e.errors
 			.map((error: any) => {
-				if (typeof error === 'string') {
-					return error;
-				} else {
-					return error.message;
-				}
+				return typeof error === 'string' ? error : error.message;
 			})
 			.join(', ');
 	}
@@ -451,7 +447,7 @@ export class TernarySearchTree<E> {
 	findSubstr(key: string): E | undefined {
 		const iter = this._iter.reset(key);
 		let node = this._root;
-		let candidate: E | undefined = undefined;
+		let candidate: E | undefined;
 		while (node) {
 			const val = iter.cmp(node.segment);
 			if (val > 0) {
@@ -489,11 +485,7 @@ export class TernarySearchTree<E> {
 				node = node.mid;
 			} else {
 				// collect
-				if (!node.mid) {
-					return undefined;
-				} else {
-					return this._nodeIterator(node.mid);
-				}
+				return !node.mid ? undefined : this._nodeIterator(node.mid);
 			}
 		}
 		return undefined;
@@ -529,20 +521,22 @@ export class TernarySearchTree<E> {
 	}
 
 	private _forEach(node: TernarySearchTreeNode<E> | undefined, callback: (value: E, index: string) => any) {
-		if (node) {
-			// left
-			this._forEach(node.left, callback);
-
-			// node
-			if (node.value) {
-				// callback(node.value, this._iter.join(parts));
-				callback(node.value, node.key);
-			}
-			// mid
-			this._forEach(node.mid, callback);
-
-			// right
-			this._forEach(node.right, callback);
+		if (!node) {
+			return;
 		}
+
+		// left
+		this._forEach(node.left, callback);
+
+		// node
+		if (node.value) {
+			// callback(node.value, this._iter.join(parts));
+			callback(node.value, node.key);
+		}
+		// mid
+		this._forEach(node.mid, callback);
+
+		// right
+		this._forEach(node.right, callback);
 	}
 }

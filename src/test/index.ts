@@ -40,12 +40,12 @@ async function runAllExtensionTests(testsRoot: string): Promise<number> {
 
 	// await vscode.extensions.getExtension(extensionId)!.activate();
 
-	mockWebviewEnvironment.install(global);
+	mockWebviewEnvironment.install(globalThis);
 
 	const mocha = new Mocha({
 		ui: 'bdd',
 		color: true,
-		timeout: 600000,
+		timeout: 600_000,
 		// Scope a run to one suite: MOCHA_GREP="PullRequestOverview" yarn test
 		grep: process.env.MOCHA_GREP ? new RegExp(process.env.MOCHA_GREP) : undefined,
 	});

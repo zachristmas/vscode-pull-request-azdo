@@ -39,9 +39,9 @@ export class VSLSHost implements vscode.Disposable {
 			return;
 		}
 
-		const localRepository: any = gitProvider.repositories.filter(
+		const localRepository: any = gitProvider.repositories.find(
 			repository => repository.rootUri.toString() === localWorkSpaceFolderUri.toString(),
-		)[0];
+		);
 		if (localRepository) {
 			const commandArgs = args.slice(2);
 			if (type === VSLS_REPOSITORY_INITIALIZATION_NAME) {

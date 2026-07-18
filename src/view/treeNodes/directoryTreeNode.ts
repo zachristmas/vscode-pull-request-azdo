@@ -56,7 +56,7 @@ export class DirectoryTreeNode extends TreeNode implements vscode.TreeItem {
 		// perform the merge
 		this.label = this.label + '/' + child.label;
 		if (this.label.startsWith('/')) {
-			this.label = this.label.substr(1);
+			this.label = this.label.slice(1);
 		}
 		this.children = child.children;
 	}
@@ -90,11 +90,7 @@ export class DirectoryTreeNode extends TreeNode implements vscode.TreeItem {
 	public addFile(file: GitFileChangeNode | RemoteFileChangeNode | InMemFileChangeNode): void {
 		let paths = file.fileName.split('/');
 		if (file.status === GitChangeType.DELETE) {
-			if (file instanceof GitFileChangeNode) {
-				paths = file.fileName.split('/');
-			} else {
-				paths = (file as InMemFileChangeNode).previousFileName!.split('/');
-			}
+			paths = file instanceof GitFileChangeNode ? file.fileName.split('/') : (file as InMemFileChangeNode).previousFileName!.split('/');
 		}
 		file.description = '';
 

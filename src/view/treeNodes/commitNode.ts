@@ -33,9 +33,9 @@ export class CommitNode extends TreeNode implements vscode.TreeItem {
 		let userIconUri: vscode.Uri | undefined;
 		try {
 			if (commit.author && commit.author.imageUrl) {
-				userIconUri = vscode.Uri.parse(`${commit.author.imageUrl}&s=${64}`);
+				userIconUri = vscode.Uri.parse(`${commit.author.imageUrl}&s=64`);
 			}
-		} catch (_) {
+		} catch {
 			// no-op
 		}
 
@@ -57,7 +57,7 @@ export class CommitNode extends TreeNode implements vscode.TreeItem {
 			// const matchingComments = this.comments.filter(comment => comment.threadContext?.filePath === change.item?.path && comment.originalCommitId === this.commit.commitId);
 			const fileName = change.item?.path ?? change.sourceServerItem ?? '';
 			const parentFileName = change.sourceServerItem ?? change.item?.path ?? '';
-			const uri = vscode.Uri.parse(path.join(`commit~${this.commit.commitId?.substr(0, 8)}`, fileName));
+			const uri = vscode.Uri.parse(path.join(`commit~${this.commit.commitId?.slice(0, 8)}`, fileName));
 			const fileChangeNode = new GitFileChangeNode(
 				this,
 				this.pullRequest,
@@ -99,6 +99,6 @@ export class CommitNode extends TreeNode implements vscode.TreeItem {
 			return fileChangeNode;
 		});
 
-		return Promise.resolve(fileChangeNodes);
+		return fileChangeNodes;
 	}
 }
