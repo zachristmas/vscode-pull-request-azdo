@@ -1212,6 +1212,88 @@ export class PullRequestModel implements IPullRequestModel {
 		return patch;
 	}
 
+	/**
+	 * Open the PR diff editor for a file in this PR, optionally landing the cursor on a 1-based
+	 * line ("Ln" as the editor shows it). Used by the vscode:// deep-link handler.
+	 */
+	static async openDiffForFile(
+		folderManager: FolderRepositoryManager,
+		pullRequestModel: PullRequestModel,
+		filePath: string,
+		line?: number,
+	): Promise<void> {
+		const targetPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+		const fileChanges = await pullRequestModel.getFileChangesInfo();
+		const mergeBase = pullRequestModel.getDiffTarget();
+		const contentChanges = await parseDiffAzdo(fileChanges, folderManager.repository, mergeBase);
+		const change = contentChanges.find(
+			fileChange => fileChange.fileName === targetPath || fileChange.previousFileName === targetPath,
+		);
+		if (!change) {
+			throw new Error(`Can't find the file '${targetPath}' in pull request ${pullRequestModel.getPullRequestId()}`);
+		}
+
+		let headUri, baseUri: vscode.Uri;
+		if (!pullRequestModel.equals(folderManager.activePullRequest)) {
+			const headCommit = pullRequestModel.head!.sha;
+			const fileName = change.status === GitChangeType.DELETE ? change.previousFileName! : change.fileName;
+			// Falls back to the head-side name for added files so the base URI stays resolvable (#109).
+			const parentFileName = change.previousFileName || fileName;
+			headUri = toPRUriAzdo(
+				vscode.Uri.file(path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName))),
+				pullRequestModel,
+				change.baseCommit,
+				headCommit,
+				fileName,
+				false,
+				change.status,
+			);
+			baseUri = toPRUriAzdo(
+				vscode.Uri.file(path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName))),
+				pullRequestModel,
+				change.baseCommit,
+				headCommit,
+				parentFileName,
+				true,
+				change.status,
+			);
+		} else {
+			const uri = vscode.Uri.file(
+				path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(change.fileName)),
+			);
+
+			headUri =
+				change.status === GitChangeType.DELETE
+					? toReviewUri(uri, undefined, undefined, '', false, { base: false }, folderManager.repository.rootUri)
+					: uri;
+
+			baseUri = toReviewUri(
+				uri,
+				change.status === GitChangeType.RENAME ? change.previousFileName : change.fileName,
+				undefined,
+				change.status === GitChangeType.ADD ? '' : mergeBase,
+				false,
+				{ base: true },
+				folderManager.repository.rootUri,
+			);
+		}
+
+		const opts: vscode.TextDocumentShowOptions = {};
+		if (line !== undefined && line > 0) {
+			// 1-based visible line -> 0-based Range
+			opts.selection = new vscode.Range(line - 1, 0, line - 1, 0);
+		}
+
+		const pathSegments = targetPath.split('/');
+		vscode.commands.executeCommand(
+			'vscode.diff',
+			baseUri,
+			headUri,
+			`${pathSegments[pathSegments.length - 1]} (Pull Request)`,
+			opts,
+		);
+	}
+
 	static async openDiffFromComment(
 		folderManager: FolderRepositoryManager,
 		pullRequestModel: PullRequestModel,

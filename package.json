@@ -22,7 +22,8 @@
 	],
 	"activationEvents": [
 		"onStartupFinished",
-		"onFileSystem:newIssue"
+		"onFileSystem:newIssue",
+		"onUri"
 	],
 	"browser": "./dist/browser/extension",
 	"main": "./dist/extension",
