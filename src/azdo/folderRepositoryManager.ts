@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as path from 'path';
+import path from 'path';
 import {
 	GitPullRequest,
 	GitPullRequestSearchCriteria,
@@ -358,7 +358,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 									email: user.email,
 									insertText: user.id!,
 									filterText:
-										`${user.id!}` +
+										user.id! +
 										(user.name && user.name !== user.id!
 											? `_${user.name.toLowerCase().replace(' ', '_')}`
 											: ''),
@@ -376,9 +376,9 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								// if the mentionable api call fails partially, we should still populate related users from timeline events into the completion list
 								cachedUsers.push({
 									label: prRelatedUsersMap[user].login,
-									insertText: `${prRelatedUsersMap[user].login}`,
+									insertText: prRelatedUsersMap[user].login,
 									filterText:
-										`${prRelatedUsersMap[user].login}` +
+										prRelatedUsersMap[user].login +
 										(prRelatedUsersMap[user].name &&
 										prRelatedUsersMap[user].name !== prRelatedUsersMap[user].login
 											? `_${prRelatedUsersMap[user].name!.toLowerCase().replace(' ', '_')}`
@@ -1182,7 +1182,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 			if (!matchesActiveBranch) {
 				actions.push({
-					label: `${key}`,
+					label: key,
 					description: `${value.metadata!.repositoryName}/${value.metadata!.owner} #${value.metadata.prNumber}`,
 					picked: false,
 					metadata: value.metadata!,

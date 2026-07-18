@@ -1,5 +1,5 @@
 // This file is providing the test runner to use when running extension tests.
-import * as path from 'path';
+import path from 'path';
 import { glob } from 'glob';
 import Mocha from 'mocha';
 

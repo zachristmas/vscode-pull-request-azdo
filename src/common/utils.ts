@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 'use strict';
-import { sep } from 'path';
+import path from 'path';
 import moment from 'moment';
 import { Disposable, Event } from 'vscode';
 
@@ -77,8 +77,8 @@ export function isDescendant(parent: string, descendant: string): boolean {
 		return true;
 	}
 
-	if (parent.charAt(parent.length - 1) !== sep) {
-		parent += sep;
+	if (parent.charAt(parent.length - 1) !== path.sep) {
+		parent += path.sep;
 	}
 
 	// Windows is case insensitive

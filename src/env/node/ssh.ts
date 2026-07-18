@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
-import { join } from 'path';
+import path from 'path';
 import Logger from '../../common/logger';
 import { baseResolver, chainResolvers, ConfigResolver, resolverFromConfig, sshParse } from '../browser/ssh';
 
@@ -45,7 +45,7 @@ export const resolve = (url: string, resolveConfig = Resolvers.current) => {
 	return config && resolveConfig(config);
 };
 
-function resolverFromConfigFile(configPath = join(homedir(), '.ssh', 'config')): ConfigResolver | undefined {
+function resolverFromConfigFile(configPath = path.join(homedir(), '.ssh', 'config')): ConfigResolver | undefined {
 	try {
 		const config = readFileSync(configPath).toString();
 		return resolverFromConfig(config);

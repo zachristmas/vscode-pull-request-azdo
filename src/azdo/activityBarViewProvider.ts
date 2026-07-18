@@ -99,7 +99,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				try {
 					return await this._replyMessage(message, await this._item.getStatusChecks());
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			case 'pr.checkPolicies':
 				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
@@ -111,7 +111,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
 					);
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			// The sidebar webview posts pr.debug on every mount (activityBarView/app.tsx). Without a case
 			// it hit the throwing default below and rejected an uncaught promise per activation; mirror
@@ -270,7 +270,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			},
 			e => {
 				vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
+				this._throwError(message, formatError(e));
 			},
 		);
 	}
@@ -289,7 +289,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			e => {
 				vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
 
-				this._throwError(message, `${formatError(e)}`);
+				this._throwError(message, formatError(e));
 			},
 		);
 	}
@@ -306,7 +306,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			},
 			e => {
 				vscode.window.showErrorMessage(`Submitting review failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
+				this._throwError(message, formatError(e));
 			},
 		);
 	}
@@ -441,7 +441,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 					isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
 				} failed. ${formatError(e)}`,
 			);
-			this._throwError(message, `${formatError(e)}`);
+			this._throwError(message, formatError(e));
 		}
 	}
 

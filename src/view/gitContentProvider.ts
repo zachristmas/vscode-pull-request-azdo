@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
-import * as pathLib from 'path';
+import pathLib from 'path';
 import * as vscode from 'vscode';
 import { GitApiImpl } from '../api/api1';
 import { getRepositoryForFile } from '../azdo/utils';

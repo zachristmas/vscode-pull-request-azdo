@@ -29,12 +29,12 @@ class Log {
 			case LogLevel.Debug:
 				const hrtime = Date.now() / 1000;
 				const timeStamp = `${hrtime}s`;
-				const info = component ? `${component}> ${message}` : `${message}`;
+				const info = component ? `${component}> ${message}` : message;
 				this._outputChannel.appendLine(`[Debug ${timeStamp}] ${info}`);
 				return;
 			case LogLevel.Info:
 			default:
-				this._outputChannel.appendLine(`[Info] ` + (component ? `${component}> ${message}` : `${message}`));
+				this._outputChannel.appendLine(`[Info] ` + (component ? `${component}> ${message}` : message));
 				return;
 		}
 	}

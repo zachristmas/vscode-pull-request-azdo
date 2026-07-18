@@ -1,4 +1,4 @@
-import * as path from 'path';
+import path from 'path';
 import sinon from 'sinon';
 import * as temp from 'temp';
 import { ExtensionContext, SecretStorage, Uri } from 'vscode';

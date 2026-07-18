@@ -394,7 +394,7 @@ const PolicyRow = ({
 				<span className="status-check-detail-text">
 					{policy.displayName}
 					{policy.detail ? `: ${policy.detail}` : ''}
-					{policy.kind === 'build' ? `${buildDetailSuffix(policy)}` : ''}
+					{policy.kind === 'build' ? buildDetailSuffix(policy) : ''}
 					{!policy.isBlocking ? ' (optional)' : ''}
 				</span>
 			</div>

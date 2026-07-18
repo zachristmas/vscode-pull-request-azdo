@@ -1,4 +1,4 @@
-import * as path from 'path';
+import path from 'path';
 import { BrowserType, runTests } from '@vscode/test-web';
 
 async function go() {

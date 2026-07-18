@@ -5,7 +5,7 @@
 
 'use strict';
 
-import * as pathUtils from 'path';
+import pathUtils from 'path';
 import { VersionControlChangeType } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { EventEmitter, Uri, UriHandler } from 'vscode';
 import { Repository } from '../api/api';

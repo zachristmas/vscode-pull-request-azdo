@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import * as path from 'path';
+import path from 'path';
 import { GitPullRequest, GitStatusState } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { createSandbox, match as sinonMatch, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';

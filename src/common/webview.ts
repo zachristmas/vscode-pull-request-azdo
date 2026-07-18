@@ -74,7 +74,7 @@ export class WebviewBase {
 		} catch (e) {
 			// Only reply if the handler hadn't already: some handlers reply then do more work that throws.
 			if (message?.req && !this._repliedReqs.has(message.req)) {
-				await this._throwError(message, `${formatError(e)}`);
+				await this._throwError(message, formatError(e));
 			}
 		}
 	}

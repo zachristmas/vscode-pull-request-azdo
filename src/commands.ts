@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
-import * as pathLib from 'path';
+import pathLib from 'path';
 import { GitPullRequestCommentThread, GitPullRequestMergeStrategy } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { GitErrorCodes } from './api/api1';
@@ -863,14 +863,14 @@ export function registerCommands(
 							'vscode.diff',
 							fileChange.parentFilePath,
 							emptyFileUri,
-							`${fileChange.fileName}`,
+							fileChange.fileName,
 							{ preserveFocus: true },
 					  )
 					: vscode.commands.executeCommand(
 							'vscode.diff',
 							emptyFileUri,
 							fileChange.parentFilePath,
-							`${fileChange.fileName}`,
+							fileChange.fileName,
 							{ preserveFocus: true },
 					  );
 			}

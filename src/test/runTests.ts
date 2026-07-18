@@ -1,4 +1,4 @@
-import * as path from 'path';
+import path from 'path';
 import * as dotenv from 'dotenv';
 import { runTests } from 'vscode-test';
 

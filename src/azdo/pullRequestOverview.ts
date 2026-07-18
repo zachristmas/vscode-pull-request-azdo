@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
-import * as path from 'path';
+import path from 'path';
 import {
 	Comment,
 	GitPullRequestCommentThread,
@@ -403,7 +403,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				try {
 					return await this._replyMessage(message, await this._item.getStatusChecks());
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			case 'pr.checkPolicies':
 				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
@@ -415,7 +415,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
 					);
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			case 'pr.add-reviewers':
 				return this.addReviewerToPr(message);
@@ -903,7 +903,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
 				} failed. ${formatError(e)}`,
 			);
-			this._throwError(message, `${formatError(e)}`);
+			this._throwError(message, formatError(e));
 		}
 	}
 
@@ -944,7 +944,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			e => {
 				vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
 
-				this._throwError(message, `${formatError(e)}`);
+				this._throwError(message, formatError(e));
 			},
 		);
 	}
@@ -958,7 +958,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			},
 			e => {
 				vscode.window.showErrorMessage(`Creating thread failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
+				this._throwError(message, formatError(e));
 			},
 		);
 	}
@@ -972,7 +972,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			},
 			e => {
 				vscode.window.showErrorMessage(`Commenting on thread failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
+				this._throwError(message, formatError(e));
 			},
 		);
 	}
@@ -986,7 +986,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			},
 			e => {
 				vscode.window.showErrorMessage(`Updating thread status failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
+				this._throwError(message, formatError(e));
 			},
 		);
 	}

@@ -225,6 +225,8 @@ export default tseslint.config(
 			'unicorn/no-useless-else': 'off',
 			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
 			'unicorn/consistent-assert': 'error',
+			'unicorn/import-style': 'error',
+			'unicorn/no-useless-template-literals': 'error',
 			'unicorn/consistent-existence-index-check': 'error',
 			'unicorn/no-for-loop': 'error',
 			'unicorn/no-lonely-if': 'error',

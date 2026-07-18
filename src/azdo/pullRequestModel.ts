@@ -1,4 +1,4 @@
-import * as path from 'path';
+import path from 'path';
 import { Build } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { ResourceRef } from 'azure-devops-node-api/interfaces/common/VSSInterfaces';
 import {

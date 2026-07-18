@@ -41,7 +41,7 @@ export class PullRequestChangesTreeDataProvider
 				}
 
 				this._onDidChangeTreeData.fire();
-				const layout = vscode.workspace.getConfiguration(`${SETTINGS_NAMESPACE}`).get<string>('fileListLayout');
+				const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
 				await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 			}),
 		);
