@@ -14,7 +14,7 @@ import { PullRequestsTreeDataProvider } from './prsTreeDataProvider';
 import { ReviewManager } from './reviewManager';
 
 export class ReviewsManager {
-	public static ID = 'Reviews';
+	public static readonly ID = 'Reviews';
 	private _disposables: vscode.Disposable[];
 
 	constructor(

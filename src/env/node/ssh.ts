@@ -4,15 +4,17 @@ import path from 'path';
 import Logger from '../../common/logger';
 import { baseResolver, chainResolvers, ConfigResolver, resolverFromConfig, sshParse } from '../browser/ssh';
 
-export class Resolvers {
-	static default = chainResolvers(baseResolver, resolverFromConfigFile());
+const defaultResolver = chainResolvers(baseResolver, resolverFromConfigFile());
 
-	static fromConfig(conf: string) {
+export const Resolvers = {
+	default: defaultResolver,
+
+	fromConfig(conf: string) {
 		return chainResolvers(baseResolver, resolverFromConfig(conf));
-	}
+	},
 
-	static current = Resolvers.default;
-}
+	current: defaultResolver,
+};
 
 /**
  * Parse and resolve an SSH url. Resolves host aliases using the configuration

@@ -92,7 +92,7 @@ export class TemporaryComment implements vscode.Comment {
 	 */
 	public contextValue: string;
 
-	static idPool = 0;
+	private static idPool = 0;
 
 	public parentCommentId?: number;
 

@@ -79,7 +79,7 @@ export function getDocumentThreadDatas(
 }
 
 export class PRNode extends TreeNode {
-	static ID = 'PRNode';
+	static readonly ID = 'PRNode';
 
 	private _fileChanges: (RemoteFileChangeNode | InMemFileChangeNode)[] | undefined;
 	private _commentController?: vscode.CommentController;

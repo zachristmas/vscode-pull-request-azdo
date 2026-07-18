@@ -33,14 +33,14 @@ import {
 import { AzdoWorkItem } from './workItem';
 
 export class PullRequestOverviewPanel extends WebviewBase {
-	public static ID: string = 'PullRequestOverviewPanel';
+	public static readonly ID: string = 'PullRequestOverviewPanel';
 	/**
 	 * UX-04: one panel per PR, keyed by PR id. Opening a second PR now opens a new tab instead of
 	 * repurposing the single existing panel (which silently discarded scroll position, expanded
 	 * threads, and any in-progress vote/comment state). Users manage tab volume with the editor's
 	 * own machinery, the same as any other document.
 	 */
-	public static panels: Map<number, PullRequestOverviewPanel> = new Map();
+	public static readonly panels: Map<number, PullRequestOverviewPanel> = new Map();
 
 	protected static readonly _viewType: string = 'PullRequestOverview';
 	protected readonly _panel: vscode.WebviewPanel;
@@ -74,7 +74,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		const prNumber = pr.getPullRequestId();
 
 		// Reveal the existing panel for this PR if one is already open; otherwise open a new tab.
-		let panel = PullRequestOverviewPanel.panels.get(prNumber);
+		let panel = this.panels.get(prNumber);
 		if (panel) {
 			panel._panel.reveal(activeColumn, true);
 		} else {
@@ -88,14 +88,14 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				azdoUserManager,
 				prNumber,
 			);
-			PullRequestOverviewPanel.panels.set(prNumber, panel);
+			this.panels.set(prNumber, panel);
 		}
 
 		await panel.update(folderRepositoryManager, pr);
 	}
 
 	public static refresh(): void {
-		for (const panel of PullRequestOverviewPanel.panels.values()) {
+		for (const panel of this.panels.values()) {
 			panel.refreshPanel();
 		}
 	}

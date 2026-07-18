@@ -19,7 +19,7 @@ import { groupBy } from '../common/utils';
 import { URI_SCHEME_PR } from '../constants';
 
 export class PullRequestCommentController implements CommentHandler, CommentReactionHandler {
-	static ID = 'PullRequestCommentController';
+	static readonly ID = 'PullRequestCommentController';
 	private _pendingCommentThreadAdds: GHPRCommentThread[] = [];
 
 	private _commonCommentHandler: CommonCommentHandler;

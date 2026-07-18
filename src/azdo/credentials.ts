@@ -65,7 +65,7 @@ export class Azdo {
 }
 
 export class CredentialStore implements vscode.Disposable {
-	static ID = 'AzdoRepository';
+	static readonly ID = 'AzdoRepository';
 	private _azdoAPI: Azdo | undefined;
 	private orgConfig: AzdoOrgConfig | undefined;
 	private _disposables: vscode.Disposable[];

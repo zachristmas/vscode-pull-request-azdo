@@ -193,6 +193,7 @@ export default tseslint.config(
 			'sonarjs/todo-tag': 'off',
 			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
 			'sonarjs/no-ignored-exceptions': 'error',
+			'sonarjs/public-static-readonly': 'error',
 			'sonarjs/prefer-single-boolean-return': 'error',
 		},
 	},
@@ -224,8 +225,10 @@ export default tseslint.config(
 			'unicorn/no-negated-condition': 'off',
 			'unicorn/no-useless-else': 'off',
 			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
+			'unicorn/class-reference-in-static-methods': 'error',
 			'unicorn/consistent-assert': 'error',
 			'unicorn/import-style': 'error',
+			'unicorn/no-static-only-class': 'error',
 			'unicorn/no-useless-template-literals': 'error',
 			'unicorn/consistent-existence-index-check': 'error',
 			'unicorn/no-for-loop': 'error',

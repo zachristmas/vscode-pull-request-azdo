@@ -6,7 +6,7 @@ import { ITelemetry } from '../common/telemetry';
 import { errorMessage } from '../common/utils';
 
 export class AzdoUserManager implements vscode.Disposable {
-	static ID = 'UserManager';
+	static readonly ID = 'UserManager';
 	private _toDispose: vscode.Disposable[] = [];
 	private _hub: Azdo | undefined;
 	private _entitlementApi?: IUserEntitlementApi;

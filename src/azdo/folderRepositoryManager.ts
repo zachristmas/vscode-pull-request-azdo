@@ -110,7 +110,7 @@ enum PagedDataType {
 }
 
 export class FolderRepositoryManager implements vscode.Disposable {
-	static ID = 'FolderRepositoryManager';
+	static readonly ID = 'FolderRepositoryManager';
 
 	private _subs: vscode.Disposable[];
 	private _activePullRequest?: PullRequestModel;

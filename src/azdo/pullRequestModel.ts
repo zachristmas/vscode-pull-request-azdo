@@ -82,7 +82,7 @@ export interface ReviewThreadChangeEvent {
 }
 
 export class PullRequestModel implements IPullRequestModel {
-	static ID = 'PullRequestModel';
+	static readonly ID = 'PullRequestModel';
 
 	public isDraft?: boolean;
 	public localBranchName?: string;

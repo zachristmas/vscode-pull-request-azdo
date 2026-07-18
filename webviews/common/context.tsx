@@ -265,7 +265,7 @@ export class PRContext {
 		}
 	};
 
-	public static instance = new PRContext();
+	public static readonly instance = new PRContext();
 }
 
 const PullRequestContext = createContext<PRContext>(PRContext.instance);

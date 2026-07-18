@@ -39,7 +39,7 @@ import { GitFileChangeNode, gitFileChangeNodeFilter, RemoteFileChangeNode } from
 const FOCUS_REVIEW_MODE = 'azdo:focusedReview';
 
 export class ReviewManager {
-	public static ID = 'Review';
+	public static readonly ID = 'Review';
 	private _localToDispose: vscode.Disposable[] = [];
 	private _disposables: vscode.Disposable[];
 

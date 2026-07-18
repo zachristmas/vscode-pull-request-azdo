@@ -51,7 +51,7 @@ export const sshParse = (url: string): Config | undefined => {
  * @param {ConfigResolver?} resolveConfig ssh config resolver (default: from ~/.ssh/config)
  * @returns {Config}
  */
- export const resolve = (url: string, resolveConfig = Resolvers.current) => {
+export const resolve = (url: string, resolveConfig = Resolvers.current) => {
 	const config = sshParse(url);
 	return config && resolveConfig(config);
 };
@@ -97,12 +97,12 @@ export function resolverFromConfig(text: string): ConfigResolver {
 	return h => config.compute(h.Host);
 }
 
-export class Resolvers {
-	static default = baseResolver;
+export const Resolvers = {
+	default: baseResolver,
 
-	static fromConfig(conf: string) {
+	fromConfig(conf: string) {
 		return chainResolvers(baseResolver, resolverFromConfig(conf));
-	}
+	},
 
-	static current = Resolvers.default;
-}
+	current: baseResolver,
+};
