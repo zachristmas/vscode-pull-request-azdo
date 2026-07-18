@@ -9,6 +9,8 @@ export interface ParsedAzdoRemote {
 //   SSH:        (ssh://)?git@ssh.dev.azure.com(:22)?[:/]v3/<org>/<project>/<repo>
 //   Legacy:     https://(user@)?<org>.visualstudio.com/(DefaultCollection/)?<project>/_git/<repo>
 //   Legacy SSH: <user>@vs-ssh.visualstudio.com(:22)?[:/]v3/<org>/<project>/<repo>
+// When the project and repository share a name ADO omits the project segment
+// (.../_git/<repo> directly under the org); for those shapes project := repo.
 // Project and repo segments may be percent-encoded (e.g. spaces as %20).
 const PATTERNS: { pattern: RegExp; org: number; project: number; repo: number }[] = [
 	{
@@ -18,10 +20,24 @@ const PATTERNS: { pattern: RegExp; org: number; project: number; repo: number }[
 		repo: 3,
 	},
 	{
+		pattern: /^https:\/\/(?:[^@/]+@)?dev\.azure\.com\/([^/]+)\/_git\/([^/]+?)(?:\.git)?\/?$/i,
+		org: 1,
+		project: 2,
+		repo: 2,
+	},
+	{
 		pattern: /^(?:ssh:\/\/)?git@ssh\.dev\.azure\.com(?::22)?[:/]v3\/([^/]+)\/([^/]+)\/([^/]+?)\/?$/i,
 		org: 1,
 		project: 2,
 		repo: 3,
+	},
+	{
+		// Must precede the generic legacy pattern: for .../DefaultCollection/_git/<repo> that
+		// pattern backtracks and mis-parses "DefaultCollection" as the project name.
+		pattern: /^https:\/\/(?:[^@/]+@)?([^./]+)\.visualstudio\.com\/(?:DefaultCollection\/)?_git\/([^/]+?)(?:\.git)?\/?$/i,
+		org: 1,
+		project: 2,
+		repo: 2,
 	},
 	{
 		pattern: /^https:\/\/(?:[^@/]+@)?([^./]+)\.visualstudio\.com\/(?:DefaultCollection\/)?([^/]+)\/_git\/([^/]+?)(?:\.git)?\/?$/i,

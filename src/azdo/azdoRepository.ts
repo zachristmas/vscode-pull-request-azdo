@@ -30,6 +30,7 @@ export class AzdoRepository implements vscode.Disposable {
 	protected _initialized: boolean;
 	protected _hub: Azdo | undefined;
 	protected _metadata: IMetadata | undefined;
+	private _metadataNotFound: boolean = false;
 	private _policyTypeMap: Map<string, string> | undefined;
 	private _toDispose: vscode.Disposable[] = [];
 	public commentsController?: vscode.CommentController;
@@ -94,20 +95,50 @@ export class AzdoRepository implements vscode.Disposable {
 			Logger.debug(`Fetch metadata for repo: ${this._metadata.id}/${this._metadata.name} - cache hit`, AzdoRepository.ID);
 			return this._metadata;
 		}
+		if (this._metadataNotFound) {
+			return undefined;
+		}
 
+		const repoName = this.remote.repositoryName;
 		const parsedRemote = parseAzdoRemoteUrl(this.remote.url);
 		const remoteProjectName = parsedRemote?.projectName ?? this._hub?.projectName;
-		Logger.debug(`Searching for repos in ${remoteProjectName} project`, AzdoRepository.ID);
-		const repos = await gitApi?.getRepositories(remoteProjectName);
+		// Track whether every lookup got a clean answer from the server; only a clean
+		// "not found" is cached, a thrown lookup stays retryable.
+		let lookupFailed = false;
 
-		Logger.debug(
-			`Found ${repos?.length} repos. Searching for repo with name ${this.remote.repositoryName}`,
-			AzdoRepository.ID,
-		);
-		this._metadata = repos?.find(v => v.name?.toLowerCase() === this.remote.repositoryName?.toLowerCase());
+		if (remoteProjectName) {
+			Logger.debug(`Searching for repo ${repoName} in ${remoteProjectName} project`, AzdoRepository.ID);
+			try {
+				const repos = await gitApi?.getRepositories(remoteProjectName);
+				this._metadata = repos?.find(v => v.name?.toLowerCase() === repoName?.toLowerCase());
+			} catch (e) {
+				lookupFailed = true;
+				Logger.appendLine(`Project-scoped repository lookup in '${remoteProjectName}' failed: ${e}`, AzdoRepository.ID);
+			}
+		}
+
 		if (!this._metadata) {
-			Logger.debug(`Fetch metadata ${this.remote.repositoryName} failed. No repo by that name.`, AzdoRepository.ID);
-			return this._metadata;
+			// Legacy visualstudio.com remotes and multi-project workspaces can carry a project
+			// name that doesn't match this repo (or none at all): fall back to an org-wide search.
+			try {
+				const repos = await gitApi?.getRepositories();
+				const matches = repos?.filter(v => v.name?.toLowerCase() === repoName?.toLowerCase()) ?? [];
+				this._metadata =
+					matches.find(v => v.project?.name?.toLowerCase() === parsedRemote?.projectName?.toLowerCase()) ??
+					matches[0];
+			} catch (e) {
+				lookupFailed = true;
+				Logger.appendLine(`Org-wide repository lookup for '${repoName}' failed: ${e}`, AzdoRepository.ID);
+			}
+		}
+
+		if (!this._metadata) {
+			this._metadataNotFound = !lookupFailed;
+			Logger.appendLine(
+				`Fetch metadata ${repoName} failed. No repo by that name in project '${remoteProjectName}' or the organization.`,
+				AzdoRepository.ID,
+			);
+			return undefined;
 		}
 		Logger.debug(`Fetch metadata ${this._metadata?.id}/${this._metadata?.name} - done`, AzdoRepository.ID);
 		return this._metadata;
@@ -115,6 +146,10 @@ export class AzdoRepository implements vscode.Disposable {
 
 	async getRepositoryId(): Promise<string | undefined> {
 		return (await this.getMetadata())?.id;
+	}
+
+	private unresolvedRepositoryMessage(): string {
+		return `unable to resolve Azure DevOps repository '${this.remote.repositoryName}' for remote '${this.remote.remoteName}' (${this.remote.url})`;
 	}
 
 	/**
@@ -189,8 +224,11 @@ export class AzdoRepository implements vscode.Disposable {
 		Logger.debug(`Creating pull request`, AzdoRepository.ID);
 		try {
 			const metadata = await this.getMetadata();
+			if (!metadata?.id) {
+				throw new Error(this.unresolvedRepositoryMessage());
+			}
 			const gitApi = await this._hub?.connection?.getGitApi();
-			const pullRequestModel = await gitApi?.createPullRequest(pullRequest, metadata?.id);
+			const pullRequestModel = await gitApi?.createPullRequest(pullRequest, metadata.id);
 			Logger.debug(`Created pull request`, AzdoRepository.ID);
 			return new PullRequestModel(this._telemetry, this, this.remote, pullRequestModel);
 		} catch (e) {
@@ -203,8 +241,15 @@ export class AzdoRepository implements vscode.Disposable {
 			Logger.debug(`Fetch pull requests for branch - enter`, AzdoRepository.ID);
 			const azdo = await this.ensure();
 			const metadata = await this.getMetadata();
+			if (!metadata?.id) {
+				// An empty repositoryId turns the URL into an org-level by-NAME repository
+				// reference ("A project name is required...") on the server. Skip quietly:
+				// unresolvable remotes (wiki repos, no access) simply have no PRs to show.
+				Logger.appendLine(`Fetching pull requests skipped: ${this.unresolvedRepositoryMessage()}`, AzdoRepository.ID);
+				return [];
+			}
 			const gitApi = await azdo._hub?.connection.getGitApi();
-			const result = await gitApi?.getPullRequests(metadata?.id || '', search);
+			const result = await gitApi?.getPullRequests(metadata.id, search);
 
 			if (!result || result.length === 0) {
 				Logger.appendLine(
@@ -298,8 +343,11 @@ export class AzdoRepository implements vscode.Disposable {
 			Logger.debug(`Get branch for name ${branchName} - enter`, AzdoRepository.ID);
 			const azdo = await this.ensure();
 			const metadata = await this.getMetadata();
+			if (!metadata?.id) {
+				throw new Error(this.unresolvedRepositoryMessage());
+			}
 			const gitApi = await azdo._hub?.connection.getGitApi();
-			const branch = await gitApi?.getBranch(metadata?.id || '', branchName);
+			const branch = await gitApi?.getBranch(metadata.id, branchName);
 
 			if (!branch) {
 				Logger.debug(`Get branch for name ${branchName} - failed. No branch with such name`, AzdoRepository.ID);
@@ -324,8 +372,11 @@ export class AzdoRepository implements vscode.Disposable {
 			Logger.debug(`List branches for ${this.remote.owner}/${this.remote.repositoryName} - enter`, AzdoRepository.ID);
 			const azdo = await this.ensure();
 			const metadata = await this.getMetadata();
+			if (!metadata?.id) {
+				throw new Error(this.unresolvedRepositoryMessage());
+			}
 			const gitApi = await azdo._hub?.connection.getGitApi();
-			const branches = await gitApi?.getBranches(metadata!.id!);
+			const branches = await gitApi?.getBranches(metadata.id);
 			Logger.debug(`List branches for ${this.remote.owner}/${this.remote.repositoryName} - done`, AzdoRepository.ID);
 			return branches?.map(branch => branch.name!) ?? [];
 		} catch (e) {
