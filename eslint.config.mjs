@@ -1,7 +1,22 @@
 import eslint from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import importX from 'eslint-plugin-import-x';
+import sonarjs from 'eslint-plugin-sonarjs';
+import unicorn from 'eslint-plugin-unicorn';
 import tseslint from 'typescript-eslint';
+
+// Shadow mode (see repo convention): new rule sets enter as warnings only; individual rules get
+// promoted to 'error' on evidence, not on a date.
+function downgradeToWarn(rules) {
+	return Object.fromEntries(
+		Object.entries(rules).map(([id, conf]) => {
+			if (Array.isArray(conf)) {
+				return [id, conf[0] === 'off' ? conf : ['warn', ...conf.slice(1)]];
+			}
+			return [id, conf === 'off' ? 'off' : 'warn'];
+		}),
+	);
+}
 
 // Flat-config port of the old .eslintrc.base.json (ESLint 7 / typescript-eslint 4 era).
 // Rule intent preserved 1:1, including the deliberate offs; import/* rules moved to
@@ -166,6 +181,39 @@ export default tseslint.config(
 			'@typescript-eslint/restrict-template-expressions': 'off',
 			'@typescript-eslint/strict-boolean-expressions': 'off',
 			'@typescript-eslint/unbound-method': 'off',
+		},
+	},
+	{
+		name: 'sonarjs-shadow',
+		plugins: { sonarjs },
+		rules: {
+			...downgradeToWarn(sonarjs.configs.recommended.rules),
+			'sonarjs/cognitive-complexity': ['warn', 15],
+			// A legacy codebase self-reports its TODOs; the tag rule adds no signal here.
+			'sonarjs/todo-tag': 'off',
+		},
+	},
+	{
+		name: 'unicorn-shadow',
+		plugins: { unicorn },
+		rules: {
+			...downgradeToWarn(unicorn.configs.recommended.rules),
+			// Churn-heavy stylistic rules that would bury the useful signal in this codebase
+			// (top offenders measured at 2283 warnings on first run; these are style-only):
+			'unicorn/prevent-abbreviations': 'off',
+			'unicorn/filename-case': 'off',
+			'unicorn/no-null': 'off',
+			'unicorn/name-replacements': 'off',
+			'unicorn/switch-case-braces': 'off',
+			'unicorn/catch-error-name': 'off',
+			'unicorn/no-for-each': 'off',
+			'unicorn/consistent-boolean-name': 'off',
+			'unicorn/prefer-single-call': 'off',
+			'unicorn/prefer-await': 'off',
+			'unicorn/consistent-class-member-order': 'off',
+			'unicorn/explicit-length-check': 'off',
+			'unicorn/no-negated-condition': 'off',
+			'unicorn/no-useless-else': 'off',
 		},
 	},
 	prettier,
