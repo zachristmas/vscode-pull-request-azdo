@@ -30,6 +30,7 @@ import { PullRequestGitHelper, PullRequestMetadata } from './pullRequestGitHelpe
 import { PullRequestModel } from './pullRequestModel';
 import {
 	computeMergeMethodsAvailability,
+	convertBranchRefToBranchName,
 	convertRESTIdentityToAccount,
 	getRelatedUsersFromPullrequest,
 	loginComparator,
@@ -914,14 +915,24 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		}
 		const origin = await this.getOrigin();
 		const meta = await origin.getMetadata();
-		const parent = meta!.isFork!
-			? await (await origin.azdo?.connection?.getGitApi())!.getRepository(meta!.parentRepository!.id!)
+		if (!meta) {
+			// meta!.isFork! used to throw a bare TypeError here when the repository couldn't be
+			// resolved (no access, unreachable org, unresolvable remote) - surface a real error.
+			throw new Error(
+				`The repository for remote '${origin.remote.remoteName}' could not be resolved. Check that you are signed in and can access ${origin.remote.url}.`,
+			);
+		}
+		const parent = meta.isFork
+			? await (await origin.azdo?.connection?.getGitApi())!.getRepository(meta.parentRepository!.id!)
 			: await (this.findRepo(byRemoteName('upstream')) || origin).getMetadata()!;
+		if (!parent) {
+			throw new Error(`The parent repository of '${origin.remote.remoteName}' could not be resolved.`);
+		}
 
 		return {
 			owner: await origin.getAuthenticatedUserName(),
-			repo: parent!.name!,
-			base: parent!.defaultBranch!,
+			repo: parent.name!,
+			base: parent.defaultBranch!,
 		};
 	}
 
@@ -987,87 +998,60 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		return HEAD && HEAD.upstream;
 	}
 
-	async createPullRequest(_params: GitPullRequest): Promise<PullRequestModel | undefined> {
-		// TODO later
-		return undefined;
-		// try {
-		// 	const repo = this._azdoRepositories.find(r => r.remote.repositoryName === params.repository?.name);
-		// 	if (!repo) {
-		// 		throw new Error(`No matching repository ${params.repository?.name} found for ${await this._azdoRepositories[0].getAuthenticatedUserName()}`);
-		// 	}
+	/**
+	 * Create a pull request on the AzDO repository behind the given remote and associate the local
+	 * source branch with it (so review mode picks it up on the next state update).
+	 */
+	async createPullRequest(remoteName: string, params: GitPullRequest): Promise<PullRequestModel | undefined> {
+		try {
+			const repo = this._azdoRepositories.find(r => r.remote.remoteName === remoteName);
+			if (!repo) {
+				throw new Error(`No Azure DevOps repository matches the remote '${remoteName}'.`);
+			}
 
-		// 	await repo.ensure();
+			await repo.ensure();
 
-		// 	const { title, body } = titleAndBodyFrom(await this.getHeadCommitMessage());
-		// 	if (!params.title) {
-		// 		params.title = title;
-		// 	}
+			if (!params.title || !params.description) {
+				const { title, body } = titleAndBodyFrom(await this.getHeadCommitMessage());
+				params.title = params.title || title;
+				params.description = params.description || body;
+			}
 
-		// 	if (!params.description) {
-		// 		params.description = body;
-		// 	}
+			const pullRequestModel = await repo.createPullRequest(params);
+			if (!pullRequestModel) {
+				throw new Error(
+					'Azure DevOps did not return the created pull request. Check the AzDO Pull Request log for details.',
+				);
+			}
 
-		// 	// Create PR
-		// 	const { data } = await repo.octokit.pulls.create(params);
-		// 	const item = convertRESTPullRequestToRawPullRequest(data, repo);
-		// 	const pullRequestModel = new PullRequestModel(this._telemetry, repo, repo.remote, item, true);
+			const branchName = convertBranchRefToBranchName(params.sourceRefName ?? '');
+			if (branchName) {
+				await PullRequestGitHelper.associateBranchWithPullRequest(this._repository, pullRequestModel, branchName);
+			}
 
-		// 	const branchNameSeparatorIndex = params.head.indexOf(':');
-		// 	const branchName = params.head.slice(branchNameSeparatorIndex + 1);
-		// 	await PullRequestGitHelper.associateBranchWithPullRequest(this._repository, pullRequestModel, branchName);
+			/* __GDPR__
+				"azdopr.create.success" : {
+					"isDraft" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" }
+				}
+			*/
+			this._telemetry.sendTelemetryEvent('azdopr.create.success', { isDraft: (params.isDraft ?? false).toString() });
+			return pullRequestModel;
+		} catch (e) {
+			Logger.appendLine(`FolderRepositoryManager> Creating pull request failed: ${formatError(e)}`);
 
-		// 	/* __GDPR__
-		// 		"pr.create.success" : {
-		// 			"isDraft" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" }
-		// 		}
-		// 	*/
-		// 	this._telemetry.sendTelemetryEvent('pr.create.success', { isDraft: (params.draft || '').toString() });
-		// 	return pullRequestModel;
-		// } catch (e) {
-		// 	if (e.message.indexOf('No commits between ') > -1) {
-		// 		// There are unpushed commits
-		// 		if (this._repository.state.HEAD?.ahead) {
-		// 			// Offer to push changes
-		// 			const shouldPush = await vscode.window.showInformationMessage(`There are currently no commits between '${params.base}' and '${params.head}'. Do you want to push your local commits and try again?`, 'Yes', 'Cancel');
-		// 			if (shouldPush === 'Yes') {
-		// 				await this._repository.push();
-		// 				return this.createPullRequest(params);
-		// 			}
-
-		// 			if (shouldPush === 'Cancel') {
-		// 				return;
-		// 			}
-		// 		}
-
-		// 		// There are uncommited changes
-		// 		if (this._repository.state.workingTreeChanges.length || this._repository.state.indexChanges.length) {
-		// 			const shouldCommit = await vscode.window.showInformationMessage(`There are currently no commits between '${params.base}' and '${params.head}'. Do you want to commit your changes and try again?`, 'Yes', 'Cancel');
-		// 			if (shouldCommit === 'Yes') {
-		// 				await vscode.commands.executeCommand('git.commit');
-		// 				await this._repository.push();
-		// 				return this.createPullRequest(params);
-		// 			}
-
-		// 			if (shouldCommit === 'Cancel') {
-		// 				return;
-		// 			}
-		// 		}
-		// 	}
-
-		// 	Logger.appendLine(`GitHubRepository> Creating pull requests failed: ${e}`);
-
-		// 	/* __GDPR__
-		// 		"pr.create.failure" : {
-		// 			"isDraft" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
-		// 			"message" : { "classification": "CallstackOrException", "purpose": "PerformanceAndHealth" }
-		// 		}
-		// 	*/
-		// 	this._telemetry.sendTelemetryErrorEvent('pr.create.failure', {
-		// 		isDraft: (params.draft || '').toString(),
-		// 		message: formatError(e)
-		// 	});
-		// 	vscode.window.showWarningMessage(`Creating pull requests for '${params.head}' failed: ${formatError(e)}`);
-		// }
+			/* __GDPR__
+				"azdopr.create.failure" : {
+					"isDraft" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
+					"message" : { "classification": "CallstackOrException", "purpose": "PerformanceAndHealth" }
+				}
+			*/
+			this._telemetry.sendTelemetryErrorEvent('azdopr.create.failure', {
+				isDraft: (params.isDraft ?? false).toString(),
+				message: formatError(e),
+			});
+			vscode.window.showErrorMessage(`Creating the pull request failed: ${formatError(e)}`);
+			return undefined;
+		}
 	}
 
 	getCurrentUser(): IAccount {

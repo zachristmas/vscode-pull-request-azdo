@@ -229,6 +229,49 @@ export function registerCommands(
 		),
 	);
 
+	const createPullRequestForActiveFolder = async (draft: boolean) => {
+		if (reposManager.folderManagers.length === 0) {
+			vscode.window.showErrorMessage('No repository with an Azure DevOps remote is open.');
+			return;
+		}
+		const folderManager = await chooseItem<FolderRepositoryManager>(
+			reposManager.folderManagers,
+			itemValue => pathLib.basename(itemValue.repository.rootUri.fsPath),
+			'Select the repository to create the pull request from',
+		);
+		if (!folderManager) {
+			return;
+		}
+		const reviewManager = ReviewManager.getReviewManagerForFolderManager(reviewManagers, folderManager);
+		if (!reviewManager) {
+			vscode.window.showErrorMessage('No review manager was found for the selected repository.');
+			return;
+		}
+		await reviewManager.createPullRequest(draft);
+	};
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.createPullRequest', async () => {
+			await createPullRequestForActiveFolder(false);
+
+			/* __GDPR__
+			"azdopr.createPullRequest" : {}
+		*/
+			telemetry.sendTelemetryEvent('azdopr.createPullRequest');
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.createDraftPullRequest', async () => {
+			await createPullRequestForActiveFolder(true);
+
+			/* __GDPR__
+			"azdopr.createDraftPullRequest" : {}
+		*/
+			telemetry.sendTelemetryEvent('azdopr.createDraftPullRequest');
+		}),
+	);
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			'azdopr.copyPullRequestUrl',
@@ -751,19 +794,22 @@ export function registerCommands(
 			if (!folderManager) {
 				return;
 			}
-			let descriptionNode: DescriptionNode;
+			let descriptionNode: DescriptionNode | undefined;
 			if (!(argument instanceof DescriptionNode)) {
-				// the command is triggerred from command palette or status bar, which means we are already in checkout mode.
+				// The command came from the palette, status bar, or the create-PR flow. The changes tree
+				// may not have produced its DescriptionNode yet (e.g. right after creating a PR), so
+				// revealing it is best-effort - the overview panel below opens either way.
 				const rootNodes = await ReviewManager.getReviewManagerForFolderManager(
 					reviewManagers,
 					folderManager,
-				)!.changesInPrDataProvider.getChildren();
-				descriptionNode = rootNodes[0] as DescriptionNode;
+				)?.changesInPrDataProvider.getChildren();
+				const first = rootNodes && rootNodes[0];
+				descriptionNode = first instanceof DescriptionNode ? first : undefined;
 			} else {
 				descriptionNode = argument;
 			}
 			const pullRequest = ensurePR(folderManager, pullRequestModel);
-			descriptionNode.reveal(descriptionNode, { select: true, focus: true });
+			descriptionNode?.reveal(descriptionNode, { select: true, focus: true });
 			// Create and show a new webview
 			PullRequestOverviewPanel.createOrShow(context.extensionPath, folderManager, pullRequest, workItem, azdoUserManager);
 

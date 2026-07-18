@@ -236,19 +236,32 @@ export class AzdoRepository implements vscode.Disposable {
 		return await this.getPullRequests({ sourceRefName: branch });
 	}
 
-	async createPullRequest(pullRequest: GitPullRequest): Promise<PullRequestModel> {
+	async createPullRequest(pullRequest: GitPullRequest): Promise<PullRequestModel | undefined> {
 		Logger.debug(`Creating pull request`, AzdoRepository.ID);
 		try {
+			const azdo = await this.ensure();
 			const metadata = await this.getMetadata();
 			if (!metadata?.id) {
 				throw new Error(this.unresolvedRepositoryMessage());
 			}
-			const gitApi = await this._hub?.connection?.getGitApi();
-			const pullRequestModel = await gitApi?.createPullRequest(pullRequest, metadata.id);
-			Logger.debug(`Created pull request`, AzdoRepository.ID);
-			return new PullRequestModel(this._telemetry, this, this.remote, pullRequestModel);
+			const gitApi = await azdo._hub?.connection?.getGitApi();
+			const created = await gitApi?.createPullRequest(pullRequest, metadata.id);
+			if (!created) {
+				throw new Error('The Azure DevOps API returned no pull request.');
+			}
+			Logger.debug(`Created pull request ${created.pullRequestId}`, AzdoRepository.ID);
+			// Convert like every other read path does: the raw GitPullRequest lacks the head/base
+			// refs PullRequestModel.update() needs, so returning it unconverted produced a model
+			// that couldn't resolve its branches.
+			return new PullRequestModel(
+				this._telemetry,
+				this,
+				this.remote,
+				await convertAzdoPullRequestToRawPullRequest(created, this),
+			);
 		} catch (e) {
 			Logger.appendLine(`AzdoRepository> Creating pull request failed: ${e}`);
+			return undefined;
 		}
 	}
 

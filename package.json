@@ -283,6 +283,17 @@
 				"icon": "$(globe)"
 			},
 			{
+				"command": "azdopr.createPullRequest",
+				"title": "Create Pull Request",
+				"category": "AzDO Pull Requests",
+				"icon": "$(plus)"
+			},
+			{
+				"command": "azdopr.createDraftPullRequest",
+				"title": "Create Draft Pull Request",
+				"category": "AzDO Pull Requests"
+			},
+			{
 				"command": "azdopr.copyPullRequestUrl",
 				"title": "Copy Pull Request URL",
 				"category": "AzDO Pull Requests",
@@ -555,6 +566,14 @@
 					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
 				},
 				{
+					"command": "azdopr.createPullRequest",
+					"when": "gitOpenRepositoryCount != 0 && azdo:authenticated && azdo:hasAzdoRemotes"
+				},
+				{
+					"command": "azdopr.createDraftPullRequest",
+					"when": "gitOpenRepositoryCount != 0 && azdo:authenticated && azdo:hasAzdoRemotes"
+				},
+				{
 					"command": "azdopr.copyPullRequestUrl",
 					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
 				},
@@ -660,6 +679,11 @@
 					"command": "azdopr.configurePRViewlet",
 					"when": "gitOpenRepositoryCount != 0 && azdo:initialized && view =~ /(azdopr|issues):azdo/",
 					"group": "navigation@3"
+				},
+				{
+					"command": "azdopr.createPullRequest",
+					"when": "gitOpenRepositoryCount != 0 && azdo:initialized && view == azdopr:azdo",
+					"group": "navigation@1"
 				},
 				{
 					"command": "azdopr.refreshList",
