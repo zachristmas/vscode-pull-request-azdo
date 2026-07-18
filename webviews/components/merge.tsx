@@ -7,7 +7,7 @@ import { BuildResult } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { GitStatusState, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as React from 'react';
- 
+
 import { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { Dropdown } from './dropdown';
 import { alertIcon, checkIcon, deleteIcon, pendingIcon } from './icon';
@@ -78,50 +78,53 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 		return () => clearInterval(handle);
 	});
 
-	return (
-		<div id="status-checks">
-			{state === PullRequestStatus.Completed ? (
-				<>
-					<div className="branch-status-message text-success">{'Pull request successfully merged.'}</div>
-					{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
-					    default branch when the deleted branch is active) already existed but was
-					    unreachable here - nothing offered to clean up the now-merged branch. */}
-					<DeleteBranch {...pr} />
-				</>
-			) : state === PullRequestStatus.Abandoned ? (
-				<>
-					<div className="branch-status-message text-muted">{'This pull request is abandoned.'}</div>
-					{/* <DeleteBranch {...pr} /> */}
-				</>
-			) : (
-				<>
-					<PolicySection pr={pr} />
-					{status.statuses.length ? (
-						<>
-							<div className="status-section">
-								<div className="status-item">
-									<StateIcon state={status.state} />
-									<div className={statusStateTextClass(status.state)}>{getSummaryLabel(status.statuses)}</div>
-									{/* item 2: real button so it's keyboard-operable (was <a aria-role> - not focusable,
-									    and aria-role is not a valid attribute). */}
-									<button type="button" className="link-button" onClick={toggleDetails}>
-										{showDetails ? 'Hide' : 'Show'}
-									</button>
-								</div>
-								{showDetails ? <StatusCheckDetails statuses={status.statuses} /> : null}
+	let stateContent: JSX.Element;
+	if (state === PullRequestStatus.Completed) {
+		stateContent = (
+			<>
+				<div className="branch-status-message text-success">{'Pull request successfully merged.'}</div>
+				{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
+				    default branch when the deleted branch is active) already existed but was
+				    unreachable here - nothing offered to clean up the now-merged branch. */}
+				<DeleteBranch {...pr} />
+			</>
+		);
+	} else if (state === PullRequestStatus.Abandoned) {
+		stateContent = (
+			<>
+				<div className="branch-status-message text-muted">{'This pull request is abandoned.'}</div>
+				{/* <DeleteBranch {...pr} /> */}
+			</>
+		);
+	} else {
+		stateContent = (
+			<>
+				<PolicySection pr={pr} />
+				{status.statuses.length ? (
+					<>
+						<div className="status-section">
+							<div className="status-item">
+								<StateIcon state={status.state} />
+								<div className={statusStateTextClass(status.state)}>{getSummaryLabel(status.statuses)}</div>
+								{/* item 2: real button so it's keyboard-operable (was <a aria-role> - not focusable,
+								    and aria-role is not a valid attribute). */}
+								<button type="button" className="link-button" onClick={toggleDetails}>
+									{showDetails ? 'Hide' : 'Show'}
+								</button>
 							</div>
-						</>
-					) : null}
-					{isSimple
-						? pr.reviewers
-							? pr.reviewers.map(state => <Reviewer key={state.reviewer.id} {...state} canDelete={false} />)
-							: []
-						: null}
-					<MergeStatusAndActions pr={pr} isSimple={isSimple} />
-				</>
-			)}
-		</div>
-	);
+							{showDetails ? <StatusCheckDetails statuses={status.statuses} /> : null}
+						</div>
+					</>
+				) : null}
+				{isSimple && pr.reviewers
+					? pr.reviewers.map(state => <Reviewer key={state.reviewer.id} {...state} canDelete={false} />)
+					: null}
+				<MergeStatusAndActions pr={pr} isSimple={isSimple} />
+			</>
+		);
+	}
+
+	return <div id="status-checks">{stateContent}</div>;
 };
 
 export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
@@ -324,10 +327,9 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 		return null;
 	}
 
+	const policyNoun = pending.length === 1 ? 'policy' : 'policies';
 	const summaryLabel =
-		pending.length > 0
-			? `${pending.length} blocking ${pending.length === 1 ? 'policy' : 'policies'} not satisfied`
-			: 'All branch policies passed';
+		pending.length > 0 ? `${pending.length} blocking ${policyNoun} not satisfied` : 'All branch policies passed';
 
 	return (
 		<div className="status-section policy-section">
@@ -385,7 +387,12 @@ const PolicyRow = ({
 		}
 	}, [requeuePolicy, policy.evaluationId, onRequeue]);
 
-	const buildLabel = policy.build?.isExpired ? 'Re-queue' : !policy.build?.buildId ? 'Queue' : 'Re-run';
+	let buildLabel = 'Re-run';
+	if (policy.build?.isExpired) {
+		buildLabel = 'Re-queue';
+	} else if (!policy.build?.buildId) {
+		buildLabel = 'Queue';
+	}
 
 	return (
 		<div className="status-check">
@@ -458,15 +465,19 @@ export const MergeStatus = ({
 	mergeFailureMessage?: string;
 	hasPolicySection?: boolean;
 }) => {
+	let mergeIcon: JSX.Element | null = null;
+	if (!isSimple) {
+		if (mergeable === PullRequestMergeability.Succeeded) {
+			mergeIcon = successIcon;
+		} else if (mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure) {
+			mergeIcon = dangerIcon;
+		} else {
+			mergeIcon = mutedIcon;
+		}
+	}
 	return (
 		<div className="status-item status-section">
-			{isSimple
-				? null
-				: mergeable === PullRequestMergeability.Succeeded
-				? successIcon
-				: mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure
-				? dangerIcon
-				: mutedIcon}
+			{mergeIcon}
 			<div className={mergeabilityTextClass(mergeable)}>
 				{getMergeabilityDescription(mergeable, mergeFailureMessage, hasPolicySection)}
 			</div>

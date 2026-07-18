@@ -34,7 +34,9 @@ export class Azdo {
 		private token: string,
 		private isPatTokenAuth: boolean = false,
 	) {
-		this._authHandler = isPatTokenAuth ? azdev.getPersonalAccessTokenHandler(token, true) : azdev.getBearerHandler(token, true);
+		this._authHandler = isPatTokenAuth
+			? azdev.getPersonalAccessTokenHandler(token, true)
+			: azdev.getBearerHandler(token, true);
 		this.connection = this.getNewWebApiClient(this.orgUrl);
 	}
 
@@ -127,7 +129,12 @@ export class CredentialStore implements vscode.Disposable {
 
 		// Prefer origin, then upstream, then anything that parses as an ADO remote
 		const ordered = [...remotes].sort((a, b) => {
-			const rank = (r: Remote) => (r.remoteName === 'origin' ? 0 : r.remoteName === 'upstream' ? 1 : 2);
+			const rank = (r: Remote) => {
+				if (r.remoteName === 'origin') {
+					return 0;
+				}
+				return r.remoteName === 'upstream' ? 1 : 2;
+			};
 			return rank(a) - rank(b);
 		});
 
@@ -162,7 +169,9 @@ export class CredentialStore implements vscode.Disposable {
 			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
 			if (new Set(inferredConfigs.map(a => a.orgUrl)).size !== 1) {
 				Logger.appendLine(
-					`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${JSON.stringify(inferredConfigs)}`,
+					`Unable to infer org config from git. Repository Length: ${
+						this._gitAPI.repositories.length
+					}. Inferred Configs: ${JSON.stringify(inferredConfigs)}`,
 					CredentialStore.ID,
 				);
 				return undefined;

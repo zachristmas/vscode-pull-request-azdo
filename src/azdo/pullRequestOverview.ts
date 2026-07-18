@@ -65,11 +65,14 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		azdoUserManager: AzdoUserManager,
 		toTheSide: boolean = false,
 	) {
-		const activeColumn = toTheSide
-			? vscode.ViewColumn.Beside
-			: vscode.window.activeTextEditor
-			? vscode.window.activeTextEditor.viewColumn
-			: vscode.ViewColumn.One;
+		let activeColumn: vscode.ViewColumn | undefined;
+		if (toTheSide) {
+			activeColumn = vscode.ViewColumn.Beside;
+		} else if (vscode.window.activeTextEditor) {
+			activeColumn = vscode.window.activeTextEditor.viewColumn;
+		} else {
+			activeColumn = vscode.ViewColumn.One;
+		}
 
 		const prNumber = pr.getPullRequestId();
 
@@ -623,13 +626,13 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					quickpick.onDidChangeValue(async value => {
 						const id = Number.parseInt(value);
 						if (Number.isInteger(id) && quickpick.items.every(w => w.label !== value)) {
-								quickpick.busy = true;
-								const wt = await this._workItem.getWorkItemById(id);
-								if (!!wt) {
-									quickpick.items = [...quickpick.items, new WorkItemPick(wt)];
-								}
-								quickpick.busy = false;
+							quickpick.busy = true;
+							const wt = await this._workItem.getWorkItemById(id);
+							if (!!wt) {
+								quickpick.items = [...quickpick.items, new WorkItemPick(wt)];
 							}
+							quickpick.busy = false;
+						}
 					}),
 					quickpick.onDidChangeSelection(value => {
 						resolve(Number.parseInt(value[0].label));

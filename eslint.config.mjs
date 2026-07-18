@@ -193,6 +193,7 @@ export default tseslint.config(
 			'sonarjs/todo-tag': 'off',
 			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
 			'sonarjs/no-ignored-exceptions': 'error',
+			'sonarjs/no-nested-conditional': 'error',
 			'sonarjs/public-static-readonly': 'error',
 			'sonarjs/prefer-single-boolean-return': 'error',
 		},

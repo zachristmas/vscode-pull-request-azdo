@@ -6,7 +6,7 @@
 import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as React from 'react';
- 
+
 import { useContext, useRef, useState } from 'react';
 
 import { CommentView, ReplyToThread } from './comment';
@@ -41,17 +41,20 @@ export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestComm
 					new Date(a.publishedDate?.valueOf() ?? NaN).getTime(),
 			)
 			.map(
-				thread =>
-					// TODO: Maybe make TimelineEvent a tagged union type?
-					isSystemThread(thread) ? (
-						<SystemThreadView key={thread.id} thread={thread} />
-					) : isUserCommentThread(thread) || hasVisibleComments(thread) ? (
+				// TODO: Maybe make TimelineEvent a tagged union type?
+				thread => {
+					if (isSystemThread(thread)) {
+						return <SystemThreadView key={thread.id} thread={thread} />;
+					}
+					if (isUserCommentThread(thread) || hasVisibleComments(thread)) {
 						// hasVisibleComments: threads created via raw REST/integrations can miss the
 						// id-1/commentType shape isUserCommentThread expects; render them as a
 						// (possibly position-less) comment card rather than dropping them - the header
 						// already counts them and the diff editor already shows them.
-						<CommentEventView key={thread.id} thread={thread} currentUser={currentUser} />
-					) : null,
+						return <CommentEventView key={thread.id} thread={thread} currentUser={currentUser} />;
+					}
+					return null;
+				},
 				// isCommitEvent(event)
 				// 	? <CommitEventView key={event.id} {...event} />
 				// 	:
@@ -124,12 +127,12 @@ export const CommitEventView = (event: CommitEvent) => (
 	</div>
 );
 
-const association = ({ authorAssociation }: ReviewEvent, format = (assoc: string) => `(${assoc.toLowerCase()})`) =>
-	authorAssociation.toLowerCase() === 'user'
-		? format('you')
-		: authorAssociation && authorAssociation !== 'NONE'
-		? format(authorAssociation)
-		: null;
+const association = ({ authorAssociation }: ReviewEvent, format = (assoc: string) => `(${assoc.toLowerCase()})`) => {
+	if (authorAssociation.toLowerCase() === 'user') {
+		return format('you');
+	}
+	return authorAssociation && authorAssociation !== 'NONE' ? format(authorAssociation) : null;
+};
 
 const positionKey = (comment: GitPullRequestCommentThread) =>
 	// comment.position !== null

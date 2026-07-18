@@ -127,14 +127,14 @@ describe('utils', () => {
 				assert.ok(!hasListeners(emitter), 'should unsubscribe');
 			});
 
-			const door: utils.PromiseAdapter<string, boolean> = (password, resolve, reject) =>
-				password === 'sesame'
-					? resolve(true)
-					: password === 'mellon'
-					? reject(new Error('wrong fable'))
-					: {
-							/* the door is silent */
-					  };
+			const door: utils.PromiseAdapter<string, boolean> = (password, resolve, reject) => {
+				if (password === 'sesame') {
+					resolve(true);
+				} else if (password === 'mellon') {
+					reject(new Error('wrong fable'));
+				}
+				// otherwise the door is silent
+			};
 
 			const tick = () => new Promise(resolve => setImmediate(resolve));
 			it('should stay subscribed until the adapter resolves', async () => {

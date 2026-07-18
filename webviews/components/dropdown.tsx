@@ -93,7 +93,12 @@ export const Dropdown = <T extends string>({
 		}
 	};
 
-	const expandButtonClass = Object.entries(options).length === 1 ? 'hidden' : areOptionsVisible ? 'open' : '';
+	let expandButtonClass = '';
+	if (Object.entries(options).length === 1) {
+		expandButtonClass = 'hidden';
+	} else if (areOptionsVisible) {
+		expandButtonClass = 'open';
+	}
 
 	return (
 		<div className="select-container" onKeyDown={onKeyDown}>

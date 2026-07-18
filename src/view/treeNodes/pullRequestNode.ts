@@ -338,12 +338,12 @@ export class PRNode extends TreeNode {
 		// blocker signal beats the per-node policy-evaluation fetch (that would be an M-sized, throttled
 		// addition; ship the free version first per ROADMAP Section 2.2).
 		const mergeStatus = this.pullRequestModel.item.mergeStatus;
-		const blockerSuffix =
-			mergeStatus === PullRequestAsyncStatus.Conflicts
-				? ' - conflicts'
-				: mergeStatus === PullRequestAsyncStatus.RejectedByPolicy
-				? ' - blocked by policy'
-				: '';
+		let blockerSuffix = '';
+		if (mergeStatus === PullRequestAsyncStatus.Conflicts) {
+			blockerSuffix = ' - conflicts';
+		} else if (mergeStatus === PullRequestAsyncStatus.RejectedByPolicy) {
+			blockerSuffix = ' - blocked by policy';
+		}
 		const tooltip = `${tooltipPrefix}${title} by ${login}${blockerSuffix}`;
 		const description = `#${formattedPRNumber} by ${login}${blockerSuffix}${autoCompleteSuffix}`;
 

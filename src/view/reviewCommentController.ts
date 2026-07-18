@@ -121,6 +121,15 @@ export class ReviewCommentController
 	 * @param thread The comment thread information from GitHub.
 	 * @returns A GHPRCommentThread that has been created on an editor.
 	 */
+	private threadMapFor(thread: IReviewThread): { [key: string]: GHPRCommentThread[] } {
+		if (thread.isOutdated) {
+			return this._obsoleteFileChangeCommentThreads;
+		}
+		return thread.diffSide === DiffSide.RIGHT
+			? this._workspaceFileChangeCommentThreads
+			: this._reviewSchemeFileChangeCommentThreads;
+	}
+
 	private createReviewCommentThread(uri: vscode.Uri, path: string, thread: IReviewThread): GHPRCommentThread {
 		// ReviewUriParams.commit is optional; an undefined mergeBase is dropped by JSON.stringify
 		const reviewUri = toReviewUri(
@@ -297,11 +306,7 @@ export class ReviewCommentController
 						return;
 					}
 
-					const threadMap = thread.isOutdated
-						? this._obsoleteFileChangeCommentThreads
-						: thread.diffSide === DiffSide.RIGHT
-						? this._workspaceFileChangeCommentThreads
-						: this._reviewSchemeFileChangeCommentThreads;
+					const threadMap = this.threadMapFor(thread);
 
 					if (threadMap[removeLeadingSlash(path)]) {
 						threadMap[removeLeadingSlash(path)].push(newThread);
@@ -311,11 +316,7 @@ export class ReviewCommentController
 				});
 
 				e.changed.forEach(thread => {
-					const threadMap = thread.isOutdated
-						? this._obsoleteFileChangeCommentThreads
-						: thread.diffSide === DiffSide.RIGHT
-						? this._workspaceFileChangeCommentThreads
-						: this._reviewSchemeFileChangeCommentThreads;
+					const threadMap = this.threadMapFor(thread);
 
 					const index = threadMap[removeLeadingSlash(thread.path)]?.findIndex(t => t.threadId === thread.id);
 					if (index > -1) {
@@ -328,11 +329,7 @@ export class ReviewCommentController
 				});
 
 				e.removed.forEach(thread => {
-					const threadMap = thread.isOutdated
-						? this._obsoleteFileChangeCommentThreads
-						: thread.diffSide === DiffSide.RIGHT
-						? this._workspaceFileChangeCommentThreads
-						: this._reviewSchemeFileChangeCommentThreads;
+					const threadMap = this.threadMapFor(thread);
 
 					const index = threadMap[removeLeadingSlash(thread.path)]?.findIndex(t => t.threadId === thread.id);
 					if (index > -1) {

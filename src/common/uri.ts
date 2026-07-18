@@ -60,7 +60,12 @@ export const EMPTY_IMAGE_URI = Uri.parse(`data:image/gif;base64,R0lGODlhAQABAIAA
 export async function asImageDataURI(uri: Uri, repository: Repository): Promise<Uri | undefined> {
 	try {
 		const { commit, baseCommit, headCommit, isBase } = JSON.parse(uri.query);
-		const ref = uri.scheme === URI_SCHEME_REVIEW ? commit : isBase ? baseCommit : headCommit;
+		let ref: string;
+		if (uri.scheme === URI_SCHEME_REVIEW) {
+			ref = commit;
+		} else {
+			ref = isBase ? baseCommit : headCommit;
+		}
 		const { size, object } = await repository.getObjectDetails(ref, uri.fsPath);
 		const { mimetype } = await repository.detectObjectType(object);
 
