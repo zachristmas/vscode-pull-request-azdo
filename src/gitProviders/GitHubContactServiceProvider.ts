@@ -21,8 +21,8 @@ interface NotifyContactServiceEventArgs {
  */
 interface Contact {
 	id: string;
-	displayName?: string | undefined;
-	email?: string | undefined;
+	displayName?: string;
+	email?: string;
 }
 
 /**

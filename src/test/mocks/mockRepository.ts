@@ -29,7 +29,7 @@ export class MockRepository implements Repository {
 	getGlobalConfig(key: string): Promise<string> {
 		return Promise.reject(new Error(`Unexpected getGlobalConfig(${key})`));
 	}
-	detectObjectType(object: string): Promise<{ mimetype: string; encoding?: string | undefined }> {
+	detectObjectType(object: string): Promise<{ mimetype: string; encoding?: string }> {
 		return Promise.reject(new Error(`Unexpected detectObjectType(${object})`));
 	}
 	buffer(ref: string, path: string): Promise<Buffer> {
@@ -133,7 +133,7 @@ export class MockRepository implements Repository {
 		return Promise.reject(new Error(`Unexpected diffBlobs(${ref1}, ${ref2}, ${treePath})`));
 	}
 
-	hashObject(data: string): Promise<string> {
+	hashObject(_data: string): Promise<string> {
 		return Promise.reject(new Error('Unexpected hashObject(...)'));
 	}
 
@@ -156,7 +156,7 @@ export class MockRepository implements Repository {
 		this._branches.push(branch);
 	}
 
-	async deleteBranch(name: string, force?: boolean  ): Promise<void> {
+	async deleteBranch(name: string, _force?: boolean): Promise<void> {
 		const index = this._branches.findIndex(b => b.name === name);
 		if (index === -1) {
 			throw new Error(`Attempt to delete nonexistent branch ${name}`);

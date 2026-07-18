@@ -434,8 +434,6 @@ export class ReviewCommentController
 
 			return ranges;
 		}
-
-		return;
 	}
 
 	// #endregion

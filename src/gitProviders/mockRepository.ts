@@ -32,7 +32,7 @@ export class MockRepository implements Repository {
 	getGlobalConfig(key: string): Promise<string> {
 		return Promise.reject(new Error(`Unexpected getGlobalConfig(${key})`));
 	}
-	detectObjectType(object: string): Promise<{ mimetype: string; encoding?: string | undefined }> {
+	detectObjectType(object: string): Promise<{ mimetype: string; encoding?: string }> {
 		return Promise.reject(new Error(`Unexpected detectObjectType(${object})`));
 	}
 	buffer(ref: string, path: string): Promise<Buffer> {

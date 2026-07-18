@@ -506,7 +506,6 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			if (!silent) {
 				this._onDidChangeRepositories.fire();
 			}
-			return;
 		});
 	}
 
@@ -538,7 +537,6 @@ export class FolderRepositoryManager implements vscode.Disposable {
 				const promises = this._azdoRepositories.map(async repo => {
 					const data = await repo.getMentionableUsers();
 					cache[repo.remote.remoteName] = data;
-					return;
 				});
 
 				Promise.all(promises).then(() => {
@@ -569,7 +567,6 @@ export class FolderRepositoryManager implements vscode.Disposable {
 					const data = await repo.getAssignableUsers();
 					cache[repo.remote.remoteName] = data.sort(loginComparator);
 					allAssignableUsers.push(...data);
-					return;
 				});
 
 				Promise.all(promises).then(() => {

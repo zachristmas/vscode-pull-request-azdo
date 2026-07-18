@@ -39,6 +39,4 @@ export function resolveCommentHandler(commentThread: GHPRCommentThread): Comment
 	}
 
 	Logger.appendLine(`Unable to find handler for comment thread ${commentThread.threadId}`);
-
-	return;
 }

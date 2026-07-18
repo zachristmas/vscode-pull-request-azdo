@@ -171,7 +171,7 @@ export default tseslint.config(
 			'@typescript-eslint/no-unsafe-member-access': 'off',
 			'@typescript-eslint/no-unsafe-return': 'off',
 			'@typescript-eslint/no-unused-expressions': ['warn', { allowShortCircuit: true }],
-			'@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+			'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
 			'@typescript-eslint/no-use-before-define': 'off',
 			'@typescript-eslint/prefer-regexp-exec': 'off',
 			'@typescript-eslint/prefer-nullish-coalescing': 'off',
@@ -194,8 +194,11 @@ export default tseslint.config(
 			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
 			'sonarjs/no-ignored-exceptions': 'error',
 			'sonarjs/no-nested-conditional': 'error',
+			'sonarjs/no-redundant-jump': 'error',
+			'sonarjs/no-redundant-optional': 'error',
 			'sonarjs/public-static-readonly': 'error',
 			'sonarjs/prefer-single-boolean-return': 'error',
+			'sonarjs/unused-import': 'error',
 		},
 	},
 	{

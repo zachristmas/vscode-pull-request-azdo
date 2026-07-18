@@ -135,8 +135,6 @@ export class Protocol {
 		if (fragments.length > 1) {
 			return fragments.at(-2);
 		}
-
-		return;
 	}
 
 	normalizeUri(): vscode.Uri | undefined {
@@ -184,8 +182,6 @@ export class Protocol {
 		if (normalizedUri) {
 			return normalizedUri.toString();
 		}
-
-		return;
 	}
 
 	update(change: { type?: ProtocolType; host?: string; owner?: string; repositoryName?: string }): Protocol {

@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import { GitPullRequest, GitRepository } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { GitPullRequest } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';
 import * as vscode from 'vscode';
