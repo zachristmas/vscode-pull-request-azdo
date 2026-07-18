@@ -360,3 +360,6 @@ preview-src
 *.patch
 .yarn/
 *.vsix
+
+# Forgeflow review state (local only)
+.forgeflow/

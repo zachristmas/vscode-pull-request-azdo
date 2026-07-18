@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as path from 'path';
-import { Comment, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { Comment, GitPullRequestCommentThread, PullRequestAsyncStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { CommentPermissions, CommentWithPermissions, IFileChangeNode } from '../../azdo/interface';
@@ -105,7 +105,11 @@ export class PRNode extends TreeNode {
 		private _isLocal: boolean,
 	) {
 		super();
-		this.commentingRangeProvider = new PullRequestCommentingRangeProvider(pullRequestModel, _folderReposManager, async () => await this.getFileChanges());
+		this.commentingRangeProvider = new PullRequestCommentingRangeProvider(
+			pullRequestModel,
+			_folderReposManager,
+			async () => await this.getFileChanges(),
+		);
 	}
 
 	// #region Tree
@@ -266,7 +270,7 @@ export class PRNode extends TreeNode {
 						change.status,
 					),
 					sha,
-					change.previousFileSHA
+					change.previousFileSHA,
 				);
 			}
 
@@ -304,7 +308,7 @@ export class PRNode extends TreeNode {
 				change.diffHunks,
 				comments.filter(comment => comment.threadContext?.filePath === fileName && !!getPositionFromThread(comment)),
 				sha,
-				change.previousFileSHA
+				change.previousFileSHA,
 			);
 
 			return changedItem;
@@ -324,8 +328,21 @@ export class PRNode extends TreeNode {
 		const tooltipPrefix = currentBranchIsForThisPR ? 'Current Branch * ' : '';
 		const formattedPRNumber = number.toString();
 		const label = `${labelPrefix}#${formattedPRNumber}: ${isDraft ? '[DRAFT] ' : ''}${title}`;
-		const tooltip = `${tooltipPrefix}${title} by ${login}`;
-		const description = `#${formattedPRNumber} by ${login}`;
+		// AC-02: zero extra API calls - autoCompleteSetBy is already on every fetched PR
+		// (PullRequest extends GitPullRequest).
+		const autoCompleteSuffix = this.pullRequestModel.item.autoCompleteSetBy ? ' - auto-complete' : '';
+		// POL-08: mergeStatus is already in the PR list payload (zero extra API calls) - a lightweight
+		// blocker signal beats the per-node policy-evaluation fetch (that would be an M-sized, throttled
+		// addition; ship the free version first per ROADMAP Section 2.2).
+		const mergeStatus = this.pullRequestModel.item.mergeStatus;
+		const blockerSuffix =
+			mergeStatus === PullRequestAsyncStatus.Conflicts
+				? ' - conflicts'
+				: mergeStatus === PullRequestAsyncStatus.RejectedByPolicy
+				? ' - blocked by policy'
+				: '';
+		const tooltip = `${tooltipPrefix}${title} by ${login}${blockerSuffix}`;
+		const description = `#${formattedPRNumber} by ${login}${blockerSuffix}${autoCompleteSuffix}`;
 
 		return {
 			label,
@@ -334,7 +351,10 @@ export class PRNode extends TreeNode {
 			description,
 			collapsibleState: 1,
 			contextValue:
-				'pullrequest' + (this._isLocal ? ':local' : '') + (currentBranchIsForThisPR ? ':active' : ':nonactive'),
+				'pullrequest' +
+				(this._isLocal ? ':local' : '') +
+				(currentBranchIsForThisPR ? ':active' : ':nonactive') +
+				(isDraft ? ':draft' : ':ready'),
 			iconPath: this.pullRequestModel.item.createdBy?.imageUrl
 				? this.pullRequestModel.item.createdBy?.imageUrl
 				: new vscode.ThemeIcon('github'),
@@ -359,7 +379,13 @@ export class PRNode extends TreeNode {
 
 		const isFileRemote = fileChange instanceof RemoteFileChangeNode || fileChange.isPartial;
 
-		const content = await provideDocumentContentForChangeModel(params, this.pullRequestModel, this._folderReposManager, fileChange as IFileChangeNode, isFileRemote);
+		const content = await provideDocumentContentForChangeModel(
+			params,
+			this.pullRequestModel,
+			this._folderReposManager,
+			fileChange as IFileChangeNode,
+			isFileRemote,
+		);
 		return content;
 	}
 

@@ -1,21 +1,90 @@
 # Changelog
 
-### 1.0.0
+## 1.5.0
+
+A combined release covering three waves of work: repairing the v1.4 review/complete flows,
+adding branch-policy and auto-complete support, and a full UX modernization of the PR webviews.
+
+> **Versioning note:** there is no standalone `1.4.0` tag. The `fix/v1.4-repair` work and the
+> v1.5 feature work ship together as `1.5.0`; the version jumps from `1.3.0` to `1.5.0` deliberately.
+
+### Completion & auto-complete
+
+- Route every "complete PR" entry point (overview, checked-out-PR sidebar, command palette) through the working `PullRequestModel.completePullRequest` path instead of the commented-out merge stub (AC-01, AC-03).
+- Set and cancel auto-complete, with a banner showing who armed it and the selected options, and a Cancel action (AC-02).
+- Restrict the merge-strategy choices to those the branch's "Limit merge types" policy allows (AC-04).
+- Optional merge-commit-message field on completion (AC-05).
+- Offer local branch cleanup after a PR merges, including when the remote source branch was already deleted (AC-08).
+- Completion confirmations now disclose that completing deletes the source branch and completes linked work items, instead of a bare "Complete this pull request?" (previously silent destructive defaults).
+
+### Branch policies
+
+- Fetch and display branch-policy evaluations in a "why can't this complete" panel, degrading gracefully where the evaluations API is unavailable (POL-01).
+- Distinct merge-status copy per async status instead of collapsing everything to "conflicts" (POL-02).
+- Build-validation rows with result text, a click-through to the build, and a re-run/re-queue button with a busy state (POL-04).
+- Surface completion blockers in the active-PR sidebar (POL-05) and as a signal on PR list tree items (POL-08).
+- Report the real merge/status result and surface the merge-failure message (POL-06).
+- Keep PR-level statuses, treat empty as NotSet, and self-limit the status refresh poll to while checks are pending (POL-09).
+- Show a "Required" badge on reviewer rows driven by min-reviewer/required-reviewer policies (POL-10).
+- Gate pending blocking policies before the git-mergeability check so "Set auto-complete" is reachable on policy-governed repos.
+
+### Votes & reviewers
+
+- Vote on a PR (approve / approve-with-suggestions / wait-for-author / reject / reset) from commands, tree/palette menus, and the sidebar (VOTE-01, VOTE-02).
+- Correct reviewer data shape in the sidebar (VOTE-03) and five distinct vote glyphs/colors with inline text rather than tooltip-only (VOTE-07).
+- Fixed voting wiping the server-side required-reviewer flag, a no-vote row showing the "Reset Vote" action label, and reviewer avatars always resolving to undefined.
+
+### Drafts
+
+- Mark a draft PR ready for review, wired end-to-end (DLA-01).
+- Convert a published PR to draft, with a confirmation that warns Azure DevOps resets all reviewer votes (DLA-02).
+
+### Comments & threads
+
+- Render comment thread positions from the server-tracked `threadContext` so comments stay glued to their code across pushes, instead of drifting to stale creation-time coordinates (ITER-01).
+- Removed the non-functional reaction picker (no Azure DevOps equivalent).
+- Threads default to collapsed on the checked-out branch.
+
+### PR browsing
+
+- Added an "All Pull Requests" category so completed/abandoned PRs can be browsed to (previously unreachable).
+- Show file changes for merged PRs whose source branch was deleted; fall back to the target commit when no common commit is found; guard an unguarded merge-base access that crashed PR node expansion.
+
+### UX modernization
+
+- UX-01: "Your review" sidebar card, an always-visible current-vote row, a controlled vote select, busy/success/failure cast feedback (aria-live), and a reset-vote link.
+- UX-02: read-only outcome summary card on completed/abandoned PRs; edit, vote, and add/remove affordances are gated off once a PR is finished.
+- UX-03: comment section pass, single-card comments, a thread-owned container with a left rail and colored status pill, resolved-thread collapse, a full-width ghost reply field, theme-aware code blocks, composer hints, and an empty-description placeholder.
+- UX-04: one editor tab per PR (keyed by PR id) instead of a reused singleton panel.
+- UX-05: a design-token system (radius, spacing, surface, semantic color) applied across both webviews, plus responsive sidebar spacing.
+
+### Reliability & accessibility
+
+- Guarantee-of-reply for the webview message contract: a host handler that throws now rejects the awaiting UI instead of leaving it pending forever, and the client bounds every pending request with a timeout and clears settled entries. Fixes a stuck "Queuing..." requeue button, a Delete-branch button that never re-enabled, an uncaught rejection on every sidebar mount, and a dropped auto-complete-cancel recovery.
+- Made previously mouse-only controls keyboard-operable: the status/policy Show/Hide toggles, the thread file chip, the reviewer/work-item remove buttons, and the title Edit/Copy-Link/Convert-to-draft actions now work via keyboard and reveal on focus.
+- Hidden PR tabs no longer poll in the background; they refresh when brought back to the foreground, and the armed-auto-complete wait backs off from 3s to 15s (UX-04).
+- The Edit and Reply composers focus their textarea on open.
+
+## 1.0.0
+
 - Autodetect Azure DevOps URL and project name from remote.
 - Fixing a lot of bugs and preparation for AI integration.
 
 ## 0.2.3
+
 - Fixed [#86](https://github.com/ankitbko/vscode-pull-request-azdo/issues/86) thanks to [danigt91](https://github.com/danigt91)
 
-
 ## 0.2.2
+
 - Reintroduced PAT token.
 - Fixed [#63](https://github.com/ankitbko/vscode-pull-request-azdo/issues/63)
 
 ## 0.2.1
+
 - Fixed continuous popup for authentication.
 
 ## 0.2.0
+
 - Fixed [#68](https://github.com/ankitbko/vscode-pull-request-azdo/issues/68) - Changed the authentication mechanism from PAT to OAuth using vscode provided authentication session. This will require users to re-authenticate.
 
 ## 0.0.25

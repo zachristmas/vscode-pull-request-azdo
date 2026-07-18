@@ -5,32 +5,29 @@
 'use strict';
 
 import * as pathLib from 'path';
-import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { GitPullRequestCommentThread, GitPullRequestMergeStrategy } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
-import { Repository } from './api/api';
 import { GitErrorCodes } from './api/api1';
 import { CredentialStore } from './azdo/credentials';
 import { FolderRepositoryManager } from './azdo/folderRepositoryManager';
-import { IFileChangeNodeWithUri, IRawFileChange, PullRequest } from './azdo/interface';
+import { PullRequest, PullRequestVote } from './azdo/interface';
 import { GHPRComment, GHPRCommentThread, TemporaryComment } from './azdo/prComment';
 import { PullRequestModel } from './azdo/pullRequestModel';
 import { PullRequestOverviewPanel } from './azdo/pullRequestOverview';
 import { RepositoriesManager } from './azdo/repositoriesManager';
 import { AzdoUserManager } from './azdo/userManager';
-import { convertRawFileChangeToFileChangeNode, getPositionFromThread, removeLeadingSlash } from './azdo/utils';
+import { getPositionFromThread } from './azdo/utils';
 import { AzdoWorkItem } from './azdo/workItem';
 import { CommentReply, resolveCommentHandler } from './commentHandlerResolver';
 import { DiffChangeType } from './common/diffHunk';
 import { getZeroBased } from './common/diffPositionMapping';
-import { GitChangeType, InMemFileChange } from './common/file';
+import { GitChangeType } from './common/file';
 import Logger from './common/logger';
 import { ITelemetry } from './common/telemetry';
-import { asImageDataURI, fromPRUri, fromReviewUri, ReviewUriParams, toPRUriAzdo } from './common/uri';
+import { asImageDataURI, fromReviewUri, ReviewUriParams } from './common/uri';
 import { formatError } from './common/utils';
-import { SETTINGS_NAMESPACE, URI_SCHEME_PR, URI_SCHEME_REVIEW } from './constants';
-import { getInMemPRContentProvider, provideDocumentContentForChangeModel } from './view/inMemPRContentProvider';
+import { SETTINGS_NAMESPACE } from './constants';
 import { PullRequestsTreeDataProvider } from './view/prsTreeDataProvider';
-import { PullRequestCommentingRangeProvider } from './view/pullRequestCommentingRangeProvider';
 import { ReviewManager } from './view/reviewManager';
 import { CommitNode } from './view/treeNodes/commitNode';
 import { DescriptionNode } from './view/treeNodes/descriptionNode';
@@ -72,6 +69,51 @@ async function chooseItem<T>(
 		};
 	});
 	return (await vscode.window.showQuickPick(items, { placeHolder }))?.itemValue;
+}
+
+/**
+ * Resolve the target pull request for a command that may be invoked from the tree (PRNode arg),
+ * directly (PullRequestModel arg), or from the command palette with no arg (falls back to the
+ * checked-out PR across all folder managers).
+ */
+async function resolveTargetPullRequest(
+	reposManager: RepositoriesManager,
+	pr?: PRNode | PullRequestModel,
+): Promise<PullRequestModel | undefined> {
+	if (pr) {
+		return pr instanceof PRNode ? pr.pullRequestModel : pr;
+	}
+	const activePullRequests: PullRequestModel[] = reposManager.folderManagers
+		.map(folderManager => folderManager.activePullRequest!)
+		.filter(activePR => !!activePR);
+	return chooseItem<PullRequestModel>(
+		activePullRequests,
+		itemValue => `${itemValue.getPullRequestId()}: ${itemValue.item.title}`,
+		'Pull request',
+	);
+}
+
+/**
+ * Cast an ADO reviewer vote on the resolved target PR. All plumbing (submitVote + refresh) already
+ * exists; the vote commands are thin wrappers so approving is a single palette/tree action.
+ */
+async function submitVoteToPullRequest(
+	reposManager: RepositoriesManager,
+	pr: PRNode | PullRequestModel | undefined,
+	vote: PullRequestVote,
+): Promise<void> {
+	const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+	if (!pullRequestModel) {
+		return;
+	}
+	try {
+		await pullRequestModel.submitVote(vote);
+		vscode.commands.executeCommand('azdopr.refreshList');
+		PullRequestOverviewPanel.refresh();
+		_onDidUpdatePR.fire();
+	} catch (e) {
+		vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
+	}
 }
 
 export function registerCommands(
@@ -369,26 +411,144 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('azdopr.merge', async (pr?: PRNode) => {
-			const folderManager = reposManager.getManagerForPullRequestModel(pr?.pullRequestModel);
-			if (!folderManager) {
+		// AC-03: FolderRepositoryManager.mergePullRequest is a commented-out stub. Complete the PR via
+		// the working PullRequestModel.completePullRequest path; the strategy quick-pick doubles as the
+		// confirmation step.
+		vscode.commands.registerCommand('azdopr.merge', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
 				return;
 			}
-			const pullRequest = ensurePR(folderManager, pr);
-			return vscode.window
-				.showWarningMessage(`Are you sure you want to merge this pull request on Azure Devops?`, { modal: true }, 'Yes')
-				.then(async value => {
-					let newPR;
-					if (value === 'Yes') {
-						try {
-							newPR = await folderManager.mergePullRequest(pullRequest);
-							return newPR;
-						} catch (e) {
-							vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
-							return newPR;
-						}
-					}
+			const strategyItems: (vscode.QuickPickItem & { strategy: GitPullRequestMergeStrategy })[] = [
+				{ label: 'Create Merge Commit', strategy: GitPullRequestMergeStrategy.NoFastForward },
+				{ label: 'Squash Commit', strategy: GitPullRequestMergeStrategy.Squash },
+				{ label: 'Rebase and Fast Forward', strategy: GitPullRequestMergeStrategy.Rebase },
+				{ label: 'Semi-Linear Merge', strategy: GitPullRequestMergeStrategy.RebaseMerge },
+			];
+			const picked = await vscode.window.showQuickPick(strategyItems, {
+				placeHolder: `Select a merge strategy to complete pull request #${pullRequestModel.getPullRequestId()}`,
+			});
+			if (!picked) {
+				return;
+			}
+			// item 4: the strategy quick-pick above mentions only the merge method, but completing also
+			// deletes the source branch and completes linked work items. Disclose both before doing it.
+			const confirmation = await vscode.window.showInformationMessage(
+				`Complete pull request #${pullRequestModel.getPullRequestId()} using ${
+					picked.label
+				}? This will delete the source branch and complete any linked work items.`,
+				{ modal: true },
+				'Complete',
+			);
+			if (confirmation !== 'Complete') {
+				return;
+			}
+			try {
+				const result = await pullRequestModel.completePullRequest({
+					deleteSourceBranch: true,
+					transitionWorkItems: true,
+					mergeStrategy: picked.strategy,
 				});
+				if (result.closedBy === undefined) {
+					vscode.window.showErrorMessage(`Completing pull request failed. ${result.mergeFailureMessage ?? ''}`);
+					return;
+				}
+				vscode.commands.executeCommand('azdopr.refreshList');
+				PullRequestOverviewPanel.refresh();
+				_onDidUpdatePR.fire();
+			} catch (e) {
+				vscode.window.showErrorMessage(`Unable to complete pull request. ${formatError(e)}`);
+			}
+		}),
+	);
+
+	// VOTE-01: vote on the checked-out PR or a selected PR tree node without opening the description webview.
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.approve', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.APPROVED),
+		),
+		vscode.commands.registerCommand('azdopr.approveWithSuggestions', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.APPROVED_WITH_SUGGESTION),
+		),
+		vscode.commands.registerCommand('azdopr.waitForAuthor', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.WAITING_FOR_AUTHOR),
+		),
+		vscode.commands.registerCommand('azdopr.reject', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.REJECTED),
+		),
+		vscode.commands.registerCommand('azdopr.resetVote', (pr?: PRNode | PullRequestModel) =>
+			submitVoteToPullRequest(reposManager, pr, PullRequestVote.NO_VOTE),
+		),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.vote', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
+				return;
+			}
+			const currentUserId = reposManager.getManagerForPullRequestModel(pullRequestModel)?.getCurrentUser().id;
+			const currentVote =
+				pullRequestModel.item.reviewers?.find(r => r.id === currentUserId)?.vote ?? PullRequestVote.NO_VOTE;
+			const options: { label: string; vote: PullRequestVote }[] = [
+				{ label: 'Approve', vote: PullRequestVote.APPROVED },
+				{ label: 'Approve with Suggestions', vote: PullRequestVote.APPROVED_WITH_SUGGESTION },
+				{ label: 'Wait for Author', vote: PullRequestVote.WAITING_FOR_AUTHOR },
+				{ label: 'Reject', vote: PullRequestVote.REJECTED },
+				{ label: 'Reset Vote', vote: PullRequestVote.NO_VOTE },
+			];
+			const items: (vscode.QuickPickItem & { vote: PullRequestVote })[] = options.map(o =>
+				o.vote === currentVote ? { ...o, description: '(current vote)' } : o,
+			);
+			const picked = await vscode.window.showQuickPick(items, {
+				placeHolder: `Vote on pull request #${pullRequestModel.getPullRequestId()}`,
+			});
+			if (!picked) {
+				return;
+			}
+			await submitVoteToPullRequest(reposManager, pullRequestModel, picked.vote);
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.readyForReview', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
+				return;
+			}
+			try {
+				await pullRequestModel.setReadyForReview(false);
+				vscode.commands.executeCommand('azdopr.refreshList');
+				PullRequestOverviewPanel.refresh();
+				_onDidUpdatePR.fire();
+			} catch (e) {
+				vscode.window.showErrorMessage(`Marking pull request ready for review failed. ${formatError(e)}`);
+			}
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.convertToDraft', async (pr?: PRNode | PullRequestModel) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, pr);
+			if (!pullRequestModel) {
+				return;
+			}
+			const confirmation = await vscode.window.showWarningMessage(
+				'Convert this pull request to a draft? Azure DevOps resets all reviewer votes when a PR is marked as draft.',
+				{ modal: true },
+				'Convert to draft',
+			);
+			if (confirmation !== 'Convert to draft') {
+				return;
+			}
+			try {
+				await pullRequestModel.setReadyForReview(true);
+				vscode.commands.executeCommand('azdopr.refreshList');
+				PullRequestOverviewPanel.refresh();
+				_onDidUpdatePR.fire();
+			} catch (e) {
+				vscode.window.showErrorMessage(`Converting pull request to draft failed. ${formatError(e)}`);
+			}
 		}),
 	);
 
@@ -473,7 +633,7 @@ export function registerCommands(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.refreshDescription', async () => {
-			if (PullRequestOverviewPanel.currentPanel) {
+			if (PullRequestOverviewPanel.panels.size > 0) {
 				PullRequestOverviewPanel.refresh();
 			}
 		}),
@@ -786,16 +946,18 @@ export function registerCommands(
 			telemetry.sendTelemetryEvent('azdopr.applySuggestionWithCopilot');
 
 			commentThread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
-			const messages = commentThread.comments.map(comment => {
-				const body = comment.body instanceof vscode.MarkdownString ? comment.body.value : comment.body;
-				return `- ${comment.author.name}: ${body}`;
-			}).join('\n');
+			const messages = commentThread.comments
+				.map(comment => {
+					const body = comment.body instanceof vscode.MarkdownString ? comment.body.value : comment.body;
+					return `- ${comment.author.name}: ${body}`;
+				})
+				.join('\n');
 
 			await vscode.commands.executeCommand('vscode.editorChat.start', {
 				initialRange: commentThread.range,
 				message: messages,
 				autoSend: true,
 			});
-		})
+		}),
 	);
 }

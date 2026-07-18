@@ -6,16 +6,16 @@
 'use strict';
 
 import * as pathUtils from 'path';
+import { VersionControlChangeType } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { EventEmitter, Uri, UriHandler } from 'vscode';
 import { Repository } from '../api/api';
-import { PullRequestModel as AzdoPullRequestModel } from '../azdo/pullRequestModel';
-import { URI_SCHEME_PR, URI_SCHEME_RESOURCE, URI_SCHEME_REVIEW } from '../constants';
-import { GitChangeType } from './file';
-import { getGitChangeTypeFromVersionControlChangeType } from './diffHunk';
-import { removeLeadingSlash } from '../azdo/utils';
-import { VersionControlChangeType } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { FolderRepositoryManager } from '../azdo/folderRepositoryManager';
 import { IRawFileChange } from '../azdo/interface';
+import { PullRequestModel as AzdoPullRequestModel } from '../azdo/pullRequestModel';
+import { removeLeadingSlash } from '../azdo/utils';
+import { URI_SCHEME_PR, URI_SCHEME_RESOURCE, URI_SCHEME_REVIEW } from '../constants';
+import { getGitChangeTypeFromVersionControlChangeType } from './diffHunk';
+import { GitChangeType } from './file';
 
 export interface ReviewUriParams {
 	path: string;

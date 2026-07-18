@@ -64,7 +64,9 @@ export class ReviewCommentController
 			_reposManager.activePullRequest!.item.title ?? '',
 		);
 		this._commentController.commentingRangeProvider = this;
-		this._commentController.reactionHandler = this.toggleReaction.bind(this);
+		// Azure DevOps has no comment-reactions concept (this was GitHub GraphQL logic, entirely
+		// commented out below) - reactionHandler is optional on CommentController, so leaving it
+		// unset removes the non-functional emoji-picker button entirely instead of shipping a broken one.
 		this._localToDispose.push(this._commentController);
 		this._commentHandlerId = uuid();
 		this._commonCommentHandler = new CommonCommentHandler(_reposManager.activePullRequest!, _reposManager);
@@ -103,7 +105,10 @@ export class ReviewCommentController
 
 		const range = new vscode.Range(new vscode.Position(line - 1, 0), new vscode.Position(line - 1, 0));
 
-		const threadData = this.createThreadData(thread.thread, uri, range, vscode.CommentThreadCollapsibleState.Collapsed);
+		// Default to expanded: when the PR's branch is checked out, a comment on the file you're
+		// actively editing should be visible immediately, matching pullRequestCommentController.ts's
+		// (non-checked-out PR view) behavior instead of requiring an extra click to see it exists.
+		const threadData = this.createThreadData(thread.thread, uri, range, vscode.CommentThreadCollapsibleState.Expanded);
 
 		return createVSCodeCommentThread(threadData, this._commentController);
 	}
@@ -132,7 +137,7 @@ export class ReviewCommentController
 			thread.thread,
 			reviewUri,
 			range,
-			vscode.CommentThreadCollapsibleState.Collapsed,
+			vscode.CommentThreadCollapsibleState.Expanded,
 		);
 
 		return createVSCodeCommentThread(threadData, this._commentController);
@@ -220,12 +225,12 @@ export class ReviewCommentController
 				workspaceDocuments.forEach(editor => {
 					const fileName = this.gitRelativeRootPath(editor.document.uri.path);
 					const threadsForEditor = this._workspaceFileChangeCommentThreads[removeLeadingSlash(fileName)] || [];
-					// If the editor has no view column, assume it is part of a diff editor and expand the comments. Otherwise, collapse them.
-					const isEmbedded = !editor.viewColumn;
+					// A comment on the file you're actively editing (checked-out PR branch) should be
+					// visible immediately, whether the editor is embedded in a diff or opened normally -
+					// this used to collapse threads on a normal (non-diff) editor, hiding existing
+					// comments until you clicked to expand them.
 					this._workspaceFileChangeCommentThreads[removeLeadingSlash(fileName)] = threadsForEditor.map(thread => {
-						thread.collapsibleState = isEmbedded
-							? vscode.CommentThreadCollapsibleState.Expanded
-							: vscode.CommentThreadCollapsibleState.Collapsed;
+						thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
 
 						return thread;
 					});
@@ -381,7 +386,7 @@ export class ReviewCommentController
 
 	async provideCommentingRanges(
 		document: vscode.TextDocument,
-		token: vscode.CancellationToken,
+		_token: vscode.CancellationToken,
 	): Promise<vscode.Range[] | undefined> {
 		let query: ReviewUriParams | undefined;
 
@@ -622,14 +627,14 @@ export class ReviewCommentController
 	// #region Incremental update comments
 	public async update(
 		localFileChanges: GitFileChangeNode[],
-		obsoleteFileChanges: (GitFileChangeNode | RemoteFileChangeNode)[],
+		_obsoleteFileChanges: (GitFileChangeNode | RemoteFileChangeNode)[],
 	): Promise<void> {
 		this._localFileChanges = localFileChanges;
 	}
 	// #endregion
 
 	// #region Reactions
-	async toggleReaction(comment: GHPRComment, reaction: vscode.CommentReaction): Promise<void> {
+	async toggleReaction(_comment: GHPRComment, _reaction: vscode.CommentReaction): Promise<void> {
 		// try {
 		// 	if (!this._reposManager.activePullRequest) {
 		// 		throw new Error('Unable to find active pull request');

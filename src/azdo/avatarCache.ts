@@ -1,5 +1,5 @@
-import * as vscode from 'vscode';
 import { WebApi } from 'azure-devops-node-api';
+import * as vscode from 'vscode';
 import Logger from '../common/logger';
 
 const ID = 'AvatarCache';

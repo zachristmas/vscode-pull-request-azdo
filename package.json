@@ -12,7 +12,7 @@
 	},
 	"enableProposedApi": false,
 	"preview": true,
-	"version": "1.3.0",
+	"version": "1.5.0",
 	"publisher": "ZacharyChristmas",
 	"engines": {
 		"vscode": "^1.97.0"
@@ -233,6 +233,41 @@
 			{
 				"command": "azdopr.readyForReview",
 				"title": "Mark Pull Request Ready For Review",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.convertToDraft",
+				"title": "Convert Pull Request To Draft",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.vote",
+				"title": "Vote...",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.approve",
+				"title": "Approve",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.approveWithSuggestions",
+				"title": "Approve with Suggestions",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.waitForAuthor",
+				"title": "Wait for Author",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.reject",
+				"title": "Reject",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.resetVote",
+				"title": "Reset Vote",
 				"category": "AzDO Pull Requests"
 			},
 			{
@@ -469,6 +504,34 @@
 					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
 				},
 				{
+					"command": "azdopr.convertToDraft",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
+					"command": "azdopr.vote",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
+					"command": "azdopr.approve",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
+					"command": "azdopr.approveWithSuggestions",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
+					"command": "azdopr.waitForAuthor",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
+					"command": "azdopr.reject",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
+					"command": "azdopr.resetVote",
+					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+				},
+				{
 					"command": "azdopr.openPullRequestInAzdo",
 					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
 				},
@@ -613,6 +676,21 @@
 					"command": "azdopr.refreshPullRequest",
 					"when": "view == azdopr:azdo && viewItem =~ /pullrequest|description/",
 					"group": "pullrequest@2"
+				},
+				{
+					"command": "azdopr.readyForReview",
+					"when": "view == azdopr:azdo && viewItem =~ /pullrequest(:local)?:(non)?active:draft/",
+					"group": "pullrequest@2"
+				},
+				{
+					"command": "azdopr.convertToDraft",
+					"when": "view == azdopr:azdo && viewItem =~ /pullrequest(:local)?:(non)?active:ready/",
+					"group": "pullrequest@2"
+				},
+				{
+					"command": "azdopr.vote",
+					"when": "view == azdopr:azdo && viewItem =~ /pullrequest/",
+					"group": "pullrequest@1"
 				},
 				{
 					"command": "azdopr.openPullRequestInAzdo",

@@ -7,10 +7,18 @@ import {
 	GitCommitRef,
 	GitPullRequest,
 	GitPullRequestCommentThread,
+	GitPullRequestCompletionOptions,
+	GitPullRequestMergeStrategy,
+	IdentityRefWithVote,
 	LineDiffBlockChangeType,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
+import {
+	PolicyConfiguration,
+	PolicyEvaluationRecord,
+	PolicyEvaluationStatus,
+} from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as vscode from 'vscode';
 import { Repository } from '../api/api';
 import { GitApiImpl } from '../api/api1';
@@ -19,7 +27,29 @@ import { DiffChangeType, DiffHunk, DiffLine, getGitChangeTypeFromVersionControlC
 import { Resource } from '../common/resources';
 import { ThreadData } from '../view/treeNodes/pullRequestNode';
 import { AzdoRepository } from './azdoRepository';
-import { IAccount, IFileChangeNode, IGitHubRef, IRawFileChange, PullRequest } from './interface';
+import {
+	IAccount,
+	IFileChangeNode,
+	IGitHubRef,
+	IRawFileChange,
+	MergeMethod,
+	MergeMethodsAvailability,
+	PullRequest,
+	PullRequestCompletionSummary,
+	PullRequestPolicyEvaluation,
+	ReviewState,
+} from './interface';
+import {
+	isBuildValidationSettings,
+	isMergeStrategySettings,
+	isMinimumReviewersSettings,
+	isRequiredReviewersSettings,
+	MergeStrategyPolicySettings,
+	MinimumReviewersPolicySettings,
+	PolicyScopeEntry,
+	RequiredReviewersPolicySettings,
+	WellKnownPolicyTypeIds,
+} from './policyTypes';
 import { GHPRComment, GHPRCommentThread } from './prComment';
 
 export interface CommentReactionHandler {
@@ -50,6 +80,204 @@ export function convertRESTUserToAccount(user: IdentityRef): IAccount {
 		id: user.id,
 		avatarUrl: user.imageUrl,
 	};
+}
+
+export function convertIdentityRefWithVoteToReviewer(r: IdentityRefWithVote): ReviewState {
+	return {
+		reviewer: {
+			email: r.uniqueName,
+			name: r.displayName,
+			// Verified live against dev.azure.com: IdentityRefWithVote carries no `_links` object at
+			// all (unlike some other identity payloads) - avatarUrl comes through as a flat `imageUrl`,
+			// same as every other identity conversion in this file (convertRESTUserToAccount et al).
+			// The old `_links.avatar.href` lookup always resolved to undefined, so reviewer avatars
+			// never rendered.
+			avatarUrl: r.imageUrl,
+			url: r.reviewerUrl,
+			id: r.id,
+		},
+		state: r.vote ?? 0,
+		isRequired: r.isRequired ?? false,
+	};
+}
+
+/**
+ * POL-01: convert a raw PolicyEvaluationRecord (untyped settings/context, PolicyInterfaces.d.ts:37,79)
+ * into the webview DTO. Kind detection is shape-first with a GUID tiebreaker only for the two
+ * settings-shapeless types (ROADMAP Section 4); unmatched types fall back to 'other' so custom/unknown
+ * policies stay visible instead of being dropped. Returns undefined for NotApplicable/disabled records.
+ */
+export function convertPolicyEvaluation(
+	record: PolicyEvaluationRecord,
+	typeMap: Map<string, string>,
+): PullRequestPolicyEvaluation | undefined {
+	const configuration = record.configuration;
+	if (!configuration || configuration.isEnabled === false) {
+		return undefined;
+	}
+
+	const settings: any = configuration.settings ?? {};
+	const typeId = configuration.type?.id;
+	const displayName = (typeId && typeMap.get(typeId)) || configuration.type?.displayName || 'Branch policy';
+
+	let kind: PullRequestPolicyEvaluation['kind'] = 'other';
+	let detail: string | undefined;
+
+	if (isMinimumReviewersSettings(settings)) {
+		kind = 'minimumReviewers';
+		detail = buildMinimumReviewersDetail(settings);
+	} else if (isBuildValidationSettings(settings)) {
+		kind = 'build';
+		detail = settings.displayName ? `Build: ${settings.displayName}` : 'Build validation';
+	} else if (isRequiredReviewersSettings(settings)) {
+		kind = 'requiredReviewers';
+		detail = buildRequiredReviewersDetail(settings);
+	} else if (isMergeStrategySettings(settings)) {
+		kind = 'mergeStrategy';
+		detail = buildMergeStrategyDetail(settings);
+	} else if (typeId === WellKnownPolicyTypeIds.workItemLinking) {
+		kind = 'workItemLinking';
+		detail = 'Work item linking';
+	} else if (typeId === WellKnownPolicyTypeIds.commentRequirements) {
+		kind = 'commentRequirements';
+		detail = 'Comment resolution';
+	}
+
+	return {
+		evaluationId: record.evaluationId ?? '',
+		kind,
+		displayName,
+		detail,
+		isBlocking: configuration.isBlocking ?? false,
+		status: record.status ?? PolicyEvaluationStatus.Queued,
+	};
+}
+
+function buildMinimumReviewersDetail(settings: MinimumReviewersPolicySettings): string {
+	const n = settings.minimumApproverCount ?? 0;
+	const suffix = settings.creatorVoteCounts ? ', creator vote counts' : '';
+	return `${n} reviewer${n === 1 ? '' : 's'} required${suffix}`;
+}
+
+function buildRequiredReviewersDetail(settings: RequiredReviewersPolicySettings): string {
+	const n = settings.requiredReviewerIds?.length ?? 0;
+	return `${n} required reviewer${n === 1 ? '' : 's'}`;
+}
+
+function buildMergeStrategyDetail(settings: MergeStrategyPolicySettings): string {
+	const allowed: string[] = [];
+	if (settings.useSquashMerge) {
+		return 'Allowed: Squash';
+	}
+	if (settings.allowNoFastForward) {
+		allowed.push('Merge commit');
+	}
+	if (settings.allowSquash) {
+		allowed.push('Squash');
+	}
+	if (settings.allowRebase) {
+		allowed.push('Rebase');
+	}
+	if (settings.allowRebaseMerge) {
+		allowed.push('Semi-linear merge');
+	}
+	return allowed.length ? `Allowed: ${allowed.join(', ')}` : 'No merge strategies allowed';
+}
+
+/**
+ * AC-02: convert the PR's completionOptions (populated whenever autoCompleteSetBy is set) into the
+ * webview's compact options-summary line, e.g. "Squash, delete branch, complete work items".
+ */
+export function buildCompletionSummary(
+	options: GitPullRequestCompletionOptions | undefined,
+): PullRequestCompletionSummary | undefined {
+	if (!options) {
+		return undefined;
+	}
+
+	return {
+		mergeStrategy:
+			options.mergeStrategy !== undefined
+				? (GitPullRequestMergeStrategy[options.mergeStrategy] as PullRequestCompletionSummary['mergeStrategy'])
+				: undefined,
+		deleteSourceBranch: options.deleteSourceBranch,
+		transitionWorkItems: options.transitionWorkItems,
+		mergeCommitMessage: options.mergeCommitMessage,
+	};
+}
+
+const ALL_MERGE_METHODS_ENABLED: MergeMethodsAvailability = {
+	NoFastForward: true,
+	Squash: true,
+	Rebase: true,
+	RebaseMerge: true,
+};
+
+/**
+ * AC-04: fold zero-or-more "Limit merge types" policy configurations into a single availability map.
+ * No matching policy -> all four enabled (current behavior preserved). One or more matching, enabled,
+ * blocking policies -> AND-composition of each policy's allow* flags (conservative - a strategy is
+ * offered only if every applicable policy allows it), mirroring server enforcement. Legacy
+ * `useSquashMerge: true` settings map to Squash-only. An all-false composition is pathological but
+ * possible with overlapping policies - keep all four enabled and let the server reject with a real
+ * error rather than rendering a form with zero options.
+ */
+export function computeMergeMethodsAvailability(configurations: PolicyConfiguration[]): MergeMethodsAvailability {
+	const relevant = configurations.filter(c => c.isEnabled && c.isBlocking && isMergeStrategySettings(c.settings ?? {}));
+
+	if (relevant.length === 0) {
+		return { ...ALL_MERGE_METHODS_ENABLED };
+	}
+
+	const availability: MergeMethodsAvailability = { ...ALL_MERGE_METHODS_ENABLED };
+	relevant.forEach(config => {
+		const settings = config.settings as MergeStrategyPolicySettings;
+		const allowed: MergeMethodsAvailability = settings.useSquashMerge
+			? { NoFastForward: false, Squash: true, Rebase: false, RebaseMerge: false }
+			: {
+					NoFastForward: !!settings.allowNoFastForward,
+					Squash: !!settings.allowSquash,
+					Rebase: !!settings.allowRebase,
+					RebaseMerge: !!settings.allowRebaseMerge,
+			  };
+		(Object.keys(availability) as MergeMethod[]).forEach(method => {
+			availability[method] = availability[method] && allowed[method];
+		});
+	});
+
+	if (!Object.values(availability).some(Boolean)) {
+		return { ...ALL_MERGE_METHODS_ENABLED };
+	}
+
+	return availability;
+}
+
+/**
+ * AC-04 fallback path: PolicyApi.getPolicyConfigurations(project) returns every policy in the project
+ * with no server-side ref filtering, so match settings.scope[] client-side the same way the server's
+ * branch-scoped route would (repositoryId null = all repos; Exact/Prefix/DefaultBranch ref matching).
+ */
+export function matchesRefScope(
+	config: PolicyConfiguration,
+	repositoryId: string,
+	targetRefName: string,
+	defaultBranchRefName: string,
+): boolean {
+	const scope: PolicyScopeEntry[] = (config.settings ?? {}).scope ?? [];
+	return scope.some(entry => {
+		if (entry.repositoryId && entry.repositoryId !== repositoryId) {
+			return false;
+		}
+		switch (entry.matchKind) {
+			case 'Prefix':
+				return !!entry.refName && targetRefName.startsWith(entry.refName);
+			case 'DefaultBranch':
+				return targetRefName === defaultBranchRefName;
+			case 'Exact':
+			default:
+				return !!entry.refName && entry.refName.toLowerCase() === targetRefName.toLowerCase();
+		}
+	});
 }
 
 export function convertRESTIdentityToAccount(user: Identity): IAccount {
@@ -325,30 +553,37 @@ export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repo
 	return undefined;
 }
 
+// ITER-01: threadContext holds the server-tracked (current) position of a thread; trackingCriteria.orig*
+// is the creation-time location. The presence of trackingCriteria means the thread HAS been tracked from
+// its original spot, so threadContext is the current position. Prefer threadContext so comments stay glued
+// to the code across pushes; fall back to orig* only when there is no threadContext.
 export function getPositionFromThread(comment: GitPullRequestCommentThread) {
-	if (comment.pullRequestThreadContext?.trackingCriteria !== undefined) {
-		return comment.pullRequestThreadContext?.trackingCriteria?.origRightFileStart === undefined
-			? comment.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart?.line
-			: comment.pullRequestThreadContext?.trackingCriteria?.origRightFileStart.line;
+	// General/system comment threads (verified live: e.g. vote-change system comments) come back with
+	// threadContext: null, not undefined - the `!== undefined` check let null through to an unguarded
+	// property access below.
+	if (comment.threadContext !== undefined && comment.threadContext !== null) {
+		return comment.threadContext.rightFileStart === undefined
+			? comment.threadContext.leftFileStart?.line
+			: comment.threadContext.rightFileStart.line;
 	}
-	return comment.threadContext?.rightFileStart === undefined
-		? comment.threadContext?.leftFileStart?.line
-		: comment.threadContext.rightFileStart.line;
+	const trackingCriteria = comment.pullRequestThreadContext?.trackingCriteria;
+	return trackingCriteria?.origRightFileStart === undefined
+		? trackingCriteria?.origLeftFileStart?.line
+		: trackingCriteria?.origRightFileStart.line;
 }
 
 export function getDiffSide(thread: GitPullRequestCommentThread): DiffSide | undefined {
-	if (thread.pullRequestThreadContext?.trackingCriteria !== undefined || thread.threadContext !== undefined) {
-		if (thread.pullRequestThreadContext?.trackingCriteria?.origRightFileStart !== undefined) {
-			return DiffSide.RIGHT;
-		} else if (thread.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart !== undefined) {
-			return DiffSide.LEFT;
-		} else if (thread.threadContext?.rightFileStart !== undefined) {
-			// Check on threadContext needs to happen after trackingCriteria
-			return DiffSide.RIGHT;
-		} else if (thread.threadContext?.leftFileStart !== undefined) {
-			return DiffSide.LEFT;
-		}
+	// Prefer the tracked threadContext side; fall back to the creation-time trackingCriteria side.
+	if (thread.threadContext?.rightFileStart !== undefined) {
+		return DiffSide.RIGHT;
+	} else if (thread.threadContext?.leftFileStart !== undefined) {
+		return DiffSide.LEFT;
+	} else if (thread.pullRequestThreadContext?.trackingCriteria?.origRightFileStart !== undefined) {
+		return DiffSide.RIGHT;
+	} else if (thread.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart !== undefined) {
+		return DiffSide.LEFT;
 	}
+	return undefined;
 }
 
 export function updateCommentReviewState(thread: GHPRCommentThread, newDraftMode: boolean) {
@@ -421,11 +656,11 @@ export function isCommentResolved(status: CommentThreadStatus): boolean {
 export function convertRawFileChangeToFileChangeNode(fileChange: IRawFileChange): IFileChangeNode {
 	return {
 		blobUrl: fileChange.blob_url,
-		status:  getGitChangeTypeFromVersionControlChangeType(fileChange.status),
+		status: getGitChangeTypeFromVersionControlChangeType(fileChange.status),
 		fileName: fileChange.filename,
 		previousFileName: fileChange.previous_filename,
 		sha: fileChange.file_sha,
 		diffHunks: fileChange.diffHunks,
-		previousFileSha: fileChange.previous_file_sha
+		previousFileSha: fileChange.previous_file_sha,
 	};
 }

@@ -4,8 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 import { Comment, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
-import { CommentPermissions, IAccount } from './interface';
 import { getAvatarIconUri } from './avatarCache';
+import { CommentPermissions, IAccount } from './interface';
 
 export interface GHPRCommentThread extends vscode.CommentThread {
 	threadId: number;

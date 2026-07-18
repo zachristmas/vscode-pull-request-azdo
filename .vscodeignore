@@ -2,7 +2,7 @@
 .readme/**
 .vscode/**
 build/**
-dist/test/**
+dist/**/test/**
 documentation/**
 node_modules/**
 scripts/**
@@ -26,3 +26,11 @@ yarn.lock
 **/*.svg
 **/*.ts
 *.vsix
+
+# Packaging hygiene: keep internal docs, build config, dep junk, and the tsc/test
+# output (runtime is the webpack bundle in dist/) out of the published .vsix.
+docs/**
+.yarn/**
+out/**
+test_workspace/**
+**/*webpack.config*.js

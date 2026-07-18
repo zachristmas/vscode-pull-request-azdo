@@ -8,6 +8,7 @@ import * as path from 'path';
 import {
 	Comment,
 	GitPullRequestCommentThread,
+	GitPullRequestMergeStrategy,
 	IdentityRefWithVote,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
@@ -17,25 +18,35 @@ import { onDidUpdatePR } from '../commands';
 import Logger from '../common/logger';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
-import { SETTINGS_NAMESPACE } from '../constants';
+import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
 import { User } from './entitlementApi';
 import { FolderRepositoryManager } from './folderRepositoryManager';
-import { GithubItemStateEnum, MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
+import { MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { AzdoUserManager } from './userManager';
+import {
+	buildCompletionSummary,
+	convertBranchRefToBranchName,
+	convertIdentityRefWithVoteToReviewer,
+	convertRESTUserToAccount,
+} from './utils';
 import { AzdoWorkItem } from './workItem';
 
 export class PullRequestOverviewPanel extends WebviewBase {
 	public static ID: string = 'PullRequestOverviewPanel';
 	/**
-	 * Track the currently panel. Only allow a single panel to exist at a time.
+	 * UX-04: one panel per PR, keyed by PR id. Opening a second PR now opens a new tab instead of
+	 * repurposing the single existing panel (which silently discarded scroll position, expanded
+	 * threads, and any in-progress vote/comment state). Users manage tab volume with the editor's
+	 * own machinery, the same as any other document.
 	 */
-	public static currentPanel?: PullRequestOverviewPanel;
+	public static panels: Map<number, PullRequestOverviewPanel> = new Map();
 
 	protected static readonly _viewType: string = 'PullRequestOverview';
 	protected readonly _panel: vscode.WebviewPanel;
 
 	protected _item: PullRequestModel;
+	private _prNumber: number;
 	private _repositoryDefaultBranch: string;
 	private _existingReviewers: ReviewState[];
 
@@ -60,38 +71,47 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			? vscode.window.activeTextEditor.viewColumn
 			: vscode.ViewColumn.One;
 
-		// If we already have a panel, show it.
-		// Otherwise, create a new panel.
-		if (PullRequestOverviewPanel.currentPanel) {
-			PullRequestOverviewPanel.currentPanel._panel.reveal(activeColumn, true);
+		const prNumber = pr.getPullRequestId();
+
+		// Reveal the existing panel for this PR if one is already open; otherwise open a new tab.
+		let panel = PullRequestOverviewPanel.panels.get(prNumber);
+		if (panel) {
+			panel._panel.reveal(activeColumn, true);
 		} else {
-			const title = `Pull Request #${pr.getPullRequestId().toString()}`;
-			PullRequestOverviewPanel.currentPanel = new PullRequestOverviewPanel(
+			const title = `Pull Request #${prNumber.toString()}`;
+			panel = new PullRequestOverviewPanel(
 				extensionPath,
 				activeColumn || vscode.ViewColumn.Active,
 				title,
 				folderRepositoryManager,
 				workItem,
 				azdoUserManager,
+				prNumber,
 			);
+			PullRequestOverviewPanel.panels.set(prNumber, panel);
 		}
 
-		await PullRequestOverviewPanel.currentPanel!.update(folderRepositoryManager, pr);
-	}
-
-	protected set _currentPanel(panel: PullRequestOverviewPanel | undefined) {
-		PullRequestOverviewPanel.currentPanel = panel;
+		await panel.update(folderRepositoryManager, pr);
 	}
 
 	public static refresh(): void {
-		if (this.currentPanel) {
-			this.currentPanel.refreshPanel();
+		for (const panel of PullRequestOverviewPanel.panels.values()) {
+			panel.refreshPanel();
 		}
 	}
 
+	// UX-04: refreshes only apply to a visible panel; a palette action (commands.ts) or list refresh that
+	// targets a hidden tab would otherwise be dropped, leaving it stale until the user manually refreshed.
+	// Remember the request and replay it the moment the tab becomes visible (see onDidChangeViewState).
+	// (item 3)
+	private _refreshWhenVisible = false;
+
 	public async refreshPanel(): Promise<void> {
 		if (this._panel && this._panel.visible) {
+			this._refreshWhenVisible = false;
 			this.update(this._folderRepositoryManager, this._item);
+		} else {
+			this._refreshWhenVisible = true;
 		}
 	}
 
@@ -106,9 +126,11 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		folderRepositoryManager: FolderRepositoryManager,
 		workItem: AzdoWorkItem,
 		azdoUserManager: AzdoUserManager,
+		prNumber: number,
 	) {
 		super();
 
+		this._prNumber = prNumber;
 		this._extensionPath = extensionPath;
 		this._folderRepositoryManager = folderRepositoryManager;
 		this._workItem = workItem;
@@ -130,6 +152,19 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		// Listen for when the panel is disposed
 		// This happens when the user closes the panel or when the panel is closed programatically
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+		// UX-04: replay a refresh that was requested while this tab was hidden, so switching back to it
+		// shows current data instead of a stale snapshot (item 3).
+		this._panel.onDidChangeViewState(
+			() => {
+				if (this._panel.visible && this._refreshWhenVisible) {
+					this._refreshWhenVisible = false;
+					this.update(this._folderRepositoryManager, this._item);
+				}
+			},
+			null,
+			this._disposables,
+		);
 
 		this._folderRepositoryManager.onDidChangeActiveIssue(
 			_ => {
@@ -190,8 +225,21 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				this._folderRepositoryManager.getPullRequestRepositoryAccessAndMergeMethods(pullRequestModel),
 				pullRequestModel.azdoRepository.getAuthenticatedUser(),
 				this.getWorkItemsWithPr(pullRequestModel),
+				// POL-01: policy data is progressive enhancement - a fetch failure must not sink the
+				// whole panel the way the other members here fail loudly.
+				pullRequestModel.getPolicyEvaluations().catch(() => undefined),
 			]);
-			const [pullRequest, threads, commits, defaultBranch, status, repositoryAccess, currentUser, workItems] = result;
+			const [
+				pullRequest,
+				threads,
+				commits,
+				defaultBranch,
+				status,
+				repositoryAccess,
+				currentUser,
+				workItems,
+				policies,
+			] = result;
 			const canEditPr = pullRequest?.canEdit();
 			const requestedReviewers = pullRequestModel.item.reviewers;
 			if (!pullRequest) {
@@ -215,7 +263,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				.get<MergeMethod>('defaultMergeMethod');
 			const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 
-			this._existingReviewers = requestedReviewers?.map(this.convertIdentityRefWithVoteToReviewer) ?? [];
+			this._existingReviewers = requestedReviewers?.map(convertIdentityRefWithVoteToReviewer) ?? [];
 
 			Logger.debug('pr.initialize', PullRequestOverviewPanel.ID);
 			this._postMessage({
@@ -239,13 +287,27 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					threads: threads,
 					commits: commits,
 					isCurrentlyCheckedOut: isCurrentlyCheckedOut,
-					base: (pullRequest.base && pullRequest.base.ref) || 'UNKNOWN',
-					head: (pullRequest.head && pullRequest.head.ref) || 'UNKNOWN',
+					// AC-08: getBranchRef() returns undefined once a branch no longer exists (e.g. the
+					// source branch deleteSourceBranch already removed on a completed PR) - the branch
+					// NAME is still known from source/targetRefName even when the live ref lookup fails,
+					// so fall back to that instead of the literal string "UNKNOWN" (which read as
+					// "from UNKNOWN" in the UI and made DeleteBranch's pr.head === 'UNKNOWN' check hide
+					// the post-merge cleanup button for exactly the PRs that need it most).
+					base:
+						(pullRequest.base && pullRequest.base.ref) ||
+						convertBranchRefToBranchName(pullRequest.item.targetRefName || '') ||
+						'UNKNOWN',
+					head:
+						(pullRequest.head && pullRequest.head.ref) ||
+						convertBranchRefToBranchName(pullRequest.item.sourceRefName || '') ||
+						'UNKNOWN',
 					repositoryDefaultBranch: defaultBranch,
 					canEdit: canEdit,
 					hasWritePermission,
 					status: !!status ? status : { statuses: [] },
 					mergeable: pullRequest.item.mergeStatus,
+					mergeFailureMessage: pullRequest.item.mergeFailureMessage,
+					mergeFailureType: pullRequest.item.mergeFailureType,
 					reviewers: this._existingReviewers,
 					isDraft: pullRequest.isDraft,
 					mergeMethodsAvailability,
@@ -253,6 +315,13 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					isIssue: false,
 					currentUser: currentUser,
 					workItems: workItems,
+					policies,
+					autoCompleteSetBy: pullRequest.item.autoCompleteSetBy
+						? convertRESTUserToAccount(pullRequest.item.autoCompleteSetBy)
+						: undefined,
+					autoCompleteOptions: pullRequest.item.autoCompleteSetBy
+						? buildCompletionSummary(pullRequest.item.completionOptions)
+						: undefined,
 				},
 			});
 		} catch (e) {
@@ -290,12 +359,18 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.checkoutPullRequest(message);
 			case 'azdopr.merge':
 				return this.mergePullRequest(message);
+			case 'azdopr.readyForReview':
+				return this.setReadyForReview(message, false);
+			case 'azdopr.convertToDraft':
+				return this.setReadyForReview(message, true);
 			case 'pr.deleteBranch':
 				return this.deleteBranch(message);
 			case 'pr.vote':
 				return this.votePullRequest(message);
 			case 'pr.complete':
 				return this.completePullRequest(message);
+			case 'pr.set-autocomplete':
+				return this.setAutoComplete(message);
 			case 'pr.reply-thread':
 				return this.replyThread(message);
 			case 'pr.change-thread-status':
@@ -314,6 +389,28 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.removeWorkItemFromPR(message);
 			case 'pr.checkMergeability':
 				return this._replyMessage(message, await this._item.getMergability());
+			// getStatusChecks / requeuePolicyEvaluation can throw (network, on-prem servers without the
+			// route). Without the guard the reply never went out and the webview's awaited postMessage
+			// pended forever - the requeue button stuck on "Queuing..." because its finally never ran.
+			// Route failures to _throwError so the client promise rejects. (item 1b)
+			case 'pr.checkStatus':
+				try {
+					return await this._replyMessage(message, await this._item.getStatusChecks());
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
+			case 'pr.checkPolicies':
+				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
+				return this._replyMessage(message, await this._item.getPolicyEvaluations());
+			case 'pr.requeue-policy':
+				try {
+					return await this._replyMessage(
+						message,
+						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
+					);
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
 			case 'pr.add-reviewers':
 				return this.addReviewerToPr(message);
 			case 'pr.remove-reviewer':
@@ -340,7 +437,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				vscode.window.showErrorMessage(message.args);
 				return;
 			default:
-				return this.MESSAGE_UNHANDLED;
+				// Never drop a message silently: an unhandled command leaves the webview's awaited
+				// postMessage promise pending forever. Mirror the sidebar host's throwing default. (item 1e)
+				return this._throwError(message, `Unhandled message: ${message.command}`);
 		}
 	}
 
@@ -577,7 +676,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			})
 			.catch(e => {
 				this._throwError(message, e);
-				vscode.window.showWarningMessage(`Unable to removing PR link in workitem. Error: ${formatError(e)}`);
+				vscode.window.showWarningMessage(formatError(e));
 			});
 	}
 
@@ -711,8 +810,14 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			this.refreshPanel();
 			vscode.commands.executeCommand('azdopr.refreshList');
 
+			// The no-seq broadcast drives the client commandHandler (head -> 'UNKNOWN'); the seq reply
+			// resolves the awaited deleteBranch() promise so the Delete button's finally runs. Without it
+			// the button stayed stuck disabled after a successful delete. (item 1c)
 			this._postMessage({
 				command: 'pr.deleteBranch',
+			});
+			this._replyMessage(message, {
+				cancelled: false,
 			});
 		} else {
 			this._replyMessage(message, {
@@ -734,27 +839,68 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		);
 	}
 
-	private mergePullRequest(
-		message: IRequestMessage<{ title: string; description: string; method: 'merge' | 'squash' | 'rebase' }>,
-	): void {
-		const { title, description, method } = message.args;
-		this._folderRepositoryManager
-			.mergePullRequest(this._item, title, description, method)
+	// AC-03: the legacy FolderRepositoryManager.mergePullRequest is a commented-out stub; route every
+	// merge entry point through the working completePullRequest path instead.
+	private async mergePullRequest(
+		message: IRequestMessage<{ title: string; description: string; method: MergeMethod }>,
+	): Promise<void> {
+		// item 4: this path hardcodes deleteSourceBranch + transitionWorkItems, so the confirmation must
+		// disclose them rather than say a bare "Complete this pull request?".
+		const confirmation = await vscode.window.showInformationMessage(
+			'Complete this pull request? This will delete the source branch and complete any linked work items.',
+			{ modal: true },
+			'Complete',
+		);
+		if (confirmation !== 'Complete') {
+			this._replyMessage(message, { state: PullRequestStatus.Active });
+			return;
+		}
+
+		const mergeStrategy = GitPullRequestMergeStrategy[message.args.method] ?? GitPullRequestMergeStrategy.NoFastForward;
+		this._item
+			.completePullRequest({ deleteSourceBranch: true, transitionWorkItems: true, mergeStrategy })
 			.then(result => {
 				vscode.commands.executeCommand('azdopr.refreshList');
 
-				if (!result.merged) {
-					vscode.window.showErrorMessage(`Merging PR failed: ${result.message}`);
+				if (result.closedBy === undefined) {
+					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage}`);
+					this._replyMessage(message, { state: PullRequestStatus.Active });
+					return;
 				}
 
-				this._replyMessage(message, {
-					state: result.merged ? GithubItemStateEnum.Merged : GithubItemStateEnum.Open,
-				});
+				this._replyMessage(message, { state: PullRequestStatus.Completed, mergeable: result.mergeStatus });
 			})
 			.catch(e => {
 				vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
 				this._throwError(message, {});
 			});
+	}
+
+	private async setReadyForReview(message: IRequestMessage<any>, isDraft: boolean): Promise<void> {
+		if (isDraft) {
+			const confirmation = await vscode.window.showWarningMessage(
+				'Convert this pull request to a draft? Azure DevOps resets all reviewer votes when a PR is marked as draft.',
+				{ modal: true },
+				'Convert to draft',
+			);
+			if (confirmation !== 'Convert to draft') {
+				this._replyMessage(message, { isDraft: this._item.isDraft });
+				return;
+			}
+		}
+
+		try {
+			const result = await this._item.setReadyForReview(isDraft);
+			vscode.commands.executeCommand('azdopr.refreshList');
+			this._replyMessage(message, { isDraft: result.isDraft });
+		} catch (e) {
+			vscode.window.showErrorMessage(
+				`${
+					isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
+				} failed. ${formatError(e)}`,
+			);
+			this._throwError(message, `${formatError(e)}`);
+		}
 	}
 
 	private async checkoutDefaultBranch(message: IRequestMessage<string>): Promise<void> {
@@ -773,7 +919,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				existingReviewer.state = review.vote ?? 0;
 				existingReviewer.isRequired = review.isRequired ?? false;
 			} else {
-				this._existingReviewers.push(this.convertIdentityRefWithVoteToReviewer(review));
+				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 			}
 		}
 	}
@@ -903,13 +1049,29 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			.then(result => {
 				vscode.commands.executeCommand('azdopr.refreshList');
 
+				// POL-06: a failed completion previously still replied state: Completed, so the webview
+				// rendered "successfully merged" for a PR that did not merge. Reply the PR's real
+				// post-attempt status and surface the failure reason persistently.
 				if (result.closedBy === undefined) {
-					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage}`);
+					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage ?? 'unknown error'}`);
+					this._replyMessage(message, {
+						state: result.status ?? PullRequestStatus.Active,
+						mergeable: result.mergeStatus,
+						mergeFailureMessage: result.mergeFailureMessage,
+						mergeFailureType: result.mergeFailureType,
+					});
+					return;
 				}
 
+				// webview.postMessage() drops keys valued `undefined` during JSON serialization, so a
+				// stale mergeFailureMessage from a prior failed attempt would never actually clear once
+				// a later completion succeeds - send `null` instead (found while fixing the identical
+				// bug in AC-02's cancel-auto-complete reply).
 				this._replyMessage(message, {
 					state: PullRequestStatus.Completed,
 					mergeable: result.mergeStatus,
+					mergeFailureMessage: null,
+					mergeFailureType: null,
 				});
 			})
 			.catch(e => {
@@ -918,22 +1080,62 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			});
 	}
 
-	private convertIdentityRefWithVoteToReviewer(r: IdentityRefWithVote) {
-		return {
-			reviewer: {
-				email: r.uniqueName,
-				name: r.displayName,
-				avatarUrl: r?.['_links']?.['avatar']?.['href'],
-				url: r.reviewerUrl,
-				id: r.id,
-			},
-			state: r.vote ?? 0,
-			isRequired: r.isRequired ?? false,
-		};
+	// AC-02: same updatePullRequest call as completion, but `status` stays Active - the server
+	// completes the PR itself once every blocking policy passes.
+	private async setAutoComplete(
+		message: IRequestMessage<{ enable: boolean; options?: PullRequestCompletion }>,
+	): Promise<void> {
+		try {
+			const result = await this._item.setAutoComplete(message.args.enable ? message.args.options : undefined);
+			vscode.commands.executeCommand('azdopr.refreshList');
+
+			// webview.postMessage() serializes through JSON.stringify, which drops keys whose value is
+			// `undefined` entirely - the webview's shallow-merge updatePR() then never overwrites the
+			// stale cached value, so canceling looked like it did nothing. Send `null` for "cleared"
+			// instead: it survives serialization and every consumer already treats it as falsy.
+			this._replyMessage(message, {
+				autoCompleteSetBy:
+					result.autoCompleteSetBy && result.autoCompleteSetBy.id !== AUTO_COMPLETE_CLEAR_ID
+						? convertRESTUserToAccount(result.autoCompleteSetBy)
+						: null,
+				autoCompleteOptions: buildCompletionSummary(result.completionOptions) ?? null,
+				state: result.status ?? this._item.item.status,
+				mergeable: result.mergeStatus,
+				mergeFailureMessage: result.mergeFailureMessage,
+			});
+		} catch (e) {
+			// Race: canceling just as the server completes the PR fails the cancel PATCH (the PR is no
+			// longer Active). Re-fetch the real state and land in Completed instead of an error toast.
+			// Guard the recovery fetch: a second network failure here must still fall through to the
+			// error toast + _throwError, or the webview promise pends forever. (item 1d)
+			if (!message.args.enable) {
+				try {
+					const fresh = await this._folderRepositoryManager.resolvePullRequest(
+						this._item.remote.owner,
+						this._item.remote.repositoryName,
+						this._item.getPullRequestId(),
+					);
+					if (fresh?.state === PullRequestStatus.Completed) {
+						vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
+						this._replyMessage(message, {
+							autoCompleteSetBy: null,
+							autoCompleteOptions: null,
+							state: fresh.state,
+							mergeable: fresh.item.mergeStatus,
+						});
+						return;
+					}
+				} catch {
+					// Recovery fetch failed too; fall through to the error path below.
+				}
+			}
+			vscode.window.showErrorMessage(`Unable to update auto-complete. ${formatError(e)}`);
+			this._throwError(message, {});
+		}
 	}
 
 	dispose() {
-		this._currentPanel = undefined;
+		PullRequestOverviewPanel.panels.delete(this._prNumber);
 
 		// Clean up our resources
 		this._panel.dispose();

@@ -7,7 +7,6 @@ import {
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as vscode from 'vscode';
 import Logger from '../common/logger';
-import { parseAzdoRemoteUrl } from './remoteUrlParser';
 import { parseRemote, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { PRCommentControllerRegistry } from '../view/pullRequestCommentControllerRegistry';
@@ -15,6 +14,7 @@ import { Azdo, CredentialStore } from './credentials';
 import { FileReviewedStatusService, FileViewedStatus } from './fileReviewedStatusService';
 import { IAccount, IGitHubRef } from './interface';
 import { PullRequestModel } from './pullRequestModel';
+import { parseAzdoRemoteUrl } from './remoteUrlParser';
 import {
 	convertAzdoBranchRefToIGitHubRef,
 	convertAzdoPullRequestToRawPullRequest,
@@ -30,6 +30,7 @@ export class AzdoRepository implements vscode.Disposable {
 	protected _initialized: boolean;
 	protected _hub: Azdo | undefined;
 	protected _metadata: IMetadata | undefined;
+	private _policyTypeMap: Map<string, string> | undefined;
 	private _toDispose: vscode.Disposable[] = [];
 	public commentsController?: vscode.CommentController;
 	public commentsHandler?: PRCommentControllerRegistry;
@@ -114,6 +115,34 @@ export class AzdoRepository implements vscode.Disposable {
 
 	async getRepositoryId(): Promise<string | undefined> {
 		return (await this.getMetadata())?.id;
+	}
+
+	/**
+	 * POL-01: display names for policy types, resolved at runtime rather than hardcoded GUIDs
+	 * (ROADMAP Section 4). Cached per-repo instance like `_metadata`.
+	 */
+	async getPolicyTypeMap(): Promise<Map<string, string>> {
+		if (this._policyTypeMap) {
+			return this._policyTypeMap;
+		}
+
+		const map = new Map<string, string>();
+		try {
+			await this.ensure();
+			const metadata = await this.getMetadata();
+			const policyApi = await this._hub?.connection.getPolicyApi();
+			const types = await policyApi?.getPolicyTypes(metadata?.project?.id ?? metadata?.project?.name ?? '');
+			types?.forEach(t => {
+				if (t.id && t.displayName) {
+					map.set(t.id, t.displayName);
+				}
+			});
+		} catch (e) {
+			Logger.appendLine(`AzdoRepository> Fetching policy types failed: ${e}`, AzdoRepository.ID);
+		}
+
+		this._policyTypeMap = map;
+		return map;
 	}
 
 	async resolveRemote(): Promise<void> {

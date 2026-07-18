@@ -19,8 +19,8 @@ import {
 } from '../../src/common/timelineEvent';
 import { groupBy } from '../../src/common/utils';
 import PullRequestContext from '../common/context';
-import { CommentBody, CommentView, ReplyToThread } from './comment';
-import { commitIcon, mergeIcon } from './icon';
+import { CommentView, ReplyToThread } from './comment';
+import { chevronIcon, commitIcon, mergeIcon } from './icon';
 import { nbsp, Spaced } from './space';
 // eslint-disable-next-line import/no-named-as-default
 import Timestamp from './timestamp';
@@ -29,6 +29,9 @@ import { AuthorLink, Avatar } from './user';
 
 export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestCommentThread[]; currentUser: Identity }) => (
 	<>
+		{/* UX-03: newest-first is deliberate (matches ADO web) and pairs with the composer sitting ABOVE
+		    the timeline (overview.tsx) - a new comment appears directly under the box. Do not "fix" the
+		    ordering to oldest-first without also moving the composer to the bottom. */}
 		{threads
 			.sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime())
 			.map(
@@ -160,7 +163,7 @@ export const ReviewEventView = (event: ReviewEvent) => {
 				</div>
 				{/* {event.state !== 'PENDING' && event.body ? <CommentBody body={event.body} bodyHTML={event.bodyHTML} /> : null} */}
 				<div className="comment-body review-comment-body">
-					{Object.entries(comments).map(([key, thread]) => (
+					{Object.entries(comments).map(() => (
 						<div className="diff-container">
 							{/* <Diff key={key}
 									comment={thread[0]}
@@ -197,9 +200,62 @@ function AddReviewSummaryComment() {
 	);
 }
 
+// UX-03: thread status now lives on the thread, not on a guessed "first comment". These maps moved
+// here from comment.tsx with the control.
+export const ThreadStatus: { [status: string]: string } = {
+	'0': 'Unknown',
+	'1': 'Active',
+	'2': 'Fixed',
+	'3': 'WontFix',
+	'4': 'Closed',
+	// '5': 'ByDesign',
+	'6': 'Pending',
+};
+
+const ThreadStatusOrder = ['1', '6', '2', '3', '4'];
+
+// Status tone -> --azdo-* semantic color (see .thread-status-pill.status-* in index.css).
+const THREAD_STATUS_TONE: { [status: number]: string } = {
+	1: 'info', // Active
+	6: 'warning', // Pending
+	2: 'success', // Fixed
+	4: 'success', // Closed
+	3: 'muted', // WontFix
+};
+
+const RESOLVED_STATUSES = [2, 3, 4]; // Fixed, WontFix, Closed
+
+// A native <select> dressed as a status pill: colored dot + label + the select's own chevron. Native
+// keeps the accessibility and z-index simplicity while reading as a modern chip.
+const ThreadStatusPill = ({ status, onChange }: { status: number; onChange: (status: string) => void }) => {
+	const tone = THREAD_STATUS_TONE[status] ?? 'muted';
+	return (
+		<span className={`thread-status-pill status-${tone}`}>
+			<span className="status-dot" />
+			<select value={status.toString()} onChange={e => onChange(e.target.value)}>
+				{ThreadStatusOrder.map(s => (
+					<option key={s} value={s}>
+						{ThreadStatus[s]}
+					</option>
+				))}
+			</select>
+		</span>
+	);
+};
+
 const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestCommentThread; currentUser: Identity }) => {
 	const { replyThread, openDiff, changeThreadStatus } = useContext(PullRequestContext);
 	const [inEditMode, setEditMode] = useState(false);
+
+	const status = thread.status ?? 0;
+	const hasStatus = ThreadStatusOrder.includes(status.toString());
+	const isResolved = RESOLVED_STATUSES.includes(status);
+	// Per-render collapse state (no persistence); resolved threads start collapsed so long PRs aren't
+	// buried in settled conversations, but they stay one click away. Only ever hides content while the
+	// thread is still resolved - reopening via the (always-visible) header pill can't strand a
+	// collapsed thread with its comments hidden and no toggle to reveal them.
+	const [collapsed, setCollapsed] = useState(isResolved);
+	const contentHidden = isResolved && collapsed;
 
 	const onCancel = () => {
 		setEditMode(false);
@@ -213,43 +269,54 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 		}
 	};
 
-	const onThreadStatusChange = async status => {
-		await changeThreadStatus(parseInt(status), thread);
+	const onThreadStatusChange = async (newStatus: string) => {
+		await changeThreadStatus(parseInt(newStatus), thread);
 	};
 
+	const hasFile = !!thread.threadContext && !!thread.threadContext.filePath;
+	const commentCount = thread.comments.length;
+
 	return (
-		<div className="thread-container">
-			{!!thread.threadContext && !!thread.threadContext.filePath ? (
-				<div className="diff-container diff">
-					<div className="diffHeader">
-						<a className="diffPath" onClick={() => openDiff(thread)}>
+		<div className={`thread-container${isResolved ? ' resolved' : ''}`}>
+			{hasFile || hasStatus ? (
+				<div className="thread-header">
+					{hasFile ? (
+						// item 2: real button so the diff opens via keyboard too (was a click-only <a>).
+						<button type="button" className="thread-file-chip" onClick={() => openDiff(thread)}>
 							{thread.threadContext.filePath}
-						</a>
-					</div>
+						</button>
+					) : null}
+					{hasStatus ? <ThreadStatusPill status={status} onChange={onThreadStatusChange} /> : null}
 				</div>
 			) : null}
-			{thread.comments.map(c => (
-				<CommentView
-					key={c.id}
-					headerInEditMode
-					{...c}
-					canEdit={c.author.id === currentUser.id}
-					threadId={thread.id}
-					isFirstCommentInThread={c.id === 1}
-					threadStatus={thread.status}
-					changeThreadStatus={status => onThreadStatusChange(status)}
-				/>
-			))}
-			{!inEditMode ? (
-				<div className="reply-thread">
-					<button title="Reply" onClick={() => setEditMode(true)}>
-						Reply
-					</button>
-				</div>
-			) : (
-				/* <input id='reply'	value='Reply' onClick={ (e) => { e.}} className='secondary' disabled={isBusy} /> */
-				<ReplyToThread onSave={onSave} onCancel={onCancel} />
-			)}
+			{isResolved ? (
+				<button className="thread-collapse-toggle" aria-expanded={!contentHidden} onClick={() => setCollapsed(c => !c)}>
+					<span className={`thread-chevron${contentHidden ? '' : ' expanded'}`}>{chevronIcon}</span>
+					{commentCount} comment{commentCount === 1 ? '' : 's'} · resolved
+				</button>
+			) : null}
+			{!contentHidden ? (
+				<>
+					{thread.comments.map(c => (
+						<CommentView
+							key={c.id}
+							headerInEditMode
+							{...c}
+							canEdit={c.author.id === currentUser.id}
+							threadId={thread.id}
+						/>
+					))}
+					{!inEditMode ? (
+						// Full-width ghost field (not a lone right-aligned button) so it's obvious which
+						// thread you're replying to - the ambiguity flagged in review.
+						<button className="reply-ghost" onClick={() => setEditMode(true)}>
+							Reply…
+						</button>
+					) : (
+						<ReplyToThread onSave={onSave} onCancel={onCancel} />
+					)}
+				</>
+			) : null}
 		</div>
 	);
 };

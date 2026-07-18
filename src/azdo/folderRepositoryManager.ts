@@ -9,6 +9,7 @@ import {
 	GitPullRequestSearchCriteria,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { PolicyConfiguration } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as vscode from 'vscode';
 import type { Repository, UpstreamRef } from '../api/api';
 import { GitApiImpl, GitErrorCodes, RefType } from '../api/api1';
@@ -23,10 +24,18 @@ import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from '../constants';
 import { AzdoRepository } from './azdoRepository';
 import { CredentialStore } from './credentials';
 import { FileReviewedStatusService } from './fileReviewedStatusService';
-import { IAccount, IPullRequestsPagingOptions, PRType, RepoAccessAndMergeMethods } from './interface';
+import { getGitPolicyConfigApi } from './gitPolicyConfigApi';
+import { IAccount, IPullRequestsPagingOptions, MergeMethodsAvailability, PRType, RepoAccessAndMergeMethods } from './interface';
 import { PullRequestGitHelper, PullRequestMetadata } from './pullRequestGitHelper';
 import { PullRequestModel } from './pullRequestModel';
-import { convertRESTIdentityToAccount, getRelatedUsersFromPullrequest, loginComparator, UserCompletion } from './utils';
+import {
+	computeMergeMethodsAvailability,
+	convertRESTIdentityToAccount,
+	getRelatedUsersFromPullrequest,
+	loginComparator,
+	matchesRefScope,
+	UserCompletion,
+} from './utils';
 
 interface PageInformation {
 	pullRequestPage: number;
@@ -113,6 +122,12 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	private _gitBlameCache: { [key: string]: string } = {};
 	private _githubManager: AzdoManager;
 	private _repositoryPageInformation: Map<string, PageInformation> = new Map<string, PageInformation>();
+	// AC-04: keyed by `${repositoryId}:${targetRefName}` - branch policies change rarely, so a short TTL
+	// avoids re-fetching on every panel poll while still picking up edits within a review session.
+	private _mergeMethodsAvailabilityCache: Map<
+		string,
+		{ expiresAt: number; availability: MergeMethodsAvailability }
+	> = new Map();
 
 	private _onDidChangeActivePullRequest = new vscode.EventEmitter<void>();
 	readonly onDidChangeActivePullRequest: vscode.Event<void> = this._onDidChangeActivePullRequest.event;
@@ -788,6 +803,20 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								}),
 								hasMorePages: false,
 							};
+						} else if (type === PRType.AllStatuses) {
+							// Every other category here hardcodes status: Active, so a completed or
+							// abandoned PR has no tree category to browse back to at all - the PR panel
+							// itself still refreshes to show the completed state if left open, but there
+							// was no way to reopen one once its panel was closed (found while verifying
+							// AC-08's post-completion cleanup prompt, which needs a completed PR to click
+							// into). PullRequestStatus.All is documented as "used in pull request search
+							// criteria to include all statuses" (GitInterfaces.d.ts:2853).
+							return {
+								items: await azdoRepository.getPullRequests({
+									status: PullRequestStatus.All,
+								}),
+								hasMorePages: false,
+							};
 						} else {
 							return { items: await azdoRepository.getPullRequests(prSearchCriteria!), hasMorePages: false };
 						}
@@ -1340,16 +1369,91 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		return branch;
 	}
 
-	async getPullRequestRepositoryAccessAndMergeMethods(_pullRequest: PullRequestModel): Promise<RepoAccessAndMergeMethods> {
+	async getPullRequestRepositoryAccessAndMergeMethods(pullRequest: PullRequestModel): Promise<RepoAccessAndMergeMethods> {
 		return {
+			// Permissions are out of AC-04 scope - stays hardcoded per the design doc.
 			hasWritePermission: true,
-			mergeMethodsAvailability: {
-				NoFastForward: true,
-				Squash: true,
-				Rebase: true,
-				RebaseMerge: true,
-			},
+			mergeMethodsAvailability: await this.getMergeMethodsAvailability(pullRequest),
 		};
+	}
+
+	/**
+	 * AC-04: restrict merge strategies by the target branch's "Limit merge types" policy instead of the
+	 * previous hardcoded all-true, so the MergeSelect "(not enabled)" UI and the default-strategy picker
+	 * both reflect what the server will actually accept at completion.
+	 */
+	private async getMergeMethodsAvailability(pullRequest: PullRequestModel): Promise<MergeMethodsAvailability> {
+		const ALL_ENABLED: MergeMethodsAvailability = { NoFastForward: true, Squash: true, Rebase: true, RebaseMerge: true };
+
+		try {
+			const azdoRepo = await pullRequest.azdoRepository.ensure();
+			const repoId = await azdoRepo.getRepositoryId();
+			const projectId = (await azdoRepo.getMetadata())?.project?.id;
+			const targetRefName = pullRequest.item.targetRefName;
+			if (!repoId || !projectId || !targetRefName) {
+				return ALL_ENABLED;
+			}
+
+			const cacheKey = `${repoId}:${targetRefName}`;
+			const cached = this._mergeMethodsAvailabilityCache.get(cacheKey);
+			if (cached && cached.expiresAt > Date.now()) {
+				return cached.availability;
+			}
+
+			const configurations = await this.fetchMergeStrategyPolicyConfigurations(
+				azdoRepo,
+				projectId,
+				repoId,
+				targetRefName,
+			);
+			const availability = computeMergeMethodsAvailability(configurations);
+
+			this._mergeMethodsAvailabilityCache.set(cacheKey, { expiresAt: Date.now() + 60_000, availability });
+			return availability;
+		} catch (e) {
+			Logger.appendLine(
+				`AC-04: computing merge-strategy availability failed, defaulting to all enabled: ${e}`,
+				FolderRepositoryManager.ID,
+			);
+			return ALL_ENABLED;
+		}
+	}
+
+	/**
+	 * AC-04: prefer the server-side branch-scoped route (correct Prefix/DefaultBranch matching, no
+	 * client-side guessing); fall back to PolicyApi.getPolicyConfigurations + client-side scope
+	 * filtering if that (unwrapped, 10.2.2-absent) route errors.
+	 */
+	private async fetchMergeStrategyPolicyConfigurations(
+		azdoRepo: AzdoRepository,
+		projectId: string,
+		repositoryId: string,
+		targetRefName: string,
+	): Promise<PolicyConfiguration[]> {
+		const webApi = azdoRepo.azdo?.connection;
+		if (webApi) {
+			try {
+				const gitPolicyConfigApi = await getGitPolicyConfigApi(webApi);
+				const configurations = await gitPolicyConfigApi?.getPolicyConfigurationsForRef(
+					projectId,
+					repositoryId,
+					targetRefName,
+				);
+				if (configurations) {
+					return configurations;
+				}
+			} catch (e) {
+				Logger.appendLine(
+					`AC-04: branch-scoped policy configurations route failed, falling back to client-side scope filter: ${e}`,
+					FolderRepositoryManager.ID,
+				);
+			}
+		}
+
+		const policyApi = await webApi?.getPolicyApi();
+		const all = (await policyApi?.getPolicyConfigurations(projectId)) ?? [];
+		const defaultBranchRefName = `refs/heads/${await azdoRepo.getDefaultBranch()}`;
+		return all.filter(config => matchesRefScope(config, repositoryId, targetRefName, defaultBranchRefName));
 	}
 
 	//#region Git related APIs

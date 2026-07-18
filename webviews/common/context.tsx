@@ -48,12 +48,20 @@ export class PRContext {
 
 	public checkMergeability = () => this.postMessage({ command: 'pr.checkMergeability' });
 
+	public checkStatus = () => this.postMessage({ command: 'pr.checkStatus' });
+
+	public checkPolicies = () => this.postMessage({ command: 'pr.checkPolicies' });
+
+	public requeuePolicy = (evaluationId: string) => this.postMessage({ command: 'pr.requeue-policy', args: { evaluationId } });
+
 	public merge = (args: { title: string; description: string; method: MergeMethod }) =>
 		this.postMessage({ command: 'azdopr.merge', args });
 
 	public deleteBranch = () => this.postMessage({ command: 'pr.deleteBranch' });
 
 	public readyForReview = () => this.postMessage({ command: 'azdopr.readyForReview' });
+
+	public convertToDraft = () => this.postMessage({ command: 'azdopr.convertToDraft' });
 
 	public replyThread = async (body: string, thread: GitPullRequestCommentThread) => {
 		const result = await this.postMessage({ command: 'pr.reply-thread', args: { text: body, threadId: thread.id } });
@@ -146,9 +154,30 @@ export class PRContext {
 		}
 	};
 
-	public complete = async (args: { deleteSourceBranch: boolean; completeWorkitem: boolean; mergeStrategy: string }) => {
+	public complete = async (args: {
+		deleteSourceBranch: boolean;
+		transitionWorkItems: boolean;
+		mergeStrategy: string;
+		mergeCommitMessage?: string;
+	}) => {
 		const options = { ...args, mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy] };
 		const result = await this.postMessage({ command: 'pr.complete', args: options });
+		this.updatePR(result);
+	};
+
+	public setAutoComplete = async (args: {
+		deleteSourceBranch: boolean;
+		transitionWorkItems: boolean;
+		mergeStrategy: string;
+		mergeCommitMessage?: string;
+	}) => {
+		const options = { ...args, mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy] };
+		const result = await this.postMessage({ command: 'pr.set-autocomplete', args: { enable: true, options } });
+		this.updatePR(result);
+	};
+
+	public cancelAutoComplete = async () => {
+		const result = await this.postMessage({ command: 'pr.set-autocomplete', args: { enable: false } });
 		this.updatePR(result);
 	};
 

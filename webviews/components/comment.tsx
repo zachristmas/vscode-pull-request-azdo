@@ -3,13 +3,14 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { Comment, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { Comment } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { prism, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import gfm from 'remark-gfm';
 
+import { PullRequestVote } from '../../src/azdo/interface';
 import { PullRequest, ReviewType } from '../common/cache';
 import PullRequestContext from '../common/context';
 import emitter from '../common/events';
@@ -27,23 +28,16 @@ export type Props = Partial<Comment> & {
 	isPRDescription?: boolean;
 	threadId: number;
 	canEdit?: boolean;
-	isFirstCommentInThread?: boolean;
-	threadStatus?: number;
-	changeThreadStatus?: (string) => void;
 };
 
 export function CommentView(comment: Props) {
-	const { threadId, content, canEdit, isPRDescription, threadStatus, isFirstCommentInThread, changeThreadStatus } = comment;
+	const { threadId, content, canEdit, isPRDescription } = comment;
 	const id = threadId * 1000 + comment.id;
 	const [bodyMd, setBodyMd] = useStateProp(content);
 	const [bodyHTMLState, setBodyHtml] = useStateProp(content);
 	const { editComment, setDescription, pr } = useContext(PullRequestContext);
 	const currentDraft = pr.pendingCommentDrafts && pr.pendingCommentDrafts[id];
 	const [inEditMode, setEditMode] = useState(!!currentDraft);
-	const [showActionBar, setShowActionBar] = useState(false);
-	const statusProps = !!isFirstCommentInThread
-		? { threadStatus: threadStatus, changeThreadStatus: changeThreadStatus }
-		: null;
 
 	if (inEditMode) {
 		return React.cloneElement(comment.headerInEditMode ? <CommentBox for={comment} /> : <></>, {}, [
@@ -73,25 +67,20 @@ export function CommentView(comment: Props) {
 	}
 
 	return (
-		<CommentBox
-			for={comment}
-			onMouseEnter={() => setShowActionBar(true)}
-			onMouseLeave={() => setShowActionBar(false)}
-			{...statusProps}
-		>
-			{showActionBar ? (
-				<div className="action-bar comment-actions">
-					<button title="Quote reply" onClick={() => emitter.emit('quoteReply', bodyMd)}>
-						{commentIcon}
+		<CommentBox for={comment}>
+			{/* UX-03: always rendered, shown by CSS on hover AND :focus-within so keyboard users can
+			    reach quote/edit (the old showActionBar state was mouse-only). */}
+			<div className="action-bar comment-actions">
+				<button title="Quote reply" onClick={() => emitter.emit('quoteReply', bodyMd)}>
+					{commentIcon}
+				</button>
+				{canEdit ? (
+					<button title="Edit comment" onClick={() => setEditMode(true)}>
+						{editIcon}
 					</button>
-					{canEdit ? (
-						<button title="Edit comment" onClick={() => setEditMode(true)}>
-							{editIcon}
-						</button>
-					) : null}
-					{/* {canDelete ? <button title='Delete comment' onClick={() => deleteComment({ id, pullRequestReviewId })} >{deleteIcon}</button> : null} */}
-				</div>
-			) : null}
+				) : null}
+				{/* {canDelete ? <button title='Delete comment' onClick={() => deleteComment({ id, pullRequestReviewId })} >{deleteIcon}</button> : null} */}
+			</div>
 			<CommentBody
 				commentContent={comment.content}
 				commentId={comment.id}
@@ -103,29 +92,15 @@ export function CommentView(comment: Props) {
 	);
 }
 
-export const ThreadStatus = {
-	'0': 'UNKNOWN',
-	'1': 'Active',
-	'2': 'Fixed',
-	'3': 'WontFix',
-	'4': 'Closed',
-	// '5': 'ByDesign',
-	'6': 'Pending',
-};
-
-const ThreadStatusOrder = ['1', '6', '2', '3', '4'];
-
 type CommentBoxProps = {
 	for: Partial<Comment>;
 	header?: React.ReactChild;
 	onMouseEnter?: any;
 	onMouseLeave?: any;
 	children?: any;
-	threadStatus?: number;
-	changeThreadStatus?: (string) => void;
 };
 
-function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children, threadStatus, changeThreadStatus }: CommentBoxProps) {
+function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children }: CommentBoxProps) {
 	const { author, publishedDate, _links } = comment;
 	const htmlUrl = _links.self.href;
 	return (
@@ -150,15 +125,8 @@ function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children, thread
 							</>
 							: null
 					} */}
-						{!!threadStatus ? (
-							<select onChange={e => changeThreadStatus(e.target.value)} defaultValue={threadStatus.toString()}>
-								{ThreadStatusOrder.map(status => (
-									<option key={status} value={status}>
-										{ThreadStatus[status]}
-									</option>
-								))}
-							</select>
-						) : null}
+						{/* UX-03: the thread status control moved to the thread header (CommentEventView in
+						    timeline.tsx), which owns thread.status - no more per-comment c.id===1 guessing. */}
 					</Spaced>
 				</div>
 				{children}
@@ -177,6 +145,10 @@ type EditCommentProps = {
 	onCancel: () => void;
 	onSave: (body: string) => Promise<any>;
 };
+
+// UX-03: surface the composer affordances. The Cmd/Ctrl+Enter submit handler already exists on every
+// composer; this just makes it (and markdown support) discoverable.
+const ComposerHint = () => <div className="composer-hint">Markdown supported · Cmd/Ctrl+Enter to submit</div>;
 
 function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 	const { updateDraft } = useContext(PullRequestContext);
@@ -231,7 +203,10 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 
 	return (
 		<form ref={form} onSubmit={onSubmit}>
-			<textarea name="markdown" defaultValue={body} onKeyDown={onKeyDown} onInput={onInput} />
+			{/* item 5: focus the textarea when this composer swaps in (Edit clicked), so the caret lands
+			    where the user is about to type without a manual click. */}
+			<textarea name="markdown" autoFocus defaultValue={body} onKeyDown={onKeyDown} onInput={onInput} />
+			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
 					Cancel
@@ -252,9 +227,12 @@ export interface Embodied {
 
 const renderers = {
 	code: ({ language, value }) => {
+		// UX-03: match the editor theme instead of hardcoding dracula (purple-on-dark inside a light
+		// VS Code). VS Code stamps document.body with vscode-light / vscode-dark / vscode-high-contrast.
+		const isLight = document.body.classList.contains('vscode-light');
 		return (
 			<SyntaxHighlighter
-				style={dracula}
+				style={isLight ? prism : vscDarkPlus}
 				language={language}
 				showLineNumbers={true}
 				wrapLongLines={true}
@@ -266,9 +244,11 @@ const renderers = {
 
 export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, body }: Embodied) => {
 	if (!body && !bodyHTML) {
+		// UX-03: dashed-border muted placeholder rather than a bare line - it reads as a fillable slot
+		// (Edit lives in the hover/focus actions, canEdit permitting).
 		return (
 			<div className="comment-body">
-				<em>No description provided.</em>
+				<div className="description-placeholder text-muted">No description provided</div>
 			</div>
 		);
 	}
@@ -329,7 +309,10 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 
 	return (
 		<form ref={form} onSubmit={onSubmit}>
-			<textarea name="markdown" onKeyDown={onKeyDown} />
+			{/* item 5: focus the textarea when the ghost Reply field swaps in, so the user can type
+			    immediately without clicking into it. */}
+			<textarea name="markdown" autoFocus onKeyDown={onKeyDown} />
+			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
 					Cancel
@@ -340,7 +323,7 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 	);
 }
 
-export function AddComment({ pendingCommentText, state, hasWritePermission, isIssue }: PullRequest) {
+export function AddComment({ pendingCommentText, hasWritePermission, isIssue, isActive }: PullRequest & { isActive: boolean }) {
 	const { updatePR, comment, close } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 	const form = useRef<HTMLFormElement>();
@@ -403,15 +386,12 @@ export function AddComment({ pendingCommentText, state, hasWritePermission, isIs
 				value={pendingCommentText}
 				placeholder="Leave a comment"
 			/>
+			<ComposerHint />
 			<div className="form-actions">
-				{hasWritePermission && !isIssue ? (
-					<button
-						id="close"
-						className="secondary"
-						disabled={isBusy || state !== PullRequestStatus.Active}
-						onClick={onClick}
-						data-command="close"
-					>
+				{/* UX-02: drop the Close button entirely on a finished PR (§2.2) rather than rendering it
+				    disabled. The comment box itself stays - ADO allows commenting on completed PRs. */}
+				{hasWritePermission && !isIssue && isActive ? (
+					<button id="close" className="secondary" disabled={isBusy} onClick={onClick} data-command="close">
 						Close Pull Request
 					</button>
 				) : null}
@@ -434,20 +414,28 @@ const COMMENT_METHODS = {
 };
 
 export const AddCommentSimple = (pr: PullRequest) => {
-	const { updatePR, requestChanges, comment } = useContext(PullRequestContext);
+	const { updatePR, votePullRequest, submit } = useContext(PullRequestContext);
 	const textareaRef = useRef<HTMLTextAreaElement>();
 
 	async function submitAction(selected: string): Promise<void> {
 		const { value } = textareaRef.current;
 		switch (selected) {
-			case ReviewType.RequestChanges:
-				await requestChanges(value);
+			case ReviewType.Approve:
+				// Optionally post the typed text as a comment first, then record the ADO vote.
+				if (value) {
+					await submit(value);
+				}
+				await votePullRequest(PullRequestVote.APPROVED);
 				break;
-			// case ReviewType.Approve:
-			// 	await votePullRequest(value);
-			// 	break;
+			case ReviewType.RequestChanges:
+				// ADO's closest idiom to "request changes" is Waiting for author (-5).
+				if (value) {
+					await submit(value);
+				}
+				await votePullRequest(PullRequestVote.WAITING_FOR_AUTHOR);
+				break;
 			default:
-				await comment(value);
+				await submit(value);
 		}
 		updatePR({ pendingCommentText: '', pendingReviewType: undefined });
 	}

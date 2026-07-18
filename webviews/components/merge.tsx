@@ -3,11 +3,19 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { BuildResult } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { GitStatusState, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
 import { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
-import { MergeMethod, PullRequestChecks, PullRequestMergeability } from '../../src/azdo/interface';
+import {
+	MergeMethod,
+	PullRequestChecks,
+	PullRequestCompletionSummary,
+	PullRequestMergeability,
+	PullRequestPolicyEvaluation,
+} from '../../src/azdo/interface';
 import { groupBy } from '../../src/common/utils';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
@@ -17,11 +25,21 @@ import { alertIcon, checkIcon, deleteIcon, pendingIcon } from './icon';
 import { nbsp } from './space';
 import { Avatar } from './user';
 
+// UX-05: check/delete/dot are shared gray glyphs; wrapping them in a text-* class recolors them
+// (CSS fill: currentColor) so the status/policy icons match their summary line, not stay gray.
+const successIcon = <span className="text-success">{checkIcon}</span>;
+const dangerIcon = <span className="text-danger">{deleteIcon}</span>;
+const mutedIcon = <span className="text-muted">{pendingIcon}</span>;
+
 export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
 	if (pr.isIssue) {
 		return null;
 	}
-	const { state, status } = pr;
+	const { state } = pr;
+	const { checkStatus } = useContext(PullRequestContext);
+	// POL-09: statuses were fetched once per overview load; refresh them on the same 3s cycle the
+	// mergeability poll already uses so build results update without reopening the panel.
+	const [status, setStatus] = useState(pr.status);
 	const [showDetails, toggleDetails] = useReducer(
 		show => !show,
 		status.statuses.some(s => s.state === GitStatusState.Failed),
@@ -39,29 +57,56 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 		}
 	}, status.statuses);
 
+	useEffect(() => {
+		const handle = setInterval(async () => {
+			// UX-04: don't poll a hidden tab (retainContextWhenHidden keeps this webview alive); the host
+			// refreshes on became-visible instead. (item 3)
+			if (document.hidden) {
+				return;
+			}
+			// Only re-fetch while checks are actively running (mirrors the mergeability poll, which stops
+			// once resolved). Avoids an unbounded 3s API poll when statuses are terminal or absent; the
+			// manual Refresh button covers later re-runs.
+			if (status.state !== GitStatusState.Pending) {
+				return;
+			}
+			const fresh = await checkStatus();
+			if (fresh) {
+				setStatus(fresh);
+			}
+		}, 3000);
+		return () => clearInterval(handle);
+	});
+
 	return (
 		<div id="status-checks">
 			{state === PullRequestStatus.Completed ? (
 				<>
-					<div className="branch-status-message">{'Pull request successfully merged.'}</div>
-					{/* <DeleteBranch {...pr} /> */}
+					<div className="branch-status-message text-success">{'Pull request successfully merged.'}</div>
+					{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
+					    default branch when the deleted branch is active) already existed but was
+					    unreachable here - nothing offered to clean up the now-merged branch. */}
+					<DeleteBranch {...pr} />
 				</>
 			) : state === PullRequestStatus.Abandoned ? (
 				<>
-					<div className="branch-status-message">{'This pull request is abondoned.'}</div>
+					<div className="branch-status-message text-muted">{'This pull request is abandoned.'}</div>
 					{/* <DeleteBranch {...pr} /> */}
 				</>
 			) : (
 				<>
+					<PolicySection pr={pr} />
 					{status.statuses.length ? (
 						<>
 							<div className="status-section">
 								<div className="status-item">
 									<StateIcon state={status.state} />
-									<div>{getSummaryLabel(status.statuses)}</div>
-									<a aria-role="button" onClick={toggleDetails}>
+									<div className={statusStateTextClass(status.state)}>{getSummaryLabel(status.statuses)}</div>
+									{/* item 2: real button so it's keyboard-operable (was <a aria-role> - not focusable,
+									    and aria-role is not a valid attribute). */}
+									<button type="button" className="link-button" onClick={toggleDetails}>
 										{showDetails ? 'Hide' : 'Show'}
-									</a>
+									</button>
 								</div>
 								{showDetails ? <StatusCheckDetails statuses={status.statuses} /> : null}
 							</div>
@@ -84,46 +129,388 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 
 	const [mergeable, setMergeability] = useState(_mergeable);
 	const { checkMergeability } = useContext(PullRequestContext);
+	// UX-04: throttle the armed-auto-complete wait to ~15s (item 3). useRef so the timestamp survives the
+	// re-render this effect triggers - the effect has no deps and re-creates the interval each render.
+	const lastArmedPoll = useRef(0);
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
-			if (mergeable === PullRequestMergeability.NotSet || mergeable === PullRequestMergeability.Queued) {
-				setMergeability(await checkMergeability());
+			// UX-04: pause polling while the tab is hidden; the host refreshes on became-visible. (item 3)
+			if (document.hidden) {
+				return;
+			}
+			// AC-02: keep polling mergeability while auto-complete is armed too, so the merge-status text
+			// picks up Succeeded once the server completes the PR - not just while NotSet/Queued.
+			const autoCompleteArmed = !!pr.autoCompleteSetBy && pr.state === PullRequestStatus.Active;
+			const activelyChecking =
+				mergeable === PullRequestMergeability.NotSet || mergeable === PullRequestMergeability.Queued;
+			if (!activelyChecking && !autoCompleteArmed) {
+				return;
+			}
+			// When the only reason to poll is the armed-auto-complete wait (nothing is actively
+			// resolving), back off to 15s - a 3s cadence there is the refresh storm UX-04 flagged.
+			if (!activelyChecking && autoCompleteArmed) {
+				const now = Date.now();
+				if (now - lastArmedPoll.current < 15000) {
+					return;
+				}
+				lastArmedPoll.current = now;
+			}
+			setMergeability(await checkMergeability());
+		}, 3000);
+		return () => clearInterval(handle);
+	});
+
+	return <AutoCompleteSection pr={{ ...pr, mergeable }} isSimple={isSimple} />;
+};
+
+// AC-02: derives NONE/completable, NONE/blocked, SET_BY_ME, SET_BY_OTHER, COMPLETED per render from
+// { autoCompleteSetBy, currentUser, policies, mergeable, state } - nothing new is stored beyond what
+// the poll above already refreshes.
+const AutoCompleteSection = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
+	const { cancelAutoComplete } = useContext(PullRequestContext);
+	const [isBusy, setBusy] = useState(false);
+
+	const mergeStatus = (
+		<MergeStatus
+			mergeable={pr.mergeable}
+			isSimple={isSimple}
+			mergeFailureMessage={pr.mergeFailureMessage}
+			hasPolicySection={!!pr.policies?.length}
+		/>
+	);
+
+	if (pr.state === PullRequestStatus.Completed) {
+		return <span>{mergeStatus}</span>;
+	}
+
+	if (pr.autoCompleteSetBy) {
+		// currentUser is absent from the activity-bar sidebar's init payload (isAuthor-only) - treat
+		// missing currentUser as "show the name, never assume it's me" rather than erroring.
+		const isMe = pr.currentUser?.id === pr.autoCompleteSetBy.id;
+		const canCancel = isMe || pr.hasWritePermission;
+		const label = isMe ? 'you' : pr.autoCompleteSetBy.name || 'another user';
+		const summary = summarizeCompletionOptions(pr.autoCompleteOptions);
+
+		const cancel = async () => {
+			try {
+				setBusy(true);
+				await cancelAutoComplete();
+			} finally {
+				setBusy(false);
+			}
+		};
+
+		return (
+			<span>
+				{mergeStatus}
+				<div className="status-section">
+					{/* .status-item is display:flex - putting the button inside it crammed both onto one
+					    line; give the button its own row instead. */}
+					<div className="status-item">
+						Auto-complete set by {label}
+						{summary ? ` (${summary})` : ''}
+					</div>
+					{canCancel ? (
+						<div className="auto-complete-cancel">
+							<button disabled={isBusy} onClick={cancel}>
+								Cancel auto-complete
+							</button>
+						</div>
+					) : null}
+				</div>
+			</span>
+		);
+	}
+
+	return (
+		<span>
+			{mergeStatus}
+			<PrActions pr={pr} isSimple={isSimple} />
+		</span>
+	);
+};
+
+function summarizeCompletionOptions(options?: PullRequestCompletionSummary): string {
+	if (!options) {
+		return '';
+	}
+	const parts: string[] = [];
+	if (options.mergeStrategy) {
+		parts.push(MERGE_METHODS[options.mergeStrategy] ?? options.mergeStrategy);
+	}
+	if (options.deleteSourceBranch) {
+		parts.push('delete branch');
+	}
+	if (options.transitionWorkItems) {
+		parts.push('complete work items');
+	}
+	return parts.join(', ');
+}
+
+export default StatusChecks;
+
+// AC-02/POL-01: a blocking policy that is Queued/Running/Rejected/Broken is one that still stands
+// between this PR and completion. Rejected/Broken are deliberately included: a rejected build
+// validation still auto-completes after a re-run passes, so this is the single signal both the POL-01
+// summary row and (later) AC-02's Set-auto-complete show/hide logic key off of - they can never disagree
+// about whether the PR is blocked.
+export function pendingBlockingPolicies(policies?: PullRequestPolicyEvaluation[]): PullRequestPolicyEvaluation[] {
+	return (policies ?? []).filter(
+		p =>
+			p.isBlocking &&
+			(p.status === PolicyEvaluationStatus.Queued ||
+				p.status === PolicyEvaluationStatus.Running ||
+				p.status === PolicyEvaluationStatus.Rejected ||
+				p.status === PolicyEvaluationStatus.Broken),
+	);
+}
+
+// POL-01: the "why can't this complete" panel. Renders nothing when `policies` is undefined (fetch
+// unavailable/failed - e.g. on-prem servers without the preview evaluations route) or empty (no branch
+// policies apply); this is strictly additive over today's checks section.
+const PolicySection = ({ pr }: { pr: PullRequest }) => {
+	const { checkPolicies } = useContext(PullRequestContext);
+	const [policies, setPolicies] = useState(pr.policies);
+	// UX-04: throttle the armed-auto-complete wait to ~15s (item 3); useRef survives the effect's
+	// per-render interval re-creation.
+	const lastArmedPoll = useRef(0);
+
+	const pending = pendingBlockingPolicies(policies);
+	const [showDetails, toggleDetails] = useReducer(
+		show => !show,
+		(policies ?? []).some(
+			p =>
+				p.status === PolicyEvaluationStatus.Rejected ||
+				p.status === PolicyEvaluationStatus.Broken ||
+				p.status === PolicyEvaluationStatus.Running,
+		),
+	) as [boolean, () => void];
+
+	useEffect(() => {
+		const handle = setInterval(async () => {
+			// UX-04: pause polling while the tab is hidden; the host refreshes on became-visible. (item 3)
+			if (document.hidden) {
+				return;
+			}
+			// Self-limiting like the mergeability/status polls: keep refreshing only while something
+			// could still change - a policy is actively evaluating, or auto-complete is armed and
+			// waiting to observe server-side completion (POL-01/AC-02 share this poll).
+			const stillEvaluating = (policies ?? []).some(
+				p => p.status === PolicyEvaluationStatus.Queued || p.status === PolicyEvaluationStatus.Running,
+			);
+			const autoCompleteArmed = !!pr.autoCompleteSetBy && pr.state === PullRequestStatus.Active;
+			if (!stillEvaluating && !autoCompleteArmed) {
+				return;
+			}
+			// Back off the armed-only wait (nothing actively evaluating) to 15s to avoid the refresh
+			// storm UX-04 flagged.
+			if (!stillEvaluating && autoCompleteArmed) {
+				const now = Date.now();
+				if (now - lastArmedPoll.current < 15000) {
+					return;
+				}
+				lastArmedPoll.current = now;
+			}
+			const fresh = await checkPolicies();
+			if (fresh) {
+				setPolicies(fresh);
 			}
 		}, 3000);
 		return () => clearInterval(handle);
 	});
 
+	if (!policies || policies.length === 0) {
+		return null;
+	}
+
+	const summaryLabel =
+		pending.length > 0
+			? `${pending.length} blocking ${pending.length === 1 ? 'policy' : 'policies'} not satisfied`
+			: 'All branch policies passed';
+
 	return (
-		<span>
-			<MergeStatus mergeable={mergeable} isSimple={isSimple} />
-			<PrActions pr={{ ...pr, mergeable }} isSimple={isSimple} />
-		</span>
+		<div className="status-section policy-section">
+			<div className="status-item">
+				<PolicyStatusIcon
+					status={pending.length > 0 ? PolicyEvaluationStatus.Rejected : PolicyEvaluationStatus.Approved}
+				/>
+				<div className={pending.length > 0 ? 'text-danger' : 'text-success'}>{summaryLabel}</div>
+				{/* item 2: real button so it's keyboard-operable (was <a aria-role>). */}
+				<button type="button" className="link-button" onClick={toggleDetails}>
+					{showDetails ? 'Hide' : 'Show'}
+				</button>
+			</div>
+			{showDetails ? <PolicyDetails policies={policies} onRequeue={setPolicies} /> : null}
+		</div>
 	);
 };
 
-export default StatusChecks;
+const PolicyDetails = ({
+	policies,
+	onRequeue,
+}: {
+	policies: PullRequestPolicyEvaluation[];
+	onRequeue: (fresh: PullRequestPolicyEvaluation[]) => void;
+}) => (
+	<div>
+		{policies.map(p => (
+			<PolicyRow key={p.evaluationId} policy={p} onRequeue={onRequeue} />
+		))}
+	</div>
+);
 
-export const MergeStatus = ({ mergeable, isSimple }: { mergeable: PullRequestMergeability; isSimple: boolean }) => {
+// POL-04: build-validation rows get number/result text, a Details link to the build's web UI, and a
+// requeue button. The button label covers all three states the same requeuePolicyEvaluation call
+// serves: Re-run (has a build), Re-queue (build expired), Queue (manual-queue policy, no build yet).
+const PolicyRow = ({
+	policy,
+	onRequeue,
+}: {
+	policy: PullRequestPolicyEvaluation;
+	onRequeue: (fresh: PullRequestPolicyEvaluation[]) => void;
+}) => {
+	const { requeuePolicy } = useContext(PullRequestContext);
+	const [isBusy, setBusy] = useState(false);
+
+	const requeue = useCallback(async () => {
+		try {
+			setBusy(true);
+			const fresh = await requeuePolicy(policy.evaluationId);
+			if (fresh) {
+				onRequeue(fresh);
+			}
+		} finally {
+			setBusy(false);
+		}
+	}, [requeuePolicy, policy.evaluationId, onRequeue]);
+
+	const buildLabel = policy.build?.isExpired ? 'Re-queue' : !policy.build?.buildId ? 'Queue' : 'Re-run';
+
+	return (
+		<div className="status-check">
+			<div>
+				<PolicyStatusIcon status={policy.status} />
+				<span className="status-check-detail-text">
+					{policy.displayName}
+					{policy.detail ? `: ${policy.detail}` : ''}
+					{policy.kind === 'build' ? `${buildDetailSuffix(policy)}` : ''}
+					{!policy.isBlocking ? ' (optional)' : ''}
+				</span>
+			</div>
+			{policy.kind === 'build' ? (
+				<div className="policy-build-actions">
+					{policy.build?.webUrl ? <a href={policy.build.webUrl}>Details</a> : null}
+					{nbsp}
+					<button disabled={isBusy} onClick={requeue}>
+						{isBusy ? 'Queuing...' : buildLabel}
+					</button>
+				</div>
+			) : null}
+		</div>
+	);
+};
+
+function buildDetailSuffix(policy: PullRequestPolicyEvaluation): string {
+	if (!policy.build?.buildId) {
+		return ' (build not queued)';
+	}
+	const resultText = buildResultText(policy.build.result);
+	const expiredText = policy.build.isExpired ? ', expired' : '';
+	return ` (Build ${policy.build.buildNumber ?? policy.build.buildId}${expiredText}${resultText ? `: ${resultText}` : ''})`;
+}
+
+function buildResultText(result?: number): string {
+	switch (result) {
+		case BuildResult.Succeeded:
+			return 'succeeded';
+		case BuildResult.PartiallySucceeded:
+			return 'partially succeeded';
+		case BuildResult.Failed:
+			return 'failed';
+		case BuildResult.Canceled:
+			return 'canceled';
+		default:
+			return '';
+	}
+}
+
+function PolicyStatusIcon({ status }: { status: PolicyEvaluationStatus }) {
+	switch (status) {
+		case PolicyEvaluationStatus.Approved:
+			return successIcon;
+		case PolicyEvaluationStatus.Rejected:
+		case PolicyEvaluationStatus.Broken:
+			return dangerIcon;
+		default:
+			return mutedIcon;
+	}
+}
+
+export const MergeStatus = ({
+	mergeable,
+	isSimple,
+	mergeFailureMessage,
+	hasPolicySection,
+}: {
+	mergeable: PullRequestMergeability;
+	isSimple: boolean;
+	mergeFailureMessage?: string;
+	hasPolicySection?: boolean;
+}) => {
 	return (
 		<div className="status-item status-section">
 			{isSimple
 				? null
 				: mergeable === PullRequestMergeability.Succeeded
-				? checkIcon
+				? successIcon
 				: mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure
-				? deleteIcon
-				: pendingIcon}
-			<div>
-				{mergeable === PullRequestMergeability.Succeeded
-					? 'This branch has no conflicts with the base branch.'
-					: mergeable === PullRequestMergeability.Queued
-					? 'Checking if this branch can be merged...'
-					: 'This branch has conflicts that must be resolved.'}
+				? dangerIcon
+				: mutedIcon}
+			<div className={mergeabilityTextClass(mergeable)}>
+				{getMergeabilityDescription(mergeable, mergeFailureMessage, hasPolicySection)}
 			</div>
 		</div>
 	);
 };
+
+// POL-02: a policy-blocked PR with a clean merge was previously described as "conflicts"; give each
+// PullRequestAsyncStatus its own copy instead of collapsing everything non-Succeeded to the conflict message.
+function getMergeabilityDescription(
+	mergeable: PullRequestMergeability,
+	mergeFailureMessage?: string,
+	hasPolicySection?: boolean,
+): string {
+	switch (mergeable) {
+		case PullRequestMergeability.Succeeded:
+			return 'This branch has no conflicts with the base branch.';
+		case PullRequestMergeability.Conflicts:
+			return 'This branch has conflicts that must be resolved.';
+		case PullRequestMergeability.RejectedByPolicy:
+			return `Completion is blocked by branch policy.${hasPolicySection ? ' See policies above.' : ''}`;
+		case PullRequestMergeability.Failure:
+			return mergeFailureMessage || 'This pull request could not be completed.';
+		case PullRequestMergeability.Queued:
+		case PullRequestMergeability.NotSet:
+		default:
+			return 'Checking if this branch can be merged...';
+	}
+}
+
+// UX-05: color the mergeability summary line so a clean merge and a blocked/conflicted one differ
+// by more than the leading icon.
+function mergeabilityTextClass(mergeable: PullRequestMergeability): string {
+	switch (mergeable) {
+		case PullRequestMergeability.Succeeded:
+			return 'text-success';
+		case PullRequestMergeability.Conflicts:
+		case PullRequestMergeability.RejectedByPolicy:
+		case PullRequestMergeability.Failure:
+			return 'text-danger';
+		default:
+			return 'text-muted';
+	}
+}
 
 export const ReadyForReview = () => {
 	const [isBusy, setBusy] = useState(false);
@@ -173,18 +560,26 @@ export const Merge = (pr: PullRequest) => {
 export const PrActions = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
 	const { hasWritePermission, canEdit, isDraft, mergeable } = pr;
 
-	return isDraft ? (
+	if (isDraft) {
 		// Only PR author and users with push rights can mark draft as ready for review
-		canEdit ? (
-			<ReadyForReview />
-		) : null
-	) : mergeable === PullRequestMergeability.Succeeded && hasWritePermission ? (
-		isSimple ? (
-			<MergeSimple {...pr} />
-		) : (
-			<Merge {...pr} />
-		)
-	) : null;
+		return canEdit ? <ReadyForReview /> : null;
+	}
+
+	// AC-02 NONE/blocked takes priority over NONE/completable: mergeable only reflects git
+	// mergeability (conflicts), not policy state - on a policy-governed repo mergeable is Succeeded
+	// almost all the time, with pending policies as the actual blocker (verified live: a PR with 2
+	// failing policies still reports mergeable: Succeeded). Checking mergeable first meant the
+	// immediate-merge button always won and "Set auto-complete" was unreachable in the common case,
+	// offering an action (immediate complete) that would just fail with a policy-rejected error.
+	if (hasWritePermission && pendingBlockingPolicies(pr.policies).length > 0) {
+		return <SetAutoComplete {...pr} />;
+	}
+
+	if (mergeable === PullRequestMergeability.Succeeded && hasWritePermission) {
+		return isSimple ? <MergeSimple {...pr} /> : <Merge {...pr} />;
+	}
+
+	return null;
 };
 
 export const MergeSimple = (pr: PullRequest) => {
@@ -208,42 +603,76 @@ export const MergeSimple = (pr: PullRequest) => {
 	return <Dropdown options={availableOptions} defaultOption={pr.defaultMergeMethod} submitAction={submitAction} />;
 };
 
-export const DeleteBranch = (pr: PullRequest) => {
+export const DeleteBranch = (_pr: PullRequest) => {
 	const { deleteBranch } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 
-	if (pr.head === 'UNKNOWN') {
-		return <div />;
-	} else {
-		return (
-			<div className="branch-status-container">
-				<form
-					onSubmit={async event => {
-						event.preventDefault();
+	// AC-08: this used to hide entirely when pr.head === 'UNKNOWN' - which is exactly what a
+	// completed PR shows once deleteSourceBranch already removed the remote branch, hiding the
+	// button for the PRs that most need local cleanup. The host-side pr.deleteBranch handler already
+	// handles "nothing to delete" gracefully (a warning toast), so just always offer it here.
+	return (
+		<div className="branch-status-container">
+			<form
+				onSubmit={async event => {
+					event.preventDefault();
 
-						try {
-							setBusy(true);
-							const result = await deleteBranch();
-							if (result && result.cancelled) {
-								setBusy(false);
-							}
-						} finally {
+					try {
+						setBusy(true);
+						const result = await deleteBranch();
+						if (result && result.cancelled) {
 							setBusy(false);
 						}
-					}}
-				>
-					<button disabled={isBusy} type="submit">
-						Delete branch
-					</button>
-				</form>
-			</div>
-		);
+					} finally {
+						setBusy(false);
+					}
+				}}
+			>
+				<button disabled={isBusy} type="submit">
+					Delete branch
+				</button>
+			</form>
+		</div>
+	);
+};
+
+export const SetAutoComplete = (pr: PullRequest) => {
+	const select = useRef<HTMLSelectElement>();
+	const [selectedMethod, selectMethod] = useState<MergeMethod | null>(null);
+
+	if (selectedMethod) {
+		return <ConfirmComplete pr={pr} method={selectedMethod} mode="autocomplete" cancel={() => selectMethod(null)} />;
 	}
+
+	return (
+		<div className="merge-select-container">
+			<button onClick={() => selectMethod(select.current.value as MergeMethod)}>Set auto-complete</button>
+			{nbsp}using method{nbsp}
+			<MergeSelect ref={select} {...pr} />
+		</div>
+	);
 };
 
 function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMethod; cancel: () => void }) {
-	const { complete } = useContext(PullRequestContext);
+	return <ConfirmComplete pr={pr} method={method} mode="complete" cancel={cancel} />;
+}
+
+// AC-02: one form for both completion paths - `mode` picks which context call fires on submit and
+// which submit label to show. Keeps ConfirmMerge and the auto-complete form from drifting apart.
+function ConfirmComplete({
+	pr,
+	method,
+	mode,
+	cancel,
+}: {
+	pr: PullRequest;
+	method: MergeMethod;
+	mode: 'complete' | 'autocomplete';
+	cancel: () => void;
+}) {
+	const { complete, setAutoComplete } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
+	const defaultCommitMessage = `Merged PR ${pr.number}: ${pr.title}`;
 
 	return (
 		<form
@@ -252,12 +681,18 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 
 				try {
 					setBusy(true);
-					const { completeWorkitem, deleteBranch }: any = event.target;
-					await complete({
+					const { transitionWorkItems, deleteBranch, mergeCommitMessage }: any = event.target;
+					const args = {
 						deleteSourceBranch: deleteBranch.checked,
-						completeWorkitem: completeWorkitem.checked,
+						transitionWorkItems: transitionWorkItems.checked,
 						mergeStrategy: method.toString(),
-					});
+						mergeCommitMessage: mergeCommitMessage.value.trim() || undefined,
+					};
+					if (mode === 'autocomplete') {
+						await setAutoComplete(args);
+					} else {
+						await complete(args);
+					}
 				} finally {
 					setBusy(false);
 				}
@@ -266,7 +701,7 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 			<div className="merge-option-container">
 				<div>
 					<label>
-						<input name="completeWorkitem" type="checkbox" defaultChecked={true} />
+						<input name="transitionWorkItems" type="checkbox" defaultChecked={true} />
 						Complete associated work items after merging
 					</label>
 				</div>
@@ -276,12 +711,21 @@ function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMe
 						Delete branch after merging
 					</label>
 				</div>
+				<div>
+					<label htmlFor="mergeCommitMessage">Merge commit message</label>
+					<textarea name="mergeCommitMessage" defaultValue={defaultCommitMessage} rows={2} />
+				</div>
 			</div>
 			<div className="form-actions">
 				<button className="secondary" onClick={cancel}>
 					Cancel
 				</button>
-				<input disabled={isBusy} type="submit" id="confirm-merge" value={MERGE_METHODS[method]} />
+				<input
+					disabled={isBusy}
+					type="submit"
+					id="confirm-merge"
+					value={mode === 'autocomplete' ? 'Set auto-complete' : MERGE_METHODS[method]}
+				/>
 			</div>
 		</form>
 	);
@@ -361,11 +805,24 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 function StateIcon({ state }: { state: GitStatusState }) {
 	switch (state) {
 		case GitStatusState.Succeeded:
-			return checkIcon;
+			return successIcon;
 		case GitStatusState.Error:
-			return deleteIcon;
+			return dangerIcon;
 		case GitStatusState.Failed:
-			return deleteIcon;
+			return dangerIcon;
 	}
-	return pendingIcon;
+	return mutedIcon;
+}
+
+// UX-05: color the status-checks summary line to match its StateIcon.
+function statusStateTextClass(state: GitStatusState): string {
+	switch (state) {
+		case GitStatusState.Succeeded:
+			return 'text-success';
+		case GitStatusState.Error:
+		case GitStatusState.Failed:
+			return 'text-danger';
+		default:
+			return 'text-muted';
+	}
 }

@@ -59,15 +59,17 @@ export function getCommentingRanges(diffHunks: DiffHunk[], isBase: boolean): vsc
 }
 
 export function mapThreadsToBase(threads: GitPullRequestCommentThread[], isBase: boolean): GitPullRequestCommentThread[] {
+	// ITER-01: prefer the tracked threadContext side; fall back to creation-time trackingCriteria only when
+	// the thread has no threadContext (mirrors getDiffSide/getPositionFromThread in azdo/utils.ts).
 	return isBase
 		? threads.filter(c =>
-				c.pullRequestThreadContext?.trackingCriteria !== undefined
-					? c.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart !== undefined
-					: c.threadContext?.leftFileStart !== undefined,
+				c.threadContext !== undefined
+					? c.threadContext?.leftFileStart !== undefined
+					: c.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart !== undefined,
 		  )
 		: threads.filter(c =>
-				c.pullRequestThreadContext?.trackingCriteria !== undefined
-					? c.pullRequestThreadContext?.trackingCriteria?.origRightFileStart !== undefined
-					: c.threadContext?.rightFileStart !== undefined,
+				c.threadContext !== undefined
+					? c.threadContext?.rightFileStart !== undefined
+					: c.pullRequestThreadContext?.trackingCriteria?.origRightFileStart !== undefined,
 		  );
 }

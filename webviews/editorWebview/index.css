@@ -5,7 +5,8 @@
 
 #app {
 	display: grid;
-	grid-template-columns: 670px auto;
+	grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+	column-gap: var(--azdo-space-5);
 }
 
 #title {
@@ -22,21 +23,122 @@
 #sidebar {
 	grid-column: 2;
 	grid-row: 2;
-	padding-left: 20px;
 }
 
-#sidebar .vote {
-	margin-bottom: 20px;
+/* UX-01: "Your review" card + UX-02: outcome summary card. Same card treatment (surface, subtle
+   border, large radius) as the comment cards so the sidebar reads as part of one system. */
+.review-card,
+.outcome-card {
+	background: var(--azdo-surface);
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
+	padding: var(--azdo-space-3);
+	margin-bottom: var(--azdo-space-5);
 }
 
-#sidebar .vote .vote-select {
-	margin-bottom: 5px;
+/* UX-01: section-label treatment shared by the card heading and the Required/Optional/Work Items
+   headers - 11px uppercase muted, so "your vote" and the reviewer groups read as peer sections. */
+.section-title {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 600;
+	color: var(--azdo-muted);
 }
 
-.vote .vote-button {
-	margin-left: auto;
+.review-card .current-vote-row {
 	display: flex;
-	align-self: auto;
+	align-items: center;
+	font-size: 13px;
+	font-weight: 600;
+	margin: var(--azdo-space-2) 0;
+}
+
+.review-card .current-vote-row.text-muted {
+	font-weight: 400;
+}
+
+.review-card .review-vote-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+}
+
+.review-card .review-vote-actions .vote-select {
+	flex: 1;
+	min-width: 0;
+}
+
+.review-card .review-vote-actions .vote-button {
+	flex-shrink: 0;
+}
+
+/* Success/failure text sits on its own line below the actions row, so it never resizes the select. */
+.review-card .cast-feedback {
+	display: flex;
+	align-items: center;
+	font-size: 12px;
+	white-space: nowrap;
+	margin-top: var(--azdo-space-2);
+}
+
+/* Link-styled Reset action; only rendered when a standing vote exists. */
+.review-card .reset-vote-link {
+	background: transparent;
+	color: var(--vscode-textLink-foreground);
+	padding: 0;
+	margin-top: var(--azdo-space-2);
+	border: none;
+	font-size: 12px;
+}
+
+.review-card .reset-vote-link:hover:enabled,
+.review-card .reset-vote-link:focus:enabled {
+	background: transparent;
+	text-decoration: underline;
+}
+
+/* UX-02: outcome summary card contents. Status dot is pure CSS (no asset, per section 6). */
+.outcome-card .outcome-status {
+	display: flex;
+	align-items: center;
+	font-size: 13px;
+}
+
+.outcome-card .outcome-label {
+	font-weight: 600;
+}
+
+.outcome-card .status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	margin-right: var(--azdo-space-2);
+	flex-shrink: 0;
+}
+
+.status-dot-success {
+	background: var(--azdo-success);
+}
+
+.status-dot-muted {
+	background: var(--azdo-muted);
+}
+
+.outcome-card .outcome-threads {
+	font-size: 12px;
+	margin-top: var(--azdo-space-2);
+}
+
+.outcome-card .outcome-vote {
+	display: flex;
+	align-items: center;
+	font-size: 12px;
+	margin-top: var(--azdo-space-2);
+}
+
+.outcome-card .outcome-vote .vote-status {
+	margin-left: var(--azdo-space-1);
 }
 
 a:focus,
@@ -48,19 +150,19 @@ textarea:focus,
 }
 
 .title-text {
-	margin-right: 5px;
+	margin-right: var(--azdo-space-1);
 }
 
 .title {
 	display: flex;
 	align-items: flex-start;
-	margin: 20px 0;
-	padding-bottom: 10px;
-	border-bottom: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	margin: var(--azdo-space-5) 0;
+	padding-bottom: var(--azdo-space-3);
+	border-bottom: 1px solid var(--azdo-border-subtle);
 }
 
 .title .pr-number {
-	margin-left: 5px;
+	margin-left: var(--azdo-space-1);
 }
 
 .loading-indicator {
@@ -92,13 +194,13 @@ body hr {
 	display: block;
 	height: 1px;
 	border: 0;
-	border-top: 1px solid #555;
+	border-top: 1px solid var(--azdo-border-subtle);
 	margin: 0 !important;
 	padding: 0;
 }
 
 body .comment-container .avatar-container {
-	margin-right: 12px;
+	margin-right: var(--azdo-space-3);
 }
 
 body .comment-container .avatar-container a {
@@ -135,12 +237,12 @@ body .comment-container .review-comment-header {
 	display: flex;
 	width: 100%;
 	box-sizing: border-box;
-	padding: 6px;
+	padding: var(--azdo-space-2);
 	font-size: 12px;
 	color: var(--vscode-foreground);
 	align-items: center;
 	background: var(--vscode-list-inactiveSelectionBackground);
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	border: 1px solid var(--azdo-border-subtle);
 }
 
 .description-header {
@@ -173,8 +275,8 @@ body .comment-container .review-comment-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-top: 5px;
-	margin-left: 15px;
+	margin-top: var(--azdo-space-1);
+	margin-left: var(--azdo-space-4);
 }
 
 .status-item,
@@ -192,7 +294,7 @@ body .comment-container .review-comment-header {
 
 .ready-for-review-container {
 	border-top: 1px solid;
-	padding-top: 10px;
+	padding-top: var(--azdo-space-3);
 }
 
 .ready-for-review-button {
@@ -217,18 +319,19 @@ body .comment-container .review-comment-header {
 }
 
 .status-section {
-	padding-bottom: 12px;
+	padding-bottom: var(--azdo-space-3);
 }
 
 #status-checks a {
-	margin-left: 10px;
+	margin-left: var(--azdo-space-3);
 	cursor: pointer;
 }
 
 #status-checks {
-	padding: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
-	margin-bottom: 20px;
+	padding: var(--azdo-space-3);
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
+	margin-bottom: var(--azdo-space-5);
 }
 
 #status-checks summary {
@@ -237,7 +340,7 @@ body .comment-container .review-comment-header {
 }
 
 #status-checks svg {
-	margin-right: 6px;
+	margin-right: var(--azdo-space-2);
 	width: 16px;
 }
 
@@ -247,7 +350,7 @@ body .comment-container .review-comment-header {
 }
 
 #status-checks .merge-select-container > * {
-	margin-right: 5px;
+	margin-right: var(--azdo-space-1);
 }
 
 #status-checks .branch-status-container {
@@ -257,18 +360,18 @@ body .comment-container .review-comment-header {
 #status-checks .branch-status-message {
 	display: inline-block;
 	line-height: 100%;
-	padding: 0 10px;
+	padding: 0 var(--azdo-space-3);
 }
 #status-checks .merge-option-container {
-	padding: 5px;
-	margin-top: 5px;
+	padding: var(--azdo-space-1);
+	margin-top: var(--azdo-space-1);
 }
 
 body .comment-container .review-comment-header > span,
 body .comment-container .review-comment-header > a,
 body .commit .commit-message > a,
 body .merged .merged-message > a {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 	white-space: nowrap;
 }
 
@@ -278,18 +381,37 @@ body .diff .diffHeader .outdatedLabel {
 	border-radius: 2px 2px 2px 2px;
 	padding: 0.1rem 0.3rem;
 	font-style: italic;
-	margin-left: 5px;
+	margin-left: var(--azdo-space-1);
 }
 
 body .diff .diffPath {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 }
 
 body .comment-container .comment-body,
 .review-body {
-	padding: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	padding: var(--azdo-space-3);
+	border: 1px solid var(--azdo-border-subtle);
 	border-top: none;
+}
+
+/* UX-03: single-card comment. The container owns one rounded border + surface; the header loses its
+   selection-color fill and full border, keeping only a subtle bottom rule; the body drops its own box
+   border. Replaces the dated two-stacked-boxes look. */
+.comment-container.review-comment > .review-comment-container {
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
+	background: var(--azdo-surface);
+}
+
+body .comment-container.review-comment .review-comment-header {
+	background: transparent;
+	border: none;
+	border-bottom: 1px solid var(--azdo-border-subtle);
+}
+
+body .comment-container.review-comment .comment-body {
+	border: none;
 }
 
 body .comment-container .review-comment-container .review-comment-body {
@@ -314,7 +436,7 @@ body {
 	margin: auto;
 	width: 100%;
 	max-width: 925px;
-	padding: 0 32px;
+	padding: 0 32px var(--azdo-space-6);
 	box-sizing: border-box;
 }
 
@@ -325,7 +447,8 @@ body .hidden-focusable {
 
 .comment-actions button:hover:enabled,
 .comment-actions button:focus:enabled {
-	background-color: transparent;
+	background-color: var(--vscode-toolbar-hoverBackground);
+	border-radius: var(--azdo-radius-sm);
 }
 
 body button.checkedOut {
@@ -338,13 +461,13 @@ body button.checkedOut {
 body button .icon {
 	width: 1em;
 	height: 1em;
-	margin-right: 6px;
+	margin-right: var(--azdo-space-2);
 }
 
 .prIcon {
 	display: flex;
 	border-radius: 10px;
-	margin-right: 5px;
+	margin-right: var(--azdo-space-1);
 	margin-top: 18px;
 }
 
@@ -393,7 +516,7 @@ body button .icon {
 }
 
 body .overview-title .button-group button {
-	margin-left: 10px;
+	margin-left: var(--azdo-space-3);
 	display: flex;
 }
 
@@ -403,20 +526,23 @@ body .overview-title .button-group button {
 	background: var(--vscode-badge-background);
 	color: var(--vscode-badge-foreground);
 	border-radius: 4px;
-	padding: 2px 8px;
-	margin-right: 12px;
+	padding: 2px var(--azdo-space-2);
+	margin-right: var(--azdo-space-3);
 }
 
 .section {
-	padding-bottom: 20px;
+	padding-bottom: var(--azdo-space-5);
 }
 
 .section-header {
-	padding-bottom: 8px;
+	padding-bottom: var(--azdo-space-2);
 	display: flex;
 }
 
-.section button {
+/* Scoped to the header so it only styles the "+" add buttons. Left unscoped, the transparent /
+   padding:0 / margin-left:auto bled onto the review-card's Vote button, turning it into bare text and
+   eating the flex free space so the vote <select> collapsed and its label was cut off. */
+.section-header button {
 	margin-left: auto;
 	padding: 0;
 	background: transparent;
@@ -427,8 +553,8 @@ body .overview-title .button-group button {
 	margin-right: 0;
 }
 
-.section button:hover,
-.section button:focus {
+.section-header button:hover,
+.section-header button:focus {
 	background: transparent;
 }
 
@@ -442,16 +568,18 @@ body .overview-title .button-group button {
 .commit svg {
 	width: 16px;
 	height: auto;
-	margin-right: 8px;
+	margin-right: var(--azdo-space-2);
 	flex-shrink: 0;
 }
 
 .comment-container.commit,
 .comment-container.merged {
-	padding: 16px 0 0 12px;
+	padding: var(--azdo-space-4) 0 0 var(--azdo-space-3);
 	box-sizing: border-box;
 }
 
+/* UX-03: system/commit timeline rows recede to muted single-line rows so they don't compete with
+   actual comment threads; the 16px icon and right-aligned timestamp are already in place. */
 .commit,
 .review,
 .merged {
@@ -459,12 +587,17 @@ body .overview-title .button-group button {
 	width: 100%;
 	border: none;
 	font-size: 12px;
-	color: var(--vscode-foreground);
+	color: var(--azdo-muted);
+}
+
+.commit .icon svg path,
+.merged .icon svg path {
+	fill: currentColor;
 }
 
 .review {
-	margin: 0px 8px;
-	padding: 4px 0;
+	margin: 0px var(--azdo-space-2);
+	padding: var(--azdo-space-1) 0;
 }
 
 .commit .commit-message,
@@ -477,7 +610,7 @@ body .overview-title .button-group button {
 
 .commit .commit-message .avatar-container,
 .merged .merged-message .avatar-container {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 	flex-shrink: 0;
 }
 
@@ -505,13 +638,13 @@ body .overview-title .button-group button {
 
 .merged .merged-message .message,
 .merged .inline-sha {
-	margin: 0 4px 0 0;
+	margin: 0 var(--azdo-space-1) 0 0;
 }
 
 .merged svg {
 	width: 14px;
 	height: auto;
-	margin-right: 8px;
+	margin-right: var(--azdo-space-2);
 	flex-shrink: 0;
 }
 
@@ -527,14 +660,14 @@ body .overview-title .button-group button {
 
 .comment-container {
 	position: relative;
-	padding-top: 20px;
+	padding-top: var(--azdo-space-5);
 	width: 100%;
 	display: flex;
 	margin: 0;
 }
 
 .comment-container[data-type='commit'] {
-	padding: 8px 0;
+	padding: var(--azdo-space-2) 0;
 }
 
 .comment-container[data-type='commit'] + .comment-container[data-type='commit'],
@@ -545,7 +678,7 @@ body .overview-title .button-group button {
 .comment-body .review-comment {
 	padding: 3px;
 	box-sizing: border-box;
-	border-top: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	border-top: 1px solid var(--azdo-border-subtle);
 }
 
 .review-comment-container .review-comment .review-comment-header {
@@ -555,23 +688,30 @@ body .overview-title .button-group button {
 
 .review-comment-container .review-comment .comment-body {
 	border: none;
-	padding: 4px 12px 8px 12px;
+	padding: var(--azdo-space-1) var(--azdo-space-3) var(--azdo-space-2) var(--azdo-space-3);
 }
 
 .comment-body .line {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	margin-bottom: 8px;
+	margin-bottom: var(--azdo-space-2);
 }
 
 body .comment-form {
-	padding: 20px 0 10px;
+	padding: var(--azdo-space-5) 0 var(--azdo-space-3);
+}
+
+/* UX-03: composer discoverability hint under the textarea. */
+.composer-hint {
+	font-size: 11px;
+	color: var(--azdo-muted);
+	margin: var(--azdo-space-1) 0 var(--azdo-space-2);
 }
 
 .review-comment-container .comment-form {
 	margin: 0 0 0 36px;
-	padding: 10px 0;
+	padding: var(--azdo-space-3) 0;
 }
 
 .task-list-item {
@@ -579,7 +719,7 @@ body .comment-form {
 }
 
 #status-checks textarea {
-	margin: 10px 0;
+	margin: var(--azdo-space-3) 0;
 }
 
 textarea {
@@ -588,14 +728,14 @@ textarea {
 }
 
 .editing-form {
-	padding: 5px 0;
+	padding: var(--azdo-space-1) 0;
 	display: flex;
 	flex-direction: column;
 }
 
 .editing-form .form-actions {
 	margin-left: auto;
-	padding: 5px 0;
+	padding: var(--azdo-space-1) 0;
 }
 
 .comment-form .form-actions > button,
@@ -615,33 +755,41 @@ textarea {
 
 .form-actions {
 	display: flex;
-	padding-top: 10px;
-	padding-bottom: 10px;
+	padding-top: var(--azdo-space-3);
+	padding-bottom: var(--azdo-space-3);
 }
 
 .main-comment-form > .form-actions {
-	margin-bottom: 10px;
+	margin-bottom: var(--azdo-space-3);
 }
 
 body .comment-form .form-actions button {
-	margin-right: 10px;
+	margin-right: var(--azdo-space-3);
 }
 
 .details .comment-body {
-	padding: 19px 0;
+	padding: var(--azdo-space-5) 0;
+}
+
+/* UX-03: empty-description placeholder reads as a fillable slot, not a bare line. */
+.description-placeholder {
+	border: 1px dashed var(--azdo-border);
+	border-radius: var(--azdo-radius-md);
+	padding: var(--azdo-space-3);
+	font-style: italic;
 }
 
 blockquote {
 	display: block;
 	flex-direction: column;
-	margin: 8px 0;
-	padding: 8px 12px;
+	margin: var(--azdo-space-2) 0;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
 	border-left-width: 5px;
 	border-left-style: solid;
 }
 
 blockquote p {
-	margin: 8px 0;
+	margin: var(--azdo-space-2) 0;
 }
 
 blockquote p:first-child {
@@ -701,7 +849,7 @@ h3 {
 .comment-body table > thead > tr > td,
 .comment-body table > tbody > tr > th,
 .comment-body table > tbody > tr > td {
-	padding: 5px 10px;
+	padding: var(--azdo-space-1) var(--azdo-space-3);
 }
 
 .comment-body table > tbody > tr + tr > td {
@@ -723,7 +871,7 @@ code {
 
 .comment-body pre:not(.hljs),
 .comment-body pre.hljs code > div {
-	padding: 16px;
+	padding: var(--azdo-space-4);
 	border-radius: 3px;
 	overflow: auto;
 }
@@ -739,14 +887,9 @@ code {
 	color: var(--vscode-editor-foreground);
 }
 
-.vscode-light .comment-body pre:not(.hljs),
-.vscode-light .comment-body code > div {
-	background-color: rgba(220, 220, 220, 0.4);
-}
-
-.vscode-dark .comment-body pre:not(.hljs),
-.vscode-dark .comment-body code > div {
-	background-color: rgba(10, 10, 10, 0.4);
+.comment-body pre:not(.hljs),
+.comment-body code > div {
+	background-color: var(--vscode-textCodeBlock-background);
 }
 
 .vscode-high-contrast .comment-body pre:not(.hljs),
@@ -769,29 +912,19 @@ code {
 	border: 1px solid var(--vscode-panel-border);
 }
 
-.vscode-light .comment-body table > thead > tr > th {
-	border-color: rgba(0, 0, 0, 0.69);
+.comment-body table > thead > tr > th {
+	border-color: var(--azdo-border-subtle);
 }
 
-.vscode-dark .comment-body table > thead > tr > th {
-	border-color: rgba(255, 255, 255, 0.69);
-}
-
-.vscode-light .comment-body h1,
-.vscode-light .comment-body hr,
-.vscode-light .comment-body table > tbody > tr + tr > td {
-	border-color: rgba(0, 0, 0, 0.18);
-}
-
-.vscode-dark .comment-body h1,
-.vscode-dark .comment-body hr,
-.vscode-dark .comment-body table > tbody > tr + tr > td {
-	border-color: rgba(255, 255, 255, 0.18);
+.comment-body h1,
+.comment-body hr,
+.comment-body table > tbody > tr + tr > td {
+	border-color: var(--azdo-border-subtle);
 }
 
 .review-comment-body .diff-container {
-	margin-top: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
+	margin-top: var(--azdo-space-3);
+	border: 1px solid var(--azdo-border-subtle);
 }
 
 .review-comment-body .diff-container .review-comment-container .comment-container {
@@ -799,7 +932,7 @@ code {
 }
 
 .review-comment-body .diff-container .review-comment-container .review-comment-header .avatar-container {
-	margin-right: 4px;
+	margin-right: var(--azdo-space-1);
 }
 
 .review-comment-body .diff-container .review-comment-container .review-comment-header .avatar {
@@ -808,7 +941,7 @@ code {
 }
 
 .diff .diffHeader {
-	padding: 6px 12px;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
 	line-height: 1.5;
 	background: var(--vscode-editorGroupHeader-tabsBackground);
 }
@@ -841,14 +974,14 @@ code {
 
 .diff .diffLine .diffTypeSign {
 	user-select: none;
-	padding-right: 5px;
+	padding-right: var(--azdo-space-1);
 }
 
 .diff .diffLine .lineNumber {
 	width: 1%;
 	min-width: 50px;
-	padding-right: 10px;
-	padding-left: 10px;
+	padding-right: var(--azdo-space-3);
+	padding-left: var(--azdo-space-3);
 	font-size: 12px;
 	line-height: 20px;
 	text-align: right;
@@ -906,9 +1039,12 @@ code {
 
 	#sidebar {
 		display: grid;
-		column-gap: 20px;
+		column-gap: var(--azdo-space-5);
+		row-gap: var(--azdo-space-4);
 		grid-template-columns: 50% 50%;
 		padding: 0;
+		/* When the sidebar stacks under #main it otherwise butts right against the composer/timeline. */
+		margin-top: var(--azdo-space-5);
 	}
 
 	.section-content {
@@ -917,7 +1053,7 @@ code {
 	}
 
 	.section-item {
-		margin-right: 8px;
+		margin-right: var(--azdo-space-2);
 	}
 
 	body .hidden-focusable {
@@ -926,14 +1062,14 @@ code {
 	}
 
 	.section-header button {
-		margin-left: 8px;
+		margin-left: var(--azdo-space-2);
 		display: flex;
 	}
 
 	.section-item.reviewer {
 		border: 1px solid var(--vscode-badge-background);
 		border-radius: 3px;
-		padding: 2px 6px;
+		padding: 2px var(--azdo-space-2);
 	}
 
 	.section-item .avatar {
@@ -942,7 +1078,7 @@ code {
 
 	.section-item .login {
 		width: auto;
-		margin-right: 4px;
+		margin-right: var(--azdo-space-1);
 	}
 }
 
@@ -962,6 +1098,17 @@ code {
 	right: 9px;
 }
 
+/* UX-03: reveal comment actions on hover AND keyboard focus, not mouse-only. The action bar is now
+   always in the DOM (see comment.tsx) so :focus-within can surface it for keyboard users. */
+.comment-container .action-bar {
+	display: none;
+}
+
+.comment-container:hover .action-bar,
+.comment-container:focus-within .action-bar {
+	display: flex;
+}
+
 .flex-action-bar {
 	display: flex;
 	justify-content: space-between;
@@ -972,13 +1119,45 @@ code {
 
 .action-bar > button,
 .flex-action-bar > button {
-	margin-left: 4px;
-	margin-right: 4px;
+	margin-left: var(--azdo-space-1);
+	margin-right: var(--azdo-space-1);
 }
 
+/* item 2: now a real <button> for keyboard access - strip the filled button chrome so the delete
+   glyph reads inline like before. */
 .remove-item {
 	height: 12px;
 	cursor: pointer;
+	background: transparent;
+	border: none;
+	padding: 0;
+	color: inherit;
+	align-items: center;
+}
+
+/* item 2: reveal the reviewer/work-item remove affordance on row hover AND keyboard focus-within,
+   instead of the old mouse-only JS showDelete state (which was unreachable by keyboard). */
+.section-item.reviewer .remove-item,
+.section-item.work-item .remove-item {
+	display: none;
+}
+
+.section-item.reviewer:hover .remove-item,
+.section-item.reviewer:focus-within .remove-item,
+.section-item.work-item:hover .remove-item,
+.section-item.work-item:focus-within .remove-item {
+	display: inline-flex;
+}
+
+/* item 2: the title action bar (Edit / Copy Link / Convert to draft) is always rendered now; reveal
+   it on hover OR keyboard focus-within so it is reachable without a mouse. */
+.overview-title .title-action-bar {
+	display: none;
+}
+
+.overview-title:hover .title-action-bar,
+.overview-title:focus-within .title-action-bar {
+	display: flex;
 }
 
 .title-editing-form {
@@ -989,31 +1168,193 @@ code {
 	margin-left: 0;
 }
 
-.thread-container .comment-container {
-	padding-top: 0px;
-}
-
-.thread-container .comment-container ~ .comment-container {
-	padding-left: 20px;
-	width: auto;
-}
-
-.thread-container .reply-thread {
-	text-align: right;
-}
-
-.thread-container .diff-container {
-	margin-top: 10px;
-	border: 1px solid var(--vscode-list-inactiveSelectionBackground);
-}
-
-body .comment-container .review-comment-header > select {
-	margin-left: 5px;
-	margin-right: 5px;
-}
-
+/* UX-03: the THREAD owns one card (border + radius + surface). The 1380eaf5 per-comment card still
+   applies to the standalone description, but inside a thread the comments go borderless so we don't
+   nest card-in-card; they're separated by rules and replies get a 2px left rail. */
 .thread-container {
-	padding-top: 16px;
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: var(--azdo-radius-lg);
+	background: var(--azdo-surface);
+	margin-top: var(--azdo-space-4);
+	overflow: hidden;
+}
+
+.thread-container > .comment-container.review-comment > .review-comment-container {
+	border: none;
+	border-radius: 0;
+	background: transparent;
+}
+
+.thread-container .comment-container {
+	padding-top: 0;
+}
+
+/* replies after the root: keep the indent, add the 2px rail + a separator rule so depth survives a
+   page fold. */
+.thread-container .comment-container ~ .comment-container {
+	width: auto;
+	margin-left: var(--azdo-space-5);
+	padding-left: var(--azdo-space-3);
+	border-left: 2px solid var(--azdo-border-subtle);
+	border-top: 1px solid var(--azdo-border-subtle);
+}
+
+/* thread header: file chip (opens the diff) on the left, status pill on the right. */
+.thread-header {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+	padding: var(--azdo-space-2) var(--azdo-space-3);
+	border-bottom: 1px solid var(--azdo-border-subtle);
+	background: var(--azdo-surface-header);
+}
+
+/* item 2: now a real <button> for keyboard access - strip the filled button chrome so it still reads
+   as an inline path chip. */
+.thread-header .thread-file-chip {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	background: transparent;
+	border: none;
+	padding: 0;
+	color: inherit;
+	text-align: left;
+	min-width: 0;
+}
+
+.thread-header .thread-file-chip:hover,
+.thread-header .thread-file-chip:focus {
+	text-decoration: underline;
+	color: var(--vscode-textLink-activeForeground);
+}
+
+.thread-header .thread-status-pill {
+	margin-left: auto;
+	flex-shrink: 0;
+}
+
+/* status pill: a native <select> dressed as a chip - colored dot + label + the select's chevron. */
+.thread-status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--azdo-space-1);
+	border: 1px solid var(--azdo-border-subtle);
+	border-radius: 999px;
+	padding: 1px var(--azdo-space-2);
+}
+
+.thread-status-pill .status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	background: var(--azdo-muted);
+}
+
+.thread-status-pill select {
+	border: none;
+	background: transparent;
+	border-radius: 0;
+	padding: 0 var(--azdo-space-1);
+	font-size: 12px;
+	color: var(--vscode-foreground);
+}
+
+.thread-status-pill.status-info {
+	border-color: var(--azdo-info);
+}
+.thread-status-pill.status-info .status-dot {
+	background: var(--azdo-info);
+}
+.thread-status-pill.status-warning {
+	border-color: var(--azdo-warning);
+}
+.thread-status-pill.status-warning .status-dot {
+	background: var(--azdo-warning);
+}
+.thread-status-pill.status-success {
+	border-color: var(--azdo-success);
+}
+.thread-status-pill.status-success .status-dot {
+	background: var(--azdo-success);
+}
+.thread-status-pill.status-muted .status-dot {
+	background: var(--azdo-muted);
+}
+
+/* resolved threads collapse to a one-line summary; this toggle expands/collapses. */
+.thread-collapse-toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-1);
+	width: 100%;
+	background: transparent;
+	color: var(--azdo-muted);
+	border: none;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
+	font-size: 12px;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.thread-collapse-toggle:hover:enabled,
+.thread-collapse-toggle:focus:enabled {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-foreground);
+}
+
+.thread-chevron {
+	display: inline-flex;
+	transform: rotate(-90deg);
+	transition: transform 0.1s ease;
+}
+
+.thread-chevron.expanded {
+	transform: rotate(0deg);
+}
+
+.thread-chevron .icon,
+.thread-chevron .icon svg {
+	width: 12px;
+	height: 12px;
+	margin-right: 0;
+}
+
+.thread-chevron .icon svg path {
+	fill: currentColor;
+}
+
+/* ghost reply field: full-width, looks like an input, swaps to the real composer on click.
+   A <button> is a form control, so display:block still shrink-wraps to its label in Chromium;
+   an explicit width (minus the inset margins) is what actually makes it span the thread footer. */
+.reply-ghost {
+	display: block;
+	box-sizing: border-box;
+	width: calc(100% - var(--azdo-space-3) * 2);
+	margin: var(--azdo-space-3);
+	padding: var(--azdo-space-2);
+	text-align: left;
+	font-size: 13px;
+	background: var(--vscode-input-background);
+	color: var(--azdo-muted);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: var(--azdo-radius-md);
+}
+
+.reply-ghost:hover:enabled,
+.reply-ghost:focus:enabled {
+	background: var(--vscode-input-background);
+	color: var(--vscode-foreground);
+	border-color: var(--vscode-focusBorder);
+}
+
+/* the real composer, once swapped in, inset inside the thread card. */
+.thread-container > form {
+	padding: 0 var(--azdo-space-3) var(--azdo-space-3);
 }
 
 .system-timestamp {
@@ -1031,7 +1372,7 @@ body .comment-container .review-comment-header > select {
 }
 
 .work-item {
-	padding: 2px 0 2px 6px;
+	padding: 2px 0 2px var(--azdo-space-2);
 	/* height: 16px; */
 	border-radius: 2px;
 	/* background: var(--vscode-badge-background); */
@@ -1040,8 +1381,8 @@ body .comment-container .review-comment-header > select {
 }
 
 .work-item-body-container .work-item:not(:first-child) {
-	margin-top: 5px;
-	padding-top: 5px;
+	margin-top: var(--azdo-space-1);
+	padding-top: var(--azdo-space-1);
 	border-top: 1px solid var(--vscode-foreground);
 }
 

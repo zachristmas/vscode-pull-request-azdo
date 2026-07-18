@@ -102,6 +102,15 @@ export class AzdoWorkItem implements vscode.Disposable {
 				w => w.rel === 'ArtifactLink' && w.url?.toUpperCase() === pr.item.artifactId?.toUpperCase(),
 			);
 
+			// WI-05: getPullRequestWorkItemRefs also returns items linked through source-branch commits,
+			// which carry no PR ArtifactLink relation. Patching '/relations/-1' produces a raw server error;
+			// guard and explain instead.
+			if (idx === undefined || idx < 0) {
+				throw new Error(
+					'This work item is linked via a commit or branch, not directly to the pull request. Remove the commit/branch link from the work item to detach it.',
+				);
+			}
+
 			const po: JsonPatchOperation = {
 				op: Operation.Remove,
 				path: `/relations/${idx}`,

@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { Build } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { ResourceRef } from 'azure-devops-node-api/interfaces/common/VSSInterfaces';
 import {
 	Comment,
@@ -22,9 +23,10 @@ import {
 	PullRequestStatus,
 	VersionControlChangeType,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { PolicyEvaluationRecord } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
+import * as diff from 'diff';
 import equals from 'fast-deep-equal';
 import * as vscode from 'vscode';
-import * as diff from 'diff';
 import { Repository } from '../api/api';
 import { IReviewThread, ViewedState } from '../common/comment';
 import { parseDiffAzdo } from '../common/diffHunk';
@@ -35,7 +37,8 @@ import { Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { toPRUriAzdo, toReviewUri } from '../common/uri';
 import { formatError } from '../common/utils';
-import { SETTINGS_NAMESPACE } from '../constants';
+import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
+import { resolveAvatarsDeep } from './avatarCache';
 import { AzdoRepository } from './azdoRepository';
 import { FileViewedStatus, PRFileViewedState } from './fileReviewedStatusService';
 import { FolderRepositoryManager } from './folderRepositoryManager';
@@ -46,11 +49,14 @@ import {
 	PullRequest,
 	PullRequestChecks,
 	PullRequestCompletion,
+	PullRequestPolicyEvaluation,
 	PullRequestVote,
 } from './interface';
-import { resolveAvatarsDeep } from './avatarCache';
+import { BuildPolicyEvaluationContext } from './policyTypes';
 import {
 	convertAzdoPullRequestToRawPullRequest,
+	convertBranchRefToBranchName,
+	convertPolicyEvaluation,
 	getDiffHunkFromFileDiff,
 	getDiffSide,
 	getPositionFromThread,
@@ -163,10 +169,29 @@ export class PullRequestModel implements IPullRequestModel {
 
 		if (item.head && item.head.exists) {
 			this.head = new GitHubRef(item.head.ref, '', item.head.sha, item.head.repo.cloneUrl);
+		} else if (item.lastMergeSourceCommit?.commitId) {
+			// Merged/abandoned PR whose source branch was deleted: getBranchRef can't resolve the ref
+			// (head.exists=false, sha=''), so isResolved() was false and the tree showed only the
+			// Description node with no file changes. The merge commits still pin the diff, and
+			// getFileChangesInfo() already falls back to them, so resolve head/base from them here to
+			// make isResolved() true and give head.sha a real commit for the diff URIs. (AC-08 sibling)
+			this.head = new GitHubRef(
+				convertBranchRefToBranchName(item.sourceRefName ?? ''),
+				'',
+				item.lastMergeSourceCommit.commitId,
+				this.remote.url,
+			);
 		}
 
 		if (item.base && item.base.exists) {
 			this.base = new GitHubRef(item.base.ref, '', item.base.sha, item.base.repo.cloneUrl);
+		} else if (item.lastMergeTargetCommit?.commitId) {
+			this.base = new GitHubRef(
+				convertBranchRefToBranchName(item.targetRefName ?? ''),
+				'',
+				item.lastMergeTargetCommit.commitId,
+				this.remote.url,
+			);
 		}
 	}
 
@@ -244,6 +269,22 @@ export class PullRequestModel implements IPullRequestModel {
 		return git!.updatePullRequest({ description, title }, repoId!, this.getPullRequestId());
 	}
 
+	/**
+	 * Toggle the draft state of the pull request. Passing `false` publishes a draft PR ("Ready for review");
+	 * passing `true` converts an active PR back to a draft (ADO resets reviewer votes on this transition).
+	 */
+	async setReadyForReview(isDraft: boolean): Promise<GitPullRequest> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = await azdoRepo.getRepositoryId();
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+
+		const updated = await git!.updatePullRequest({ isDraft }, repoId!, this.getPullRequestId());
+		this.item.isDraft = updated.isDraft;
+		this.isDraft = updated.isDraft;
+		return updated;
+	}
+
 	async completePullRequest(options: PullRequestCompletion): Promise<GitPullRequest> {
 		const azdoRepo = await this.azdoRepository.ensure();
 		const repoId = await azdoRepo.getRepositoryId();
@@ -258,8 +299,42 @@ export class PullRequestModel implements IPullRequestModel {
 					deleteSourceBranch: options.deleteSourceBranch,
 					mergeStrategy: options.mergeStrategy,
 					transitionWorkItems: options.transitionWorkItems,
+					mergeCommitMessage: options.mergeCommitMessage,
 				},
 			},
+			repoId!,
+			this.getPullRequestId(),
+		);
+	}
+
+	/**
+	 * AC-02: set or cancel auto-complete. Same updatePullRequest call as completePullRequest - the only
+	 * difference is `status` is left untouched (server completes the PR itself once every blocking
+	 * policy passes). Cancel by patching autoCompleteSetBy to the documented zero-GUID identity.
+	 */
+	async setAutoComplete(options: PullRequestCompletion | undefined): Promise<GitPullRequest> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = await azdoRepo.getRepositoryId();
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+		const currentUserId = azdo?.authenticatedUser?.id;
+
+		if (options && !currentUserId) {
+			throw new Error('Unable to set auto-complete: no authenticated user id available.');
+		}
+
+		return await git!.updatePullRequest(
+			options
+				? {
+						autoCompleteSetBy: { id: currentUserId },
+						completionOptions: {
+							deleteSourceBranch: options.deleteSourceBranch,
+							mergeStrategy: options.mergeStrategy,
+							transitionWorkItems: options.transitionWorkItems,
+							mergeCommitMessage: options.mergeCommitMessage,
+						},
+				  }
+				: { autoCompleteSetBy: { id: AUTO_COMPLETE_CLEAR_ID } },
 			repoId!,
 			this.getPullRequestId(),
 		);
@@ -479,12 +554,20 @@ export class PullRequestModel implements IPullRequestModel {
 		const repoId = (await azdoRepo.getRepositoryId()) || '';
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
+		const currentUserId = azdo?.authenticatedUser?.id || '';
+
+		// createPullRequestReviewer is a full-replace PUT: omitting isRequired resets it to null
+		// server-side on every vote, even when a required-reviewer policy still requires this person
+		// (verified live against dev.azure.com - the policy evaluation itself stays correct, but the
+		// reviewer's isRequired flag the UI reads for the POL-10 badge gets wiped). Preserve whatever
+		// we already know about this reviewer from the last fetch.
+		const existingIsRequired = this.item.reviewers?.find(r => r.id === currentUserId)?.isRequired;
 
 		return await git?.createPullRequestReviewer(
-			{ vote: vote },
+			{ vote: vote, isRequired: existingIsRequired },
 			repoId,
 			this.getPullRequestId(),
-			azdo?.authenticatedUser?.id || '',
+			currentUserId,
 		);
 	}
 
@@ -716,8 +799,12 @@ export class PullRequestModel implements IPullRequestModel {
 		const git = await azdo?.connection.getGitApi();
 
 		let pr_statuses = (await git?.getPullRequestStatuses(repoId, this.getPullRequestId())) ?? [];
+		// POL-09: keep PR-level (iteration-less) statuses alongside the latest-iteration ones. Statuses
+		// posted without an iterationId were previously dropped whenever any iteration-scoped status existed
+		// (their iterationId ?? 0 never equalled the max iteration).
+		const maxIteration = Math.max(0, ...pr_statuses.map(s => s.iterationId ?? 0));
 		pr_statuses = pr_statuses
-			.filter(p => p.iterationId === Math.max(...pr_statuses.map(s => s.iterationId ?? 0)))
+			.filter(p => p.iterationId === undefined || (p.iterationId ?? 0) === maxIteration)
 			.filter(
 				p =>
 					p.id ===
@@ -743,15 +830,121 @@ export class PullRequestModel implements IPullRequestModel {
 			}),
 		};
 
-		if (pr_statuses?.every(s => s.state === GitStatusState.Succeeded)) {
+		// POL-09: an empty status list must not read as Succeeded ([].every() is vacuously true); a PR with
+		// no posted statuses is NotSet, not implicitly passing.
+		if (pr_statuses.length === 0) {
+			statuses.state = GitStatusState.NotSet;
+		} else if (pr_statuses.every(s => s.state === GitStatusState.Succeeded)) {
 			statuses.state = GitStatusState.Succeeded;
-		} else if (pr_statuses?.some(s => s.state === GitStatusState.Error || s.state === GitStatusState.Failed)) {
+		} else if (pr_statuses.some(s => s.state === GitStatusState.Error || s.state === GitStatusState.Failed)) {
 			statuses.state = GitStatusState.Failed;
-		} else if (pr_statuses?.every(s => s.state === GitStatusState.NotApplicable)) {
+		} else if (pr_statuses.every(s => s.state === GitStatusState.NotApplicable)) {
 			statuses.state = GitStatusState.NotApplicable;
 		}
 
 		return statuses;
+	}
+
+	/**
+	 * POL-01: fetch branch-policy evaluations for this PR - the "why can't this complete" signal that
+	 * getStatusChecks() (custom PR statuses) never surfaces for build-validation/min-reviewer/comment-
+	 * resolution policies. Never throws; policy data is progressive enhancement (degrades to []).
+	 */
+	async getPolicyEvaluations(): Promise<PullRequestPolicyEvaluation[]> {
+		try {
+			const azdoRepo = await this.azdoRepository.ensure();
+			const projectId = (await azdoRepo.getMetadata())?.project?.id;
+			if (!projectId) {
+				Logger.appendLine(
+					`Fetch policy evaluations for PR #${this.getPullRequestId()} skipped - no project id`,
+					PullRequestModel.ID,
+				);
+				return [];
+			}
+
+			const azdo = azdoRepo.azdo;
+			const policyApi = await azdo?.connection.getPolicyApi();
+			const artifactId = `vstfs:///CodeReview/CodeReviewId/${projectId}/${this.getPullRequestId()}`;
+			const records = (await policyApi?.getPolicyEvaluations(projectId, artifactId)) ?? [];
+
+			const typeMap = await azdoRepo.getPolicyTypeMap();
+			const evaluations = records
+				.map(record => convertPolicyEvaluation(record, typeMap))
+				.filter((p): p is PullRequestPolicyEvaluation => !!p);
+
+			await this.enrichBuildPolicyEvaluations(records, evaluations, projectId);
+
+			return evaluations;
+		} catch (e) {
+			Logger.appendLine(`Fetch policy evaluations for PR #${this.getPullRequestId()} failed: ${e}`, PullRequestModel.ID);
+			return [];
+		}
+	}
+
+	/**
+	 * POL-04: enrich build-validation rows with build number/result/web URL so a reviewer never has to
+	 * open the ADO web UI to see why validation failed. context.buildId is absent until a build has
+	 * been queued (e.g. manualQueueOnly policies before first queue) - those rows keep isExpired only.
+	 * One dead build (.catch) must never sink the rest of the list.
+	 */
+	private async enrichBuildPolicyEvaluations(
+		records: PolicyEvaluationRecord[],
+		evaluations: PullRequestPolicyEvaluation[],
+		projectId: string,
+	): Promise<void> {
+		const buildEvaluations = evaluations.filter(e => e.kind === 'build');
+		if (buildEvaluations.length === 0) {
+			return;
+		}
+
+		const azdoRepo = await this.azdoRepository.ensure();
+		const buildApi = await azdoRepo.azdo?.connection.getBuildApi();
+
+		const contextByEvaluationId = new Map<string, BuildPolicyEvaluationContext>();
+		records.forEach(record => {
+			if (record.evaluationId && buildEvaluations.some(e => e.evaluationId === record.evaluationId)) {
+				contextByEvaluationId.set(record.evaluationId, (record.context ?? {}) as BuildPolicyEvaluationContext);
+			}
+		});
+
+		const buildIds = [
+			...new Set([...contextByEvaluationId.values()].map(c => c.buildId).filter((id): id is number => !!id)),
+		];
+		const builds = buildApi
+			? await Promise.all(buildIds.map(id => buildApi.getBuild(projectId, id).catch(() => undefined)))
+			: [];
+		const buildById = new Map(builds.filter((b): b is Build => !!b).map(b => [b.id!, b]));
+
+		buildEvaluations.forEach(evaluation => {
+			const context = contextByEvaluationId.get(evaluation.evaluationId);
+			const build = context?.buildId ? buildById.get(context.buildId) : undefined;
+			evaluation.build = {
+				buildId: context?.buildId,
+				buildNumber: build?.buildNumber,
+				result: build?.result,
+				webUrl: (build?._links as any)?.web?.href,
+				isExpired: context?.isExpired,
+			};
+		});
+	}
+
+	/**
+	 * POL-04: requeue a (build-validation) policy evaluation, e.g. after fixing the build or on an
+	 * expired result. Returns the full refreshed list so the webview can replace state wholesale and
+	 * pick up any cascading status changes.
+	 */
+	async requeuePolicyEvaluation(evaluationId: string): Promise<PullRequestPolicyEvaluation[]> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const projectId = (await azdoRepo.getMetadata())?.project?.id;
+		if (!projectId) {
+			return this.getPolicyEvaluations();
+		}
+
+		const azdo = azdoRepo.azdo;
+		const policyApi = await azdo?.connection.getPolicyApi();
+		await policyApi?.requeuePolicyEvaluation(projectId, evaluationId);
+
+		return this.getPolicyEvaluations();
 	}
 
 	/**
@@ -785,14 +978,26 @@ export class PullRequestModel implements IPullRequestModel {
 			base.version = this.item.lastMergeTargetCommit?.commitId;
 		}
 
-		// Find mergebase to be used later.
-		this.mergeBase = (await this.getMergeBase(base.version!, target.version!))?.[0].commitId;
+		// Find mergebase to be used later. getMergeBases returns an empty array (not an error) when
+		// one commit is a direct ancestor of the other - a completely normal shape for a PR whose
+		// source branch is a fast-forward descendant of target with no divergent commits on either
+		// side. The unguarded [0].commitId here used to throw in that case, which getChildren()'s
+		// catch swallowed silently, leaving the PR's tree node with no children and no visible error.
+		this.mergeBase = (await this.getMergeBase(base.version!, target.version!))?.[0]?.commitId;
 
 		const diffBase = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('diffBase');
 		const useCommonCommit = diffBase !== DiffBaseConfig.head;
 
 		const commitDiffs = await this.getCommitDiffs(base, target, useCommonCommit);
-		const commonCommit = commitDiffs?.commonCommit ?? this.mergeBase!;
+		// getMergeBases and the diff API's own commonCommit can BOTH come back null/empty for the same
+		// fast-forward shape (verified live: a source branch with no divergent commits from target)
+		// - an undefined value here serializes as a missing field, which the file-diff API then
+		// rejects with "An object ID must be 40 characters long..." for an empty BaseVersionCommit.
+		// In that exact fast-forward case target's own commit IS the common ancestor (the same
+		// fallback getDiffTarget() already uses for the 'head' diffBase mode), so fall all the way
+		// back to it rather than propagating undefined.
+		const commonCommit = commitDiffs?.commonCommit || this.mergeBase || base.version;
+		this.mergeBase = this.mergeBase || commonCommit;
 		Logger.debug(
 			`Fetching file changes for PR #${this.getPullRequestId()}. base: ${base.version}, mergeBase: ${
 				this.mergeBase

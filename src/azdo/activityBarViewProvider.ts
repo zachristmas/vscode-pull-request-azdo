@@ -3,22 +3,34 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { GitPullRequestCommentThread, IdentityRefWithVote } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import {
+	GitPullRequestCommentThread,
+	GitPullRequestMergeStrategy,
+	IdentityRefWithVote,
+	PullRequestStatus,
+} from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
+import Logger from '../common/logger';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
-import { SETTINGS_NAMESPACE } from '../constants';
+import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
 import { FolderRepositoryManager } from './folderRepositoryManager';
-import { GithubItemStateEnum, MergeMethod, PullRequestVote } from './interface';
+import { MergeMethod, PullRequestCompletion, PullRequestVote, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { getDefaultMergeMethod } from './pullRequestOverview';
+import {
+	buildCompletionSummary,
+	convertBranchRefToBranchName,
+	convertIdentityRefWithVoteToReviewer,
+	convertRESTUserToAccount,
+} from './utils';
 
 export class PullRequestViewProvider extends WebviewBase implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'azdo:activePullRequest';
 
 	private _view?: vscode.WebviewView;
 
-	private _existingReviewers: IdentityRefWithVote[];
+	private _existingReviewers: ReviewState[];
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
@@ -65,12 +77,51 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			// 	return this.createComment(message);
 			case 'azdopr.merge':
 				return this.mergePullRequest(message);
+			case 'azdopr.readyForReview':
+				return this.setReadyForReview(message, false);
+			case 'azdopr.convertToDraft':
+				return this.setReadyForReview(message, true);
 			case 'pr.deleteBranch':
 				return this.deleteBranch(message);
 			case 'pr.approve':
 				return this.approvePullRequest(message);
+			case 'pr.vote':
+				return this.votePullRequest(message);
+			case 'pr.set-autocomplete':
+				return this.setAutoComplete(message);
 			case 'pr.submit':
 				return this.submitReview(message);
+			case 'pr.checkMergeability':
+				return this._replyMessage(message, await this._item.getMergability());
+			// See pullRequestOverview.ts: guard the throwing fetches so a failure rejects the webview
+			// promise instead of leaving it (and the requeue button) hung forever. (item 1b)
+			case 'pr.checkStatus':
+				try {
+					return await this._replyMessage(message, await this._item.getStatusChecks());
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
+			case 'pr.checkPolicies':
+				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
+				return this._replyMessage(message, await this._item.getPolicyEvaluations());
+			case 'pr.requeue-policy':
+				try {
+					return await this._replyMessage(
+						message,
+						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
+					);
+				} catch (e) {
+					return this._throwError(message, `${formatError(e)}`);
+				}
+			// The sidebar webview posts pr.debug on every mount (activityBarView/app.tsx). Without a case
+			// it hit the throwing default below and rejected an uncaught promise per activation; mirror
+			// the overview host and just log it. (item 1a)
+			case 'pr.debug':
+				return this.webviewDebug(message);
+			default:
+				// Never drop a message silently: an unhandled command leaves the webview's awaited
+				// postMessage promise pending forever (how the v1.4 sidebar bugs shipped).
+				return this._throwError(message, `Unhandled message: ${message.command}`);
 		}
 	}
 
@@ -82,9 +133,16 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				pullRequestModel.getPullRequestId(),
 			),
 			this._folderRepositoryManager.getPullRequestRepositoryAccessAndMergeMethods(pullRequestModel),
+			// POL-05: pre-stage the sidebar compact policy summary here; POL-01's fetch failure must not
+			// sink the whole sidebar the way the other members here fail loudly.
+			pullRequestModel.getPolicyEvaluations().catch(() => undefined),
+			// POL-05: the checked-out-PR sidebar previously hardcoded status: { statuses: [] }, so the
+			// shared StatusChecks/PolicySection components (isSimple=true) never showed anything even
+			// though the overview side already renders both.
+			pullRequestModel.getStatusChecks(),
 		])
 			.then(result => {
-				const [pullRequest, repositoryAccess] = result;
+				const [pullRequest, repositoryAccess, policies, status] = result;
 				if (!pullRequest) {
 					throw new Error(
 						`Fail to resolve Pull Request #${pullRequestModel.getPullRequestId()} in ${
@@ -110,7 +168,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 					.get<MergeMethod>('defaultMergeMethod');
 				const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 				const currentUser = this._folderRepositoryManager.getCurrentUser();
-				this._existingReviewers = pullRequest.item.reviewers ?? [];
+				this._existingReviewers = (pullRequest.item.reviewers ?? []).map(convertIdentityRefWithVoteToReviewer);
 
 				this._postMessage({
 					command: 'pr.initialize',
@@ -130,19 +188,35 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 						},
 						state: pullRequest.state,
 						isCurrentlyCheckedOut: isCurrentlyCheckedOut,
-						base: pullRequest.base?.ref ?? 'UNKNOWN',
-						head: pullRequest.head?.ref ?? 'UNKNOWN',
+						// AC-08: fall back to the parsed branch name (still known even once the branch
+						// itself is deleted) rather than the literal string "UNKNOWN" - see
+						// pullRequestOverview.ts.
+						base:
+							pullRequest.base?.ref ??
+							convertBranchRefToBranchName(pullRequest.item.targetRefName || '') ??
+							'UNKNOWN',
+						head:
+							pullRequest.head?.ref ??
+							convertBranchRefToBranchName(pullRequest.item.sourceRefName || '') ??
+							'UNKNOWN',
 						canEdit: canEdit,
 						hasWritePermission,
 						mergeable: pullRequest.item.mergeStatus,
 						isDraft: pullRequest.isDraft,
-						status: { statuses: [] },
+						status: !!status ? status : { statuses: [] },
 						events: [],
 						mergeMethodsAvailability,
 						defaultMergeMethod,
 						isIssue: false,
-						isAuthor: currentUser.id === pullRequest.item.createdBy?.uniqueName,
+						isAuthor: currentUser.id === pullRequest.item.createdBy?.id,
 						reviewers: this._existingReviewers,
+						policies,
+						autoCompleteSetBy: pullRequest.item.autoCompleteSetBy
+							? convertRESTUserToAccount(pullRequest.item.autoCompleteSetBy)
+							: undefined,
+						autoCompleteOptions: pullRequest.item.autoCompleteSetBy
+							? buildCompletionSummary(pullRequest.item.completionOptions)
+							: undefined,
 					},
 				});
 			})
@@ -152,15 +226,13 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 	}
 
 	private close(message: IRequestMessage<string>): void {
-		vscode.commands
-			.executeCommand<GitPullRequestCommentThread>('azdopr.close', this._item, message.args)
-			.then(comment => {
-				if (comment) {
-					this._replyMessage(message, {
-						value: comment,
-					});
-				}
-			});
+		vscode.commands.executeCommand<GitPullRequestCommentThread>('azdopr.close', this._item, message.args).then(comment => {
+			if (comment) {
+				this._replyMessage(message, {
+					value: comment,
+				});
+			}
+		});
 	}
 
 	// private createComment(message: IRequestMessage<string>) {
@@ -173,13 +245,32 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 
 	private updateReviewers(review?: IdentityRefWithVote): void {
 		if (review) {
-			const existingReviewer = this._existingReviewers.find(reviewer => review.uniqueName === reviewer.uniqueName);
+			const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
 			if (existingReviewer) {
-				existingReviewer.vote = review.vote;
+				existingReviewer.state = review.vote ?? 0;
+				existingReviewer.isRequired = review.isRequired ?? false;
 			} else {
-				this._existingReviewers.push(review);
+				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 			}
 		}
+	}
+
+	private votePullRequest(message: IRequestMessage<number>): void {
+		this._item.submitVote(message.args).then(
+			review => {
+				this.updateReviewers(review);
+				this._replyMessage(message, {
+					review: review,
+					reviewers: this._existingReviewers,
+				});
+				//refresh the pr list as the vote changed
+				vscode.commands.executeCommand('azdopr.refreshList');
+			},
+			e => {
+				vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
+				this._throwError(message, `${formatError(e)}`);
+			},
+		);
 	}
 
 	private approvePullRequest(message: IRequestMessage<string>): void {
@@ -310,8 +401,13 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 
 			vscode.commands.executeCommand('azdopr.refreshList');
 
+			// See pullRequestOverview.ts: broadcast drives the head->'UNKNOWN' commandHandler, seq reply
+			// resolves the awaited deleteBranch() promise so the button recovers. (item 1c)
 			this._postMessage({
 				command: 'pr.deleteBranch',
+			});
+			this._replyMessage(message, {
+				cancelled: false,
 			});
 		} else {
 			this._replyMessage(message, {
@@ -320,33 +416,124 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 		}
 	}
 
+	private async setReadyForReview(message: IRequestMessage<any>, isDraft: boolean): Promise<void> {
+		if (isDraft) {
+			const confirmation = await vscode.window.showWarningMessage(
+				'Convert this pull request to a draft? Azure DevOps resets all reviewer votes when a PR is marked as draft.',
+				{ modal: true },
+				'Convert to draft',
+			);
+			if (confirmation !== 'Convert to draft') {
+				this._replyMessage(message, { isDraft: this._item.isDraft });
+				return;
+			}
+		}
+
+		try {
+			const result = await this._item.setReadyForReview(isDraft);
+			vscode.commands.executeCommand('azdopr.refreshList');
+			this._replyMessage(message, { isDraft: result.isDraft });
+		} catch (e) {
+			vscode.window.showErrorMessage(
+				`${
+					isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
+				} failed. ${formatError(e)}`,
+			);
+			this._throwError(message, `${formatError(e)}`);
+		}
+	}
+
+	// AC-03: complete the PR from the checked-out-PR sidebar instead of calling the commented-out
+	// FolderRepositoryManager.mergePullRequest stub. The MergeSimple dropdown supplies the strategy.
 	private async mergePullRequest(
-		message: IRequestMessage<{ title: string; description: string; method: 'merge' | 'squash' | 'rebase' }>,
+		message: IRequestMessage<{ title: string; description: string; method: MergeMethod }>,
 	): Promise<void> {
-		const { title, description, method } = message.args;
-		const confirmation = await vscode.window.showInformationMessage('Merge this pull request?', { modal: true }, 'Yes');
-		if (confirmation !== 'Yes') {
-			this._replyMessage(message, { state: GithubItemStateEnum.Open });
+		// item 4: this path hardcodes deleteSourceBranch + transitionWorkItems; disclose both in the
+		// confirmation instead of the bare "Complete this pull request?".
+		const confirmation = await vscode.window.showInformationMessage(
+			'Complete this pull request? This will delete the source branch and complete any linked work items.',
+			{ modal: true },
+			'Complete',
+		);
+		if (confirmation !== 'Complete') {
+			this._replyMessage(message, { state: PullRequestStatus.Active });
 			return;
 		}
 
-		this._folderRepositoryManager
-			.mergePullRequest(this._item, title, description, method)
+		const mergeStrategy = GitPullRequestMergeStrategy[message.args.method] ?? GitPullRequestMergeStrategy.NoFastForward;
+		this._item
+			.completePullRequest({ deleteSourceBranch: true, transitionWorkItems: true, mergeStrategy })
 			.then(result => {
 				vscode.commands.executeCommand('azdopr.refreshList');
 
-				if (!result.merged) {
-					vscode.window.showErrorMessage(`Merging PR failed: ${result.message}`);
+				if (result.closedBy === undefined) {
+					vscode.window.showErrorMessage(`Completing PR failed: ${result.mergeFailureMessage}`);
+					this._replyMessage(message, { state: PullRequestStatus.Active });
+					return;
 				}
 
-				this._replyMessage(message, {
-					state: result.merged ? GithubItemStateEnum.Merged : GithubItemStateEnum.Open,
-				});
+				this._replyMessage(message, { state: PullRequestStatus.Completed });
 			})
 			.catch(e => {
-				vscode.window.showErrorMessage(`Unable to merge pull request. ${formatError(e)}`);
+				vscode.window.showErrorMessage(`Unable to complete pull request. ${formatError(e)}`);
 				this._throwError(message, {});
 			});
+	}
+
+	// AC-02: same set/cancel-auto-complete plumbing as the overview host - see pullRequestOverview.ts
+	// for the race-handling rationale (cancel-vs-complete).
+	private async setAutoComplete(
+		message: IRequestMessage<{ enable: boolean; options?: PullRequestCompletion }>,
+	): Promise<void> {
+		try {
+			const result = await this._item.setAutoComplete(message.args.enable ? message.args.options : undefined);
+			vscode.commands.executeCommand('azdopr.refreshList');
+
+			// webview.postMessage() serializes through JSON.stringify, which drops keys whose value is
+			// `undefined` entirely - the webview's shallow-merge updatePR() then never overwrites the
+			// stale cached value, so canceling looked like it did nothing. Send `null` for "cleared"
+			// instead: it survives serialization and every consumer already treats it as falsy.
+			this._replyMessage(message, {
+				autoCompleteSetBy:
+					result.autoCompleteSetBy && result.autoCompleteSetBy.id !== AUTO_COMPLETE_CLEAR_ID
+						? convertRESTUserToAccount(result.autoCompleteSetBy)
+						: null,
+				autoCompleteOptions: buildCompletionSummary(result.completionOptions) ?? null,
+				state: result.status ?? this._item.item.status,
+				mergeable: result.mergeStatus,
+				mergeFailureMessage: result.mergeFailureMessage,
+			});
+		} catch (e) {
+			// See pullRequestOverview.ts: guard the recovery fetch so a second failure still routes to
+			// the error toast + _throwError instead of leaving the webview promise pending. (item 1d)
+			if (!message.args.enable) {
+				try {
+					const fresh = await this._folderRepositoryManager.resolvePullRequest(
+						this._item.remote.owner,
+						this._item.remote.repositoryName,
+						this._item.getPullRequestId(),
+					);
+					if (fresh?.state === PullRequestStatus.Completed) {
+						vscode.window.showInformationMessage('Pull request was already completed by auto-complete.');
+						this._replyMessage(message, {
+							autoCompleteSetBy: null,
+							autoCompleteOptions: null,
+							state: fresh.state,
+							mergeable: fresh.item.mergeStatus,
+						});
+						return;
+					}
+				} catch {
+					// Recovery fetch failed too; fall through to the error path below.
+				}
+			}
+			vscode.window.showErrorMessage(`Unable to update auto-complete. ${formatError(e)}`);
+			this._throwError(message, {});
+		}
+	}
+
+	private webviewDebug(message: IRequestMessage<string>): void {
+		Logger.debug(message.args, PullRequestViewProvider.viewType);
 	}
 
 	private _getHtmlForWebview() {

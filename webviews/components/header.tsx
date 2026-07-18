@@ -35,10 +35,11 @@ export function Header({
 	isDraft,
 	isIssue,
 	threads,
-}: PullRequest) {
+	isActive,
+}: PullRequest & { isActive: boolean }) {
 	return (
 		<>
-			<Title {...{ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue }} />
+			<Title {...{ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, isDraft, state, isActive }} />
 			<div className="subtitle">
 				<div id="status">{getStatus(state, isDraft)}</div>
 				{!isIssue ? <Avatar url={author.url} avatarUrl={author.avatarUrl} /> : null}
@@ -63,11 +64,21 @@ export function Header({
 	);
 }
 
-function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue }: Partial<PullRequest>) {
+function Title({
+	title,
+	number,
+	url,
+	canEdit,
+	isCurrentlyCheckedOut,
+	isIssue,
+	isDraft,
+	state,
+	isActive,
+}: Partial<PullRequest> & { isActive?: boolean }) {
 	const [inEditMode, setEditMode] = useState(false);
-	const [showActionBar, setShowActionBar] = useState(false);
 	const [currentTitle, setCurrentTitle] = useStateProp(title);
-	const { setTitle, refresh, copyPrLink } = useContext(PullRequestContext);
+	const { setTitle, refresh, copyPrLink, convertToDraft, updatePR } = useContext(PullRequestContext);
+	const canConvertToDraft = !isIssue && !isDraft && state === PullRequestStatus.Active;
 	const editableTitle = inEditMode ? (
 		<form
 			className="editing-form title-editing-form"
@@ -97,11 +108,7 @@ function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue }: 
 	);
 
 	return (
-		<div
-			className="overview-title"
-			onMouseEnter={() => setShowActionBar(true)}
-			onMouseLeave={() => setShowActionBar(false)}
-		>
+		<div className="overview-title">
 			{editableTitle}
 			<div className="block-select">
 				{/*
@@ -109,31 +116,47 @@ function Title({ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue }: 
 			  Add an empty selectable div here to block triple click on title from selecting the following buttons. Issue #628.
 			*/}
 			</div>
-			{canEdit && showActionBar && !inEditMode ? (
-				<div className="flex-action-bar comment-actions">
-					{
+			{/* item 2: the title actions (Edit / Copy Link / Convert to draft) are always in the DOM now
+			    and revealed on hover OR focus-within (see index.css .title-action-bar), so keyboard users
+			    can reach them - they were previously gated on an onMouseEnter-only showActionBar state. */}
+			{canEdit && !inEditMode ? (
+				<div className="flex-action-bar comment-actions title-action-bar">
+					{isActive ? (
 						<button title="Edit" onClick={() => setEditMode(true)}>
 							{editIcon}
 						</button>
-					}
+					) : null}
 					{
 						<button title="Copy Link" onClick={copyPrLink}>
 							{copyIcon}
 						</button>
 					}
+					{canConvertToDraft ? (
+						<button
+							title="Convert to draft"
+							onClick={async () => {
+								const result = await convertToDraft();
+								if (result && result.isDraft) {
+									updatePR({ isDraft: true });
+								}
+							}}
+						>
+							Convert to draft
+						</button>
+					) : null}
 				</div>
 			) : (
-				<div className="flex-action-bar comment-actons"></div>
+				<div className="flex-action-bar comment-actions title-action-bar"></div>
 			)}
 			<div className="button-group">
-				<CheckoutButtons {...{ isCurrentlyCheckedOut, isIssue }} />
+				<CheckoutButtons {...{ isCurrentlyCheckedOut, isIssue, isActive }} />
 				<button onClick={refresh}>Refresh</button>
 			</div>
 		</div>
 	);
 }
 
-const CheckoutButtons = ({ isCurrentlyCheckedOut, isIssue }) => {
+const CheckoutButtons = ({ isCurrentlyCheckedOut, isIssue, isActive }) => {
 	const { exitReviewMode, checkout } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 
@@ -167,7 +190,9 @@ const CheckoutButtons = ({ isCurrentlyCheckedOut, isIssue }) => {
 				</button>
 			</>
 		);
-	} else if (!isIssue) {
+	} else if (!isIssue && isActive) {
+		// UX-02: never offer plain Checkout on a finished PR (§2.2). Exit Review Mode above stays
+		// available regardless of state so a user can leave review mode of a merged PR.
 		return (
 			<button aria-live="polite" disabled={isBusy} onClick={() => onClick('checkout')}>
 				Checkout
