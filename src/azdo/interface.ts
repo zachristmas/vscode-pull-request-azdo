@@ -163,9 +163,11 @@ export interface IRawFileChange {
 export interface IFileChangeNode {
 	status: GitChangeType;
 	sha?: string;
-	blobUrl: string;
+	// Both undefined-able in the implementing nodes: GitFileChangeNode has no blobUrl for local
+	// changes, and previousFileName only exists for renames/deletes.
+	blobUrl: string | undefined;
 	fileName: string;
-	previousFileName: string;
+	previousFileName: string | undefined;
 	diffHunks?: DiffHunk[];
 	previousFileSha?: string;
 }

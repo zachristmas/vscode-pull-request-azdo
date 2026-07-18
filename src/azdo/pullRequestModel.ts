@@ -149,8 +149,10 @@ export class PullRequestModel implements IPullRequestModel {
 		}/pullrequest/${this.getPullRequestId()}`;
 	}
 
-	public head: GitHubRef;
-	public base: GitHubRef;
+	// Assigned in update() (called from the constructor); may still be absent at runtime for
+	// unresolvable branches, which isResolved()/validatePullRequestModel() check via !!this.head.
+	public head!: GitHubRef;
+	public base!: GitHubRef;
 
 	protected updateState(state: string) {
 		if (state.toLowerCase() === 'active') {
@@ -367,7 +369,7 @@ export class PullRequestModel implements IPullRequestModel {
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
 
-		let tc: CommentThreadContext = undefined;
+		let tc: CommentThreadContext;
 
 		const endLine = threadContext?.endLine ?? threadContext?.line;
 		if (threadContext?.isLeft) {
@@ -410,14 +412,16 @@ export class PullRequestModel implements IPullRequestModel {
 	}
 
 	private convertThreadToIReviewThread(result: GitPullRequestCommentThread): IReviewThread {
+		// path/line/diffSide are undefined at runtime for general (non-file) threads; consumers
+		// filter on them, so keep the pre-strict values rather than inventing defaults.
 		return {
-			id: result.id,
+			id: result.id!,
 			isResolved: isCommentResolved(result.status),
 			viewerCanResolve: true,
-			path: result.threadContext?.filePath,
-			line: getPositionFromThread(result),
-			diffSide: getDiffSide(result),
-			isDeleted: result.isDeleted,
+			path: result.threadContext?.filePath as string,
+			line: getPositionFromThread(result)!,
+			diffSide: getDiffSide(result)!,
+			isDeleted: result.isDeleted ?? false,
 			thread: result,
 			isOutdated: false,
 			originalLine: 0, // TODO What goes here and in isOutdated
@@ -533,7 +537,7 @@ export class PullRequestModel implements IPullRequestModel {
 		const threadWithComment = this._reviewThreadsCache.find(thread => thread.id === threadId);
 
 		if (threadWithComment) {
-			threadWithComment.thread.comments.push(result);
+			threadWithComment.thread.comments = [...(threadWithComment.thread.comments ?? []), result];
 			this._onDidChangeReviewThreads.fire({ added: [], changed: [threadWithComment], removed: [] });
 		}
 
@@ -613,7 +617,10 @@ export class PullRequestModel implements IPullRequestModel {
 		const threadWithComment = this._reviewThreadsCache.find(thread => thread.id === threadId);
 
 		if (threadWithComment) {
-			threadWithComment.thread.comments = [...threadWithComment.thread.comments.filter(c => c.id !== commentId), result];
+			threadWithComment.thread.comments = [
+				...(threadWithComment.thread.comments ?? []).filter(c => c.id !== commentId),
+				result,
+			];
 			this._onDidChangeReviewThreads.fire({ added: [], changed: [threadWithComment], removed: [] });
 		}
 
@@ -1037,12 +1044,13 @@ export class PullRequestModel implements IPullRequestModel {
 				diffHunks: getDiffHunkFromFileDiff(diff),
 				filename: diff.path!,
 				previous_filename: diff.originalPath!,
-				blob_url: change_map?.item?.url,
-				raw_url: change_map?.item?.url,
+				// '' rather than undefined keeps IRawFileChange tight; consumers already treat falsy as absent
+				blob_url: change_map?.item?.url ?? '',
+				raw_url: change_map?.item?.url ?? '',
 				file_sha: change_map?.item?.objectId,
 				previous_file_sha: change_map?.item?.originalObjectId,
-				status: change_map?.changeType,
-				baseCommit: baseCommit,
+				status: change_map?.changeType ?? VersionControlChangeType.None,
+				baseCommit: baseCommit!,
 				headCommit: target.version!,
 			});
 		}
@@ -1204,7 +1212,8 @@ export class PullRequestModel implements IPullRequestModel {
 			const [leftFileContent, rightFileContent] = await Promise.all([leftFileContentPromise, rightFileContentPromise]);
 			patch = diff.createTwoFilesPatch(
 				fileChange.fileName,
-				fileChange.previousFileName,
+				// undefined used to print a literal 'undefined' header in the fallback patch
+				fileChange.previousFileName ?? fileChange.fileName,
 				leftFileContent,
 				rightFileContent,
 			);

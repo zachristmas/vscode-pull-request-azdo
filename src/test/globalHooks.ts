@@ -1,5 +1,3 @@
-/* eslint-disable prefer-rest-params */
-/* eslint-disable prefer-spread */
 // Global Mocha test hooks.
 
 import * as util from 'util';
@@ -14,14 +12,14 @@ beforeEach(function () {
 		consoleOutputs?: string[];
 		consoleErrors?: string[];
 	};
-	console.log = function captureLog() {
-		original.log.apply(console, arguments);
-		const formatted = util.format.apply(util, arguments);
+	console.log = function captureLog(...args: unknown[]) {
+		original.log.apply(console, args);
+		const formatted = util.format(...args);
 		currentTest.consoleOutputs = (currentTest.consoleOutputs || []).concat(formatted);
 	};
-	console.error = function captureError() {
-		original.error.apply(console, arguments);
-		const formatted = util.format.apply(util, arguments);
+	console.error = function captureError(...args: unknown[]) {
+		original.error.apply(console, args);
+		const formatted = util.format(...args);
 		currentTest.consoleErrors = (currentTest.consoleErrors || []).concat(formatted);
 	};
 });

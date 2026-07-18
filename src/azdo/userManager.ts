@@ -20,7 +20,7 @@ export class AzdoUserManager implements vscode.Disposable {
 			await this._credentialStore.initialize();
 		}
 		this._hub = this._credentialStore.getHub();
-		this._entitlementApi = await getEntitlementApi(this._hub?.connection);
+		this._entitlementApi = this._hub ? await getEntitlementApi(this._hub.connection) : undefined;
 
 		return this;
 	}

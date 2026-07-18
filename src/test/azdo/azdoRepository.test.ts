@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { expect } from 'chai';
 import * as dotenv from 'dotenv';
-import { createSandbox, SinonSandbox } from 'sinon';
+import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { AzdoRepository } from '../../azdo/azdoRepository';
 import { CredentialStore } from '../../azdo/credentials';
 import { Protocol } from '../../common/protocol';
@@ -13,12 +13,13 @@ import { FileReviewedStatusService } from '../../azdo/fileReviewedStatusService'
 import { GitApiImpl } from '../../api/api1';
 import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { MockRepository } from '../mocks/mockRepository';
+import { asReal } from '../mocks/stub';
 
 describe('AzdoRepository', function () {
 	let sinon: SinonSandbox;
 	let credentialStore: CredentialStore;
 	let telemetry: MockTelemetry;
-	let fileReviewedStatusService;
+	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 
 	this.timeout(1000000);
 
@@ -50,7 +51,7 @@ describe('AzdoRepository', function () {
 			await credentialStore.initialize();
 			const url = 'https://dev.azure.com/anksinha/test/_git/test';
 			const remote = new Remote('origin', url, new Protocol(url));
-			const azdoRepo = new AzdoRepository(remote, credentialStore, fileReviewedStatusService, telemetry);
+			const azdoRepo = new AzdoRepository(remote, credentialStore, asReal(fileReviewedStatusService), telemetry);
 			const metadata = await azdoRepo.getMetadata();
 			expect(metadata?.name).to.be.eq('test');
 		});

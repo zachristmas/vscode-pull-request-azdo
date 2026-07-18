@@ -8,6 +8,7 @@ import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInter
 import * as React from 'react';
 // eslint-disable-next-line no-duplicate-imports
 import { useContext, useEffect, useRef, useState } from 'react';
+import { ReviewState } from '../../src/azdo/interface';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
 import { getClosedCommentDescription } from './header';
@@ -16,7 +17,7 @@ import { REVIEW_STATE_ICON, Reviewer, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
 
 export default function Sidebar({ reviewers, workItems, hasWritePermission, isActive }: PullRequest & { isActive: boolean }) {
-	const { addRequiredReviewers, addOptionalReviewers, associateWorkItem, updatePR, pr } = useContext(PullRequestContext);
+	const { addRequiredReviewers, addOptionalReviewers, associateWorkItem, pr } = useContext(PullRequestContext);
 
 	// UX-02: on a finished PR keep the reviewer/work-item rows (they are the review record) but drop
 	// every mutation affordance - the vote panel, the add (+) buttons, and the hover-remove.
@@ -36,14 +37,12 @@ export default function Sidebar({ reviewers, workItems, hasWritePermission, isAc
 				reviewers={reviewers.filter(r => r.isRequired)}
 				addReviewers={addRequiredReviewers}
 				hasWritePermission={canManage}
-				updatePR={newReviewers => updatePR({ reviewers: pr.reviewers.concat(newReviewers.added) })}
 			/>
 			<ReviewerPanel
 				labelText="Optional Reviewers"
 				reviewers={reviewers.filter(r => !r.isRequired)}
 				addReviewers={addOptionalReviewers}
 				hasWritePermission={canManage}
-				updatePR={newReviewers => updatePR({ reviewers: pr.reviewers.concat(newReviewers.added) })}
 			/>
 			<div id="work-item" className="section">
 				<div className="section-header">
@@ -101,16 +100,26 @@ function WorkItem(workItem: WorkItem & { canDelete: boolean }) {
 const WorkItemDetails = (workItem: WorkItem) => (
 	<div className="work-item-container">
 		<a href={workItem._links['html']['href']}>
-			<div className="work-item-type">{workItem.fields['System.WorkItemType']}</div>
+			<div className="work-item-type">{workItem.fields?.['System.WorkItemType']}</div>
 			<div className="work-item-title">
-				{workItem.id}: {workItem.fields['System.Title']}
+				{workItem.id}: {workItem.fields?.['System.Title']}
 				{}
 			</div>
 		</a>
 	</div>
 );
 
-const ReviewerPanel = ({ reviewers, labelText, hasWritePermission, addReviewers, updatePR }) => (
+const ReviewerPanel = ({
+	reviewers,
+	labelText,
+	hasWritePermission,
+	addReviewers,
+}: {
+	reviewers: ReviewState[];
+	labelText: string;
+	hasWritePermission: boolean;
+	addReviewers: () => Promise<void>;
+}) => (
 	<div id="reviewers" className="section">
 		<div className="section-header">
 			<div className="section-title">{labelText}</div>
@@ -118,8 +127,8 @@ const ReviewerPanel = ({ reviewers, labelText, hasWritePermission, addReviewers,
 				<button
 					title={`Add ${labelText}`}
 					onClick={async () => {
-						const newReviewers = await addReviewers();
-						updatePR(newReviewers.added);
+						// context appendReview already refreshes pr.reviewers; the old updatePR call threw on the void return
+						await addReviewers();
 					}}
 				>
 					{plusIcon}
@@ -145,7 +154,7 @@ export const VoteText = {
 };
 
 // Real votes only; '0' (Reset Vote) is no longer an option in the select - it moved to the reset link.
-const VoteOrder = ['10', '5', '-5', '-10'];
+const VoteOrder: (keyof typeof VoteText)[] = ['10', '5', '-5', '-10'];
 
 type CastState = 'idle' | 'busy' | 'success' | 'error';
 

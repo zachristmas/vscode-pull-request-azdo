@@ -30,7 +30,7 @@ export class Protocol {
 		return this.org ? `${this.org}/${this.repositoryName}/${owner}` : owner;
 	}
 
-	public readonly url: vscode.Uri;
+	public readonly url!: vscode.Uri;
 	constructor(uriString: string) {
 		if (this.parseSshProtocol(uriString)) {
 			return;

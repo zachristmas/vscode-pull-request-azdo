@@ -30,7 +30,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 
 	private _view?: vscode.WebviewView;
 
-	private _existingReviewers: ReviewState[];
+	private _existingReviewers!: ReviewState[];
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,

@@ -115,7 +115,11 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 		const reviewThreads = this.pullRequestModel.reviewThreadsCache;
 		const threadsByPath = groupBy(reviewThreads, thread => thread.path);
 		editors.forEach(editor => {
-			const { fileName, isBase } = fromPRUri(editor.document.uri);
+			const params = fromPRUri(editor.document.uri);
+			if (!params) {
+				return;
+			}
+			const { fileName, isBase } = params;
 			if (threadsByPath[fileName]) {
 				const fileCache = this._commentThreadCache[this.getCommentThreadCacheKey(fileName, isBase)] ?? [];
 				const newThreads = threadsByPath[fileName]
@@ -166,8 +170,11 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 		this._openPREditors = prEditors;
 
 		removed.forEach(editor => {
-			const { fileName, isBase } = fromPRUri(editor.document.uri);
-			const key = this.getCommentThreadCacheKey(fileName, isBase);
+			const params = fromPRUri(editor.document.uri);
+			if (!params) {
+				return;
+			}
+			const key = this.getCommentThreadCacheKey(params.fileName, params.isBase);
 			const threads = this._commentThreadCache[key] || [];
 			threads.forEach(t => t.dispose());
 			delete this._commentThreadCache[key];
@@ -188,18 +195,23 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 				return samePath && sameLine;
 			});
 
-			let newThread: GHPRCommentThread;
+			let newThread: GHPRCommentThread | undefined;
 			if (index > -1) {
-				newThread = this._pendingCommentThreadAdds[index];
-				newThread.threadId = thread.id;
-				newThread.comments = thread.thread.comments.map(
-					c => new GHPRComment(c, this.pullRequestModel.getCommentPermission(c), newThread),
-				);
+				const pendingThread = this._pendingCommentThreadAdds[index];
+				pendingThread.threadId = thread.id;
+				pendingThread.comments =
+					thread.thread.comments?.map(
+						c => new GHPRComment(c, this.pullRequestModel.getCommentPermission(c), pendingThread),
+					) ?? [];
 				this._pendingCommentThreadAdds.splice(index, 1);
+				newThread = pendingThread;
 			} else {
 				const openPREditors = this.getPREditors(vscode.window.visibleTextEditors);
 				const matchingEditor = openPREditors.find(editor => {
 					const query = fromPRUri(editor.document.uri);
+					if (!query) {
+						return false;
+					}
 					const sameSide =
 						(thread.diffSide === DiffSide.RIGHT && !query.isBase) ||
 						(thread.diffSide === DiffSide.LEFT && query.isBase);
@@ -251,8 +263,8 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 				updateThread(
 					matchingThread,
 					thread.thread.comments
-						.filter(c => !c.isDeleted)
-						.map(c => new GHPRComment(c, this.pullRequestModel.getCommentPermission(c), matchingThread)),
+						?.filter(c => !c.isDeleted)
+						.map(c => new GHPRComment(c, this.pullRequestModel.getCommentPermission(c), matchingThread)) ?? [],
 				);
 			}
 		});
@@ -299,7 +311,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 
 	private getCommentSide(thread: GHPRCommentThread): DiffSide {
 		const query = fromPRUri(thread.uri);
-		return query.isBase ? DiffSide.LEFT : DiffSide.RIGHT;
+		return query?.isBase ? DiffSide.LEFT : DiffSide.RIGHT;
 	}
 
 	private async updateCommentThreadCache(thread: GHPRCommentThread, fileName: string): Promise<void> {

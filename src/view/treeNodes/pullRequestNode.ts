@@ -87,7 +87,7 @@ export class PRNode extends TreeNode {
 
 	private _inMemPRContentProvider?: vscode.Disposable;
 
-	private _command: vscode.Command;
+	private _command!: vscode.Command;
 	public commentingRangeProvider: vscode.CommentingRangeProvider;
 
 	public get command(): vscode.Command {

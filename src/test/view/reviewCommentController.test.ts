@@ -11,7 +11,7 @@ import {
 	GitPullRequest,
 	GitPullRequestCommentThread,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import { createSandbox, SinonSandbox } from 'sinon';
+import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';
 import * as vscode from 'vscode';
 import { IGit, Repository } from '../../api/api';
@@ -33,6 +33,7 @@ import { toReviewUri } from '../../common/uri';
 import { PullRequestsTreeDataProvider } from '../../view/prsTreeDataProvider';
 import { ReviewCommentController } from '../../view/reviewCommentController';
 import { GitFileChangeNode, RemoteFileChangeNode } from '../../view/treeNodes/fileChangeNode';
+import { asReal } from '../mocks/stub';
 import { MockAzdoRepository } from '../mocks/mockAzdoRepository';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
@@ -76,7 +77,7 @@ describe('ReviewCommentController', function () {
 	let provider: PullRequestsTreeDataProvider;
 	let manager: FolderRepositoryManager;
 	let activePullRequest: PullRequestModel;
-	let fileReviewedStatusService;
+	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 	let gitImpl: GitApiImpl;
 
 	beforeEach(async function () {
@@ -95,12 +96,12 @@ describe('ReviewCommentController', function () {
 
 		provider = new PullRequestsTreeDataProvider(telemetry);
 		fileReviewedStatusService = sinon.createStubInstance(FileReviewedStatusService);
-		manager = new FolderRepositoryManager(repository, telemetry, gitImpl, credentialStore, fileReviewedStatusService);
+		manager = new FolderRepositoryManager(repository, telemetry, gitImpl, credentialStore, asReal(fileReviewedStatusService));
 		sinon.stub(credentialStore, 'isAuthenticated').returns(false);
 		await manager.updateRepositories();
 
 		const pr = createMock<GitPullRequest>();
-		const repo = new AzdoRepository(remote, credentialStore, fileReviewedStatusService, telemetry);
+		const repo = new AzdoRepository(remote, credentialStore, asReal(fileReviewedStatusService), telemetry);
 		activePullRequest = new PullRequestModel(
 			telemetry,
 			repo,
@@ -206,7 +207,7 @@ describe('ReviewCommentController', function () {
 			// });
 
 			sinon.stub(activePullRequest.azdoRepository.azdo!.connection, 'getGitApi').resolves({
-				createThread: async (c, r, n, p) => {
+				createThread: async (c: unknown, r: unknown, n: unknown, p: unknown) => {
 					return {
 						id: 1,
 						comments: [
@@ -223,7 +224,7 @@ describe('ReviewCommentController', function () {
 						status: CommentThreadStatus.Active,
 					};
 				},
-				getPullRequestIterations: (r, n, p, i) => {
+				getPullRequestIterations: (r: unknown, n: unknown, p: unknown, i: unknown) => {
 					return [];
 				},
 			} as any);

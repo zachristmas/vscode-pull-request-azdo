@@ -14,8 +14,8 @@ export interface BaseTreeNode {
 export type TreeNodeParent = TreeNode | BaseTreeNode;
 
 export abstract class TreeNode implements vscode.Disposable {
-	childrenDisposables: vscode.Disposable[];
-	parent: TreeNodeParent;
+	childrenDisposables: vscode.Disposable[] = [];
+	parent!: TreeNodeParent;
 	label?: string;
 
 	constructor() {}

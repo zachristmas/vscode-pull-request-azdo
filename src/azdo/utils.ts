@@ -639,12 +639,13 @@ export function getCommentThreadStatusKeys(): string[] {
 }
 
 export class UserCompletion extends vscode.CompletionItem {
-	login: string;
+	// Instances are only built as object literals, never via `new`, so these are always present
+	login!: string;
 	email?: string;
-	uri: vscode.Uri;
+	uri!: vscode.Uri;
 }
 
-export function isCommentResolved(status: CommentThreadStatus): boolean {
+export function isCommentResolved(status: CommentThreadStatus | undefined): boolean {
 	return (
 		status === CommentThreadStatus.ByDesign ||
 		status === CommentThreadStatus.Closed ||

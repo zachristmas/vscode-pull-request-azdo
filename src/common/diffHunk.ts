@@ -222,7 +222,6 @@ export function getModifiedContentFromDiffHunk(originalContent: string, patch: s
 			right.push(left[j - 1]);
 		}
 
-		// eslint-disable-next-line @typescript-eslint/restrict-plus-operands
 		lastCommonLine = oriStartLine + diffHunk.oldLength - 1;
 
 		for (let j = 0; j < diffHunk.diffLines.length; j++) {

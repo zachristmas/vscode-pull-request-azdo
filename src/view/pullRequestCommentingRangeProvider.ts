@@ -16,7 +16,10 @@ export class PullRequestCommentingRangeProvider implements vscode.CommentingRang
 		this._commonCommentHandler = new CommonCommentHandler(pullRequestModel, _folderReposManager);
 	}
 
-	async provideCommentingRanges(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<vscode.Range[] | vscode.CommentingRanges> {
+	async provideCommentingRanges(
+		document: vscode.TextDocument,
+		token: vscode.CancellationToken,
+	): Promise<vscode.Range[] | undefined> {
 		return await this._commonCommentHandler.provideCommentingRanges(
 			document,
 			token,
@@ -24,5 +27,4 @@ export class PullRequestCommentingRangeProvider implements vscode.CommentingRang
 			this.fileChanges,
 		);
 	}
-
 }

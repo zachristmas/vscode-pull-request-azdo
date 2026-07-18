@@ -47,7 +47,7 @@ export const Overview = (pr: PullRequest) => {
 					/>
 				</div>
 				<AddComment {...pr} isActive={isActive} />
-				<Timeline threads={pr.threads} currentUser={pr.currentUser} />
+				<Timeline threads={pr.threads ?? []} currentUser={pr.currentUser} />
 			</div>
 		</>
 	);

@@ -14,8 +14,17 @@ const enum KEYCODES {
 	up = 38,
 }
 
-export const Dropdown = ({ options, defaultOption, submitAction }) => {
-	const [selectedMethod, selectMethod] = useState<string>(defaultOption);
+// Generic so callers can use a narrower key type (e.g. MergeMethod) for submitAction.
+export const Dropdown = <T extends string>({
+	options,
+	defaultOption,
+	submitAction,
+}: {
+	options: { [key: string]: string };
+	defaultOption: T;
+	submitAction: (selected: T) => Promise<void>;
+}) => {
+	const [selectedMethod, selectMethod] = useState<T>(defaultOption);
 	const [areOptionsVisible, setOptionsVisible] = useState<boolean>(false);
 
 	const dropdownId = uuid();
@@ -25,36 +34,37 @@ export const Dropdown = ({ options, defaultOption, submitAction }) => {
 		setOptionsVisible(!areOptionsVisible);
 	};
 
-	const onMethodChange = e => {
-		selectMethod(e.target.value);
+	const onMethodChange = (e: React.MouseEvent<HTMLButtonElement>) => {
+		selectMethod((e.target as HTMLButtonElement).value as T);
 		setOptionsVisible(false);
 		const primaryButton = document.getElementById(`confirm-button${dropdownId}`);
-		primaryButton.focus();
+		primaryButton?.focus();
 	};
 
-	const onKeyDown = e => {
+	const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
 		if (areOptionsVisible) {
-			const currentElement = document.activeElement;
+			// a keydown reaching this handler means something inside the dropdown has focus
+			const currentElement = document.activeElement!;
 
 			switch (e.keyCode) {
 				case KEYCODES.esc:
 					setOptionsVisible(false);
 					const expandOptionsButton = document.getElementById(EXPAND_OPTIONS_BUTTON);
-					expandOptionsButton.focus();
+					expandOptionsButton?.focus();
 					break;
 
 				case KEYCODES.down:
 					if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
 						const firstOptionButton = document.getElementById(`${dropdownId}option0`);
-						firstOptionButton.focus();
+						firstOptionButton?.focus();
 					} else {
 						const regex = new RegExp(`${dropdownId}option([0-9])`);
 						const result = currentElement.id.match(regex);
-						if (result.length) {
+						if (result?.length) {
 							const index = parseInt(result[1]);
 							if (index < Object.entries(options).length - 1) {
 								const nextOption = document.getElementById(`${dropdownId}option${index + 1}`);
-								nextOption.focus();
+								nextOption?.focus();
 							}
 						}
 					}
@@ -64,15 +74,15 @@ export const Dropdown = ({ options, defaultOption, submitAction }) => {
 					if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
 						const lastIndex = Object.entries(options).length - 1;
 						const lastOptionButton = document.getElementById(`${dropdownId}option${lastIndex}`);
-						lastOptionButton.focus();
+						lastOptionButton?.focus();
 					} else {
 						const regex = new RegExp(`${dropdownId}option([0-9])`);
 						const result = currentElement.id.match(regex);
-						if (result.length) {
+						if (result?.length) {
 							const index = parseInt(result[1]);
 							if (index > 0) {
 								const nextOption = document.getElementById(`${dropdownId}option${index - 1}`);
-								nextOption.focus();
+								nextOption?.focus();
 							}
 						}
 					}
@@ -102,7 +112,7 @@ export const Dropdown = ({ options, defaultOption, submitAction }) => {
 	);
 };
 
-function Confirm({
+function Confirm<T extends string>({
 	dropdownId,
 	options,
 	selected,
@@ -110,8 +120,8 @@ function Confirm({
 }: {
 	dropdownId: string;
 	options: { [key: string]: string };
-	selected: string;
-	submitAction: (selected: string) => Promise<void>;
+	selected: T;
+	submitAction: (selected: T) => Promise<void>;
 }) {
 	const [isBusy, setBusy] = useState(false);
 

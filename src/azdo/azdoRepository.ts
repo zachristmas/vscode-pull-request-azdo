@@ -27,7 +27,7 @@ export type IMetadata = GitRepository;
 
 export class AzdoRepository implements vscode.Disposable {
 	static ID = 'AzdoRepository';
-	protected _initialized: boolean;
+	protected _initialized: boolean = false;
 	protected _hub: Azdo | undefined;
 	protected _metadata: IMetadata | undefined;
 	private _metadataNotFound: boolean = false;
@@ -35,7 +35,7 @@ export class AzdoRepository implements vscode.Disposable {
 	private _toDispose: vscode.Disposable[] = [];
 	public commentsController?: vscode.CommentController;
 	public commentsHandler?: PRCommentControllerRegistry;
-	public readonly isGitHubDotCom: boolean; // TODO: WTF is this for? Enterprise?
+	public readonly isGitHubDotCom: boolean = false; // TODO: WTF is this for? Enterprise?
 
 	constructor(
 		public remote: Remote,

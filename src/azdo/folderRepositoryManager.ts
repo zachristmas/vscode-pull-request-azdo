@@ -216,7 +216,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		vscode.languages.registerCompletionItemProvider(
 			{ scheme: 'comment' },
 			{
-				provideCompletionItems: async (document, position) => {
+				provideCompletionItems: async (document: vscode.TextDocument, position: vscode.Position) => {
 					try {
 						const query = JSON.parse(document.uri.query);
 						if (query.extensionId !== EXTENSION_ID) {
@@ -608,7 +608,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			return [];
 		}
 
-		const localBranches = (await this.repository.getRefs({}))
+		// getRefs is optional on the API (Remote Hub providers don't implement it)
+		const localBranches = ((await this.repository.getRefs?.({})) ?? [])
 			.filter(r => r.type === RefType.Head && r.name !== undefined)
 			.map(r => r.name!);
 
@@ -1206,7 +1207,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			if (result.legacy) {
 				result.picked = true;
 			} else {
-				result.description = result.description + ' is still Open';
+				result.description = `${result.description ?? ''} is still Open`;
 			}
 		});
 

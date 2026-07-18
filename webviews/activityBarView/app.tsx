@@ -15,7 +15,7 @@ export function main() {
 	render(<Root>{pr => <Overview {...pr} />}</Root>, document.getElementById('app'));
 }
 
-export function Root({ children }) {
+export function Root({ children }: { children: (pr: PullRequest) => JSX.Element }) {
 	const ctx = useContext(PullRequestContext);
 	const [pr, setPR] = useState<PullRequest>(ctx.pr);
 	useEffect(() => {

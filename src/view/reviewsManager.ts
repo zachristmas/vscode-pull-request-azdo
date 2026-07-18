@@ -28,7 +28,7 @@ export class ReviewsManager {
 	) {
 		this._disposables = [];
 		const gitContentProvider = new GitContentProvider(gitApi);
-		gitContentProvider.registerTextDocumentContentFallback(this.provideTextDocumentContent.bind(this));
+		gitContentProvider.registerTextDocumentContentFallback(async uri => (await this.provideTextDocumentContent(uri)) ?? '');
 		this._disposables.push(vscode.workspace.registerTextDocumentContentProvider(URI_SCHEME_REVIEW, gitContentProvider));
 		this.registerListeners();
 		this._disposables.push(this._prsTreeDataProvider);

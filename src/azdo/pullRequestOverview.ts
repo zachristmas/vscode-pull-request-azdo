@@ -45,10 +45,10 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	protected static readonly _viewType: string = 'PullRequestOverview';
 	protected readonly _panel: vscode.WebviewPanel;
 
-	protected _item: PullRequestModel;
+	protected _item!: PullRequestModel;
 	private _prNumber: number;
-	private _repositoryDefaultBranch: string;
-	private _existingReviewers: ReviewState[];
+	private _repositoryDefaultBranch!: string;
+	private _existingReviewers!: ReviewState[];
 
 	private _changeActivePullRequestListener: vscode.Disposable | undefined;
 	private _extensionPath: string;

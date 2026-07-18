@@ -151,7 +151,6 @@ export function mapOldPositionToNew(patch: string, line: number): number {
 
 		if (diffHunk.oldLineNumber > line) {
 			// No-op
-			// eslint-disable-next-line @typescript-eslint/restrict-plus-operands
 		} else if (diffHunk.oldLineNumber + diffHunk.oldLength - 1 < line) {
 			delta += diffHunk.newLength - diffHunk.oldLength;
 		} else {
