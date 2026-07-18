@@ -125,3 +125,11 @@ export function isUserCommentThread(thread: GitPullRequestCommentThread) {
 export function isSystemThread(thread: GitPullRequestCommentThread) {
 	return thread.comments?.find(c => c.id === 1)?.commentType === CommentType.System;
 }
+
+// Threads created outside the extension (raw REST, integrations) can miss the shapes the two
+// predicates above key on: no comment with id 1, or a commentType that is unknown/codeChange/
+// absent. The ADO web UI still shows them, so the timeline treats any non-system thread with a
+// visible comment as renderable instead of dropping it.
+export function hasVisibleComments(thread: GitPullRequestCommentThread) {
+	return !!thread.comments?.some(c => !c.isDeleted && !!c.content);
+}
