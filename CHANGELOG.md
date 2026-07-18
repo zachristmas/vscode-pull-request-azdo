@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.0
+
+Deep links in both directions, the restored create-PR flow, and thread-card context/navigation on the description page.
+
+- Copy links FROM VS Code: `Copy Pull Request URL`, `Copy Link to File in Pull Request` (links to the file's diff in the PR files view; works from a PR tree file node or the active PR diff editor), and `Copy VS Code Deep Link to Pull Request`. Line anchors are not emitted for file links because the ADO PR files view has no verified line-anchor URL params; the toast notes this when a selection exists.
+- Open PRs IN VS Code from a `vscode://` deep link: `vscode://zacharychristmas.azdo-pull-requests-multiproject/open-pr?org={orgUrl}&project={project}&repo={repo}&pr={id}[&path={/file}&line={n}]` finds the workspace folder cloning that repo, opens the PR description page, and with `path`/`line` opens the file's diff with the cursor on that line. Links arriving before activation are queued; previously a URI handler was registered but nothing subscribed, so incoming URIs were silently dropped.
+- Create Pull Request is back: `Create Pull Request` and `Create Draft Pull Request` from the palette or the `+` icon on the PR view. The whole flow was repaired for Azure DevOps: a real `GitPullRequest` payload (the old code still sent GitHub-shaped params to a stubbed API), the target-branch picker prefilled from ADO `defaultBranch` (was "undefined"), publish-branch no longer crashes on quick-pick cancel, the branch-exists validator actually runs, and unresolved-repository failures surface real error messages instead of TypeErrors or silent no-ops.
+- Clicking a thread's file chip on the description page now opens the diff with the cursor on the thread's line instead of Ln 1 Col 1.
+- Description-page thread chips include the thread's line number (`/src/rateLimiter.ts:17`); file-level threads keep the bare path.
+
 ## 1.5.2
 
 Field fixes from the 2026-07-17 screenshot/triage session.
