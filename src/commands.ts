@@ -19,19 +19,20 @@ import { AzdoUserManager } from './azdo/userManager';
 import { getPositionFromThread } from './azdo/utils';
 import { AzdoWorkItem } from './azdo/workItem';
 import { CommentReply, resolveCommentHandler } from './commentHandlerResolver';
+import { buildPullRequestDeepLink, deepLinkParamsFromPullRequest } from './common/deepLink';
 import { DiffChangeType } from './common/diffHunk';
 import { getZeroBased } from './common/diffPositionMapping';
 import { GitChangeType } from './common/file';
 import Logger from './common/logger';
 import { ITelemetry } from './common/telemetry';
-import { asImageDataURI, fromReviewUri, ReviewUriParams } from './common/uri';
+import { asImageDataURI, fromPRUri, fromReviewUri, ReviewUriParams } from './common/uri';
 import { formatError } from './common/utils';
-import { SETTINGS_NAMESPACE } from './constants';
+import { SETTINGS_NAMESPACE, URI_SCHEME_PR, URI_SCHEME_REVIEW } from './constants';
 import { PullRequestsTreeDataProvider } from './view/prsTreeDataProvider';
 import { ReviewManager } from './view/reviewManager';
 import { CommitNode } from './view/treeNodes/commitNode';
 import { DescriptionNode } from './view/treeNodes/descriptionNode';
-import { GitFileChangeNode, InMemFileChangeNode } from './view/treeNodes/fileChangeNode';
+import { GitFileChangeNode, InMemFileChangeNode, RemoteFileChangeNode } from './view/treeNodes/fileChangeNode';
 import { PRNode } from './view/treeNodes/pullRequestNode';
 
 const _onDidUpdatePR = new vscode.EventEmitter<PullRequest | void>();
@@ -72,16 +73,16 @@ async function chooseItem<T>(
 }
 
 /**
- * Resolve the target pull request for a command that may be invoked from the tree (PRNode arg),
- * directly (PullRequestModel arg), or from the command palette with no arg (falls back to the
- * checked-out PR across all folder managers).
+ * Resolve the target pull request for a command that may be invoked from the tree (PRNode or
+ * DescriptionNode arg), directly (PullRequestModel arg), or from the command palette with no arg
+ * (falls back to the checked-out PR across all folder managers).
  */
 async function resolveTargetPullRequest(
 	reposManager: RepositoriesManager,
-	pr?: PRNode | PullRequestModel,
+	pr?: PRNode | DescriptionNode | PullRequestModel,
 ): Promise<PullRequestModel | undefined> {
 	if (pr) {
-		return pr instanceof PRNode ? pr.pullRequestModel : pr;
+		return pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
 	}
 	const activePullRequests: PullRequestModel[] = reposManager.folderManagers
 		.map(folderManager => folderManager.activePullRequest!)
@@ -91,6 +92,73 @@ async function resolveTargetPullRequest(
 		itemValue => `${itemValue.getPullRequestId()}: ${itemValue.item.title}`,
 		'Pull request',
 	);
+}
+
+interface PullRequestFileTarget {
+	pullRequest: PullRequestModel;
+	fileName: string;
+}
+
+/**
+ * Resolve the {pull request, file} pair a file-scoped command targets: a PR tree file node when
+ * invoked from a context menu, otherwise the active editor (a pr_azdo diff editor, a review_azdo
+ * editor, or a plain file inside a repo with a checked-out PR).
+ */
+async function resolvePullRequestFileTarget(
+	reposManager: RepositoriesManager,
+	node?: RemoteFileChangeNode | GitFileChangeNode | InMemFileChangeNode,
+): Promise<PullRequestFileTarget | undefined> {
+	if (node) {
+		return { pullRequest: node.pullRequest, fileName: node.fileName };
+	}
+
+	const editorUri = vscode.window.activeTextEditor?.document.uri;
+	if (!editorUri) {
+		return undefined;
+	}
+
+	if (editorUri.scheme === URI_SCHEME_PR) {
+		const params = fromPRUri(editorUri);
+		if (!params) {
+			return undefined;
+		}
+		for (const folderManager of reposManager.folderManagers) {
+			const azdoRepo = folderManager.azdoRepositories.find(repo => repo.remote.remoteName === params.remoteName);
+			if (!azdoRepo) {
+				continue;
+			}
+			const active = folderManager.activePullRequest;
+			const pullRequest =
+				active?.getPullRequestId() === params.prNumber
+					? active
+					: await folderManager.resolvePullRequest(
+							azdoRepo.remote.owner,
+							azdoRepo.remote.repositoryName,
+							params.prNumber,
+					  );
+			if (pullRequest) {
+				return { pullRequest, fileName: params.fileName };
+			}
+		}
+		return undefined;
+	}
+
+	if (editorUri.scheme === URI_SCHEME_REVIEW) {
+		const pullRequest = reposManager.getManagerForFile(editorUri)?.activePullRequest;
+		return pullRequest ? { pullRequest, fileName: fromReviewUri(editorUri).path } : undefined;
+	}
+
+	if (editorUri.scheme === 'file') {
+		const folderManager = reposManager.getManagerForFile(editorUri);
+		const pullRequest = folderManager?.activePullRequest;
+		if (!pullRequest) {
+			return undefined;
+		}
+		const relative = pathLib.relative(folderManager!.repository.rootUri.fsPath, editorUri.fsPath);
+		return { pullRequest, fileName: `/${relative.split(pathLib.sep).join('/')}` };
+	}
+
+	return undefined;
 }
 
 /**
@@ -157,6 +225,81 @@ export function registerCommands(
 			"pr.openInAzdo" : {}
 		*/
 				telemetry.sendTelemetryEvent('azdopr.openInAzdo');
+			},
+		),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand(
+			'azdopr.copyPullRequestUrl',
+			async (e?: PRNode | DescriptionNode | PullRequestModel) => {
+				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
+				if (!pullRequestModel) {
+					return;
+				}
+				await vscode.env.clipboard.writeText(pullRequestModel.url);
+				vscode.window.showInformationMessage('Pull request URL copied to clipboard.');
+
+				/* __GDPR__
+			"azdopr.copyPullRequestUrl" : {}
+		*/
+				telemetry.sendTelemetryEvent('azdopr.copyPullRequestUrl');
+			},
+		),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand(
+			'azdopr.copyVscodeDeepLink',
+			async (e?: PRNode | DescriptionNode | PullRequestModel) => {
+				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
+				if (!pullRequestModel) {
+					return;
+				}
+				const params = deepLinkParamsFromPullRequest(pullRequestModel);
+				if (!params) {
+					vscode.window.showErrorMessage(
+						'Unable to build a deep link: the organization or project of this pull request could not be determined.',
+					);
+					return;
+				}
+				await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
+				vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
+
+				/* __GDPR__
+			"azdopr.copyVscodeDeepLink" : {}
+		*/
+				telemetry.sendTelemetryEvent('azdopr.copyVscodeDeepLink');
+			},
+		),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand(
+			'azdopr.copyFileLinkInPullRequest',
+			async (e?: RemoteFileChangeNode | GitFileChangeNode | InMemFileChangeNode) => {
+				const target = await resolvePullRequestFileTarget(reposManager, e);
+				if (!target) {
+					vscode.window.showErrorMessage(
+						'Copy File Link needs a pull request diff editor or a pull request file node to work on.',
+					);
+					return;
+				}
+				const filePath = target.fileName.startsWith('/') ? target.fileName : `/${target.fileName}`;
+				await vscode.env.clipboard.writeText(`${target.pullRequest.url}?_a=files&path=${encodeURIComponent(filePath)}`);
+				// The ADO PR files view has no verified line-anchor URL params (couldn't be confirmed against
+				// the live org, 2026-07-18), so the link targets the file's diff rather than a selected line.
+				const hasSelection = !e && vscode.window.activeTextEditor?.selection.isEmpty === false;
+				vscode.window.showInformationMessage(
+					hasSelection
+						? 'File diff link copied. The AzDO pull request files view has no line anchors, so the link opens the file, not the selected line.'
+						: 'File diff link copied to clipboard.',
+				);
+
+				/* __GDPR__
+			"azdopr.copyFileLinkInPullRequest" : {}
+		*/
+				telemetry.sendTelemetryEvent('azdopr.copyFileLinkInPullRequest');
 			},
 		),
 	);
