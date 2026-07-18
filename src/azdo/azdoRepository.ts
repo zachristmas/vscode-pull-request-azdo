@@ -165,15 +165,31 @@ export class AzdoRepository implements vscode.Disposable {
 		try {
 			await this.ensure();
 			const metadata = await this.getMetadata();
+			const project = metadata?.project?.id ?? metadata?.project?.name;
+			if (!project) {
+				// Without a project the route degrades to an org-level call the server rejects;
+				// return the empty map uncached so a later call can retry once metadata resolves.
+				Logger.appendLine(
+					`AzdoRepository> Fetching policy types skipped: ${this.unresolvedRepositoryMessage()}`,
+					AzdoRepository.ID,
+				);
+				return map;
+			}
 			const policyApi = await this._hub?.connection.getPolicyApi();
-			const types = await policyApi?.getPolicyTypes(metadata?.project?.id ?? metadata?.project?.name ?? '');
-			types?.forEach(t => {
+			const types = await policyApi?.getPolicyTypes(project);
+			if (!types) {
+				return map;
+			}
+			types.forEach(t => {
 				if (t.id && t.displayName) {
 					map.set(t.id, t.displayName);
 				}
 			});
 		} catch (e) {
+			// Cache only successful fetches - a transient failure here used to pin an empty map
+			// for the lifetime of the repo instance, hiding policy display names forever.
 			Logger.appendLine(`AzdoRepository> Fetching policy types failed: ${e}`, AzdoRepository.ID);
+			return map;
 		}
 
 		this._policyTypeMap = map;
