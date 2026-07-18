@@ -117,10 +117,12 @@ export function isMergeStrategySettings(s: any): s is MergeStrategyPolicySetting
 	);
 }
 
-/** Well-known cloud GUIDs (ROADMAP Section 4: "confirm per-org"). Used ONLY to disambiguate the two
- *  settings-shapeless policy types; display names always come from getPolicyTypes/type.displayName. */
+/** Well-known cloud GUIDs. Confirmed 2026-07-17 against live Azure DevOps Services via getPolicyTypes
+ *  (Minimum number of reviewers / Work item linking / Comment requirements); on-prem Server IDs may
+ *  differ. Used ONLY to disambiguate the settings-shapeless policy types; display names always come
+ *  from getPolicyTypes/type.displayName. */
 export const WellKnownPolicyTypeIds = {
 	minimumReviewers: 'fa4e907d-c16b-4a4c-9dfa-4906e5d171dd',
 	workItemLinking: '40e92b44-2fe1-4dd6-b3d8-74a9c21d0c6e',
-	commentRequirements: 'c6a1889d-b943-4856-b76f-9e46bb6b0df2', // docs-derived; verify per-org
+	commentRequirements: 'c6a1889d-b943-4856-b76f-9e46bb6b0df2',
 } as const;

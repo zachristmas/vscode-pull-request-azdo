@@ -3352,7 +3352,7 @@ Totals after reclassification: 201 portable, 79 partial, 65 not-portable, 33 alr
 
 **Verification debt (flagged by agents, confirm before building on):**
 
-- ITER-01's claim that `threadContext` holds the tracked position when threads are fetched with an iteration pair matches the d.ts contract, but should be confirmed against a live PR with a line-shifting second push before shipping the inversion.
+- ITER-01 RESOLVED (2026-07-17): confirmed on a live PR with a line-shifting second push. A comment authored on right-side line 10 tracked to `threadContext` left line 10 after 5 lines were inserted above it, while `trackingCriteria.orig*` stayed frozen at right line 10. Displaying `threadContext` (the fix) keeps the comment on its code; the old `orig*` path would land it 5 lines adrift.
 - ITER-06's "untrackable thread" signal is not spelled out by the typings; needs one live-PR experiment.
 - ADO vote-reset behavior on convert-to-draft (DLA-02 prompt copy) needs a live check.
 - The 0.25.1 CVE-2021-28470 fix could not be located in public history (chunk K1); treat as unverifiable rather than unpatched.
