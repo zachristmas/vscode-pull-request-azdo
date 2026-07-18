@@ -18,8 +18,8 @@
 
 5. Generate VSIX
 
-   - If you don't yet have **vsce** install it `npm install -g vsce`
-   - Run `vsce package --yarn`. This will generate a .vsix in the project directory.
+   - Run `npx vsce package --no-dependencies`. This will generate a .vsix in the project directory.
+     (webpack bundles all runtime dependencies into `dist/`, so the VSIX needs no `node_modules`)
 
 6. Draft new GitHub release
 
