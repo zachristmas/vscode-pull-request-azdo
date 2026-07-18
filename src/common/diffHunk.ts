@@ -8,10 +8,10 @@
  */
 
 import { VersionControlChangeType } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { GitChangeType, InMemFileChange, SlimFileChange } from './file';
 import { Repository } from '../api/api';
 import { IRawFileChange as IAzdoRawFileChange } from '../azdo/interface';
 import { removeLeadingSlash } from '../azdo/utils';
-import { GitChangeType, InMemFileChange, SlimFileChange } from './file';
 
 export enum DiffChangeType {
 	Context,
@@ -113,7 +113,6 @@ export function* parseDiffHunk(diffHunkPatch: string): IterableIterator<DiffHunk
 		if (DIFF_HUNK_HEADER.test(line)) {
 			if (diffHunk) {
 				yield diffHunk;
-				diffHunk = undefined;
 			}
 
 			if (positionInHunk === -1) {

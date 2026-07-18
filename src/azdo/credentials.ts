@@ -166,7 +166,7 @@ export class CredentialStore implements vscode.Disposable {
 			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
 			if ([...new Set(inferredConfigs.map(a => a.orgUrl))].length !== 1) {
 				Logger.appendLine(
-					`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${inferredConfigs}`,
+					`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${JSON.stringify(inferredConfigs)}`,
 					CredentialStore.ID,
 				);
 				return undefined;

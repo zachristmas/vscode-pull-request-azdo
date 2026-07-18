@@ -6,11 +6,11 @@ import {
 } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
 import * as vscode from 'vscode';
+import { Azdo, CredentialStore } from './credentials';
 import { PullRequestModel } from '../azdo/pullRequestModel';
 import Logger from '../common/logger';
-import { errorMessage } from '../common/utils';
 import { ITelemetry } from '../common/telemetry';
-import { Azdo, CredentialStore } from './credentials';
+import { errorMessage } from '../common/utils';
 
 export class AzdoWorkItem implements vscode.Disposable {
 	static ID = 'WorkItem';

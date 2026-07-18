@@ -5,12 +5,12 @@
 
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { Repository, UpstreamRef } from '../api/api';
-import { ITelemetry } from '../common/telemetry';
-import { EventType } from '../common/timelineEvent';
 import { CredentialStore } from './credentials';
 import { FolderRepositoryManager, ReposManagerState, ReposManagerStateContext } from './folderRepositoryManager';
 import { PullRequestModel } from './pullRequestModel';
+import { Repository, UpstreamRef } from '../api/api';
+import { ITelemetry } from '../common/telemetry';
+import { EventType } from '../common/timelineEvent';
 
 export interface ItemsResponseResult<T> {
 	items: T[];

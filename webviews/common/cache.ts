@@ -6,6 +6,7 @@
 import { GitCommitRef, GitPullRequestCommentThread, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
+import { vscode } from './message';
 import {
 	IAccount,
 	ILabel,
@@ -18,7 +19,6 @@ import {
 	ReviewState,
 } from '../../src/azdo/interface';
 import { TimelineEvent } from '../../src/common/timelineEvent';
-import { vscode } from './message';
 
 export enum ReviewType {
 	Comment = 'comment',

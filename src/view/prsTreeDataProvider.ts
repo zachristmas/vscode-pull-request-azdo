@@ -65,7 +65,7 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 					...(isLoggedIn ? ['Sign out of Azure Devops...'] : []),
 				]);
 
-				// eslint-disable-next-line @typescript-eslint/no-var-requires
+				 
 				const { name, publisher } = require('../../package.json') as { name: string; publisher: string };
 				const extensionId = `${publisher}.${name}`;
 

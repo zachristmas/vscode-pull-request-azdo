@@ -30,6 +30,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit -p tsconfig.json
 
+      - name: Lint
+        run: pnpm run lint:ci
+
       - name: Bundle
         run: pnpm run bundle
 

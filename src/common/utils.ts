@@ -132,7 +132,7 @@ export function gitErrorCode(e: unknown): string | undefined {
 		: undefined;
 }
 
-export function formatError(e: HookError | any): string {
+export function formatError(e: any): string {
 	if (!(e instanceof Error)) {
 		if (typeof e === 'string') {
 			return e;
@@ -199,7 +199,7 @@ export async function promiseFromEvent<T, U>(event: Event<T>, adapter: PromiseAd
 				try {
 					Promise.resolve(adapter(value, resolve, reject)).catch(reject);
 				} catch (error) {
-					reject(error);
+					reject(error instanceof Error ? error : new Error(String(error)));
 				}
 			})),
 	).then(

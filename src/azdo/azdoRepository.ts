@@ -6,10 +6,6 @@ import {
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as vscode from 'vscode';
-import Logger from '../common/logger';
-import { parseRemote, Remote } from '../common/remote';
-import { ITelemetry } from '../common/telemetry';
-import { PRCommentControllerRegistry } from '../view/pullRequestCommentControllerRegistry';
 import { Azdo, CredentialStore } from './credentials';
 import { FileReviewedStatusService, FileViewedStatus } from './fileReviewedStatusService';
 import { IAccount, IGitHubRef } from './interface';
@@ -20,6 +16,10 @@ import {
 	convertAzdoPullRequestToRawPullRequest,
 	convertBranchRefToBranchName,
 } from './utils';
+import Logger from '../common/logger';
+import { parseRemote, Remote } from '../common/remote';
+import { ITelemetry } from '../common/telemetry';
+import { PRCommentControllerRegistry } from '../view/pullRequestCommentControllerRegistry';
 
 export const PULL_REQUEST_PAGE_SIZE = 20;
 

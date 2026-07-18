@@ -2,17 +2,17 @@ import * as path from 'path';
 import { expect } from 'chai';
 import * as dotenv from 'dotenv';
 import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
+import { GitApiImpl } from '../../api/api1';
 import { AzdoRepository } from '../../azdo/azdoRepository';
 import { CredentialStore } from '../../azdo/credentials';
+import { FileReviewedStatusService } from '../../azdo/fileReviewedStatusService';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
+import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
-import { MockTelemetry } from '../mocks/mockTelemetry';
-import { FileReviewedStatusService } from '../../azdo/fileReviewedStatusService';
-import { GitApiImpl } from '../../api/api1';
-import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { MockRepository } from '../mocks/mockRepository';
+import { MockTelemetry } from '../mocks/mockTelemetry';
 import { asReal } from '../mocks/stub';
 
 describe('AzdoRepository', function () {

@@ -5,13 +5,13 @@
 'use strict';
 
 import * as vscode from 'vscode';
+import { PullRequestCommentController } from './pullRequestCommentController';
 import { FolderRepositoryManager } from '../azdo/folderRepositoryManager';
 import { IFileChangeNodeWithUri } from '../azdo/interface';
 import { GHPRComment } from '../azdo/prComment';
 import { PullRequestModel } from '../azdo/pullRequestModel';
 import { CommentReactionHandler } from '../azdo/utils';
 import { fromPRUri } from '../common/uri';
-import { PullRequestCommentController } from './pullRequestCommentController';
 
 interface PullRequestCommentHandlerInfo {
 	handler: PullRequestCommentController & CommentReactionHandler;

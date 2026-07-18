@@ -4,8 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { TreeNode, TreeNodeParent } from './treeNode';
+import { PullRequestModel } from '../../azdo/pullRequestModel';
 
 export class DescriptionNode extends TreeNode implements vscode.TreeItem {
 	public command?: vscode.Command;

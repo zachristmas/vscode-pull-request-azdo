@@ -6,6 +6,10 @@
 import * as path from 'path';
 import { Comment, GitPullRequestCommentThread, PullRequestAsyncStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
+import { DescriptionNode } from './descriptionNode';
+import { DirectoryTreeNode } from './directoryTreeNode';
+import { GitFileChangeNode, InMemFileChangeNode, RemoteFileChangeNode } from './fileChangeNode';
+import { TreeNode, TreeNodeParent } from './treeNode';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { CommentPermissions, CommentWithPermissions, IFileChangeNode } from '../../azdo/interface';
 import { PullRequestModel } from '../../azdo/pullRequestModel';
@@ -14,15 +18,11 @@ import { mapThreadsToBase } from '../../common/commentingRanges';
 import { getZeroBased } from '../../common/diffPositionMapping';
 import { GitChangeType, SlimFileChange } from '../../common/file';
 import Logger from '../../common/logger';
-import { formatError } from '../../common/utils';
 import { fromPRUri, toPRUriAzdo } from '../../common/uri';
+import { formatError } from '../../common/utils';
 import { SETTINGS_NAMESPACE } from '../../constants';
 import { getInMemPRContentProvider, provideDocumentContentForChangeModel } from '../inMemPRContentProvider';
 import { PullRequestCommentingRangeProvider } from '../pullRequestCommentingRangeProvider';
-import { DescriptionNode } from './descriptionNode';
-import { DirectoryTreeNode } from './directoryTreeNode';
-import { GitFileChangeNode, InMemFileChangeNode, RemoteFileChangeNode } from './fileChangeNode';
-import { TreeNode, TreeNodeParent } from './treeNode';
 
 /**
  * Thread data is raw data. It should be transformed to GHPRCommentThreads

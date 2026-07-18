@@ -4,9 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import { MockRepository } from './mockRepository';
 import { APIState, PublishEvent } from '../@types/git';
 import { IGit, Repository } from '../api/api';
-import { MockRepository } from './mockRepository';
 
 export class MockGitProvider implements IGit, vscode.Disposable {
 	private _mockRepository: Repository;

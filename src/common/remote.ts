@@ -3,8 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { Repository } from '../api/api';
 import { Protocol } from './protocol';
+import { Repository } from '../api/api';
 
 export class Remote {
 	public get host(): string {

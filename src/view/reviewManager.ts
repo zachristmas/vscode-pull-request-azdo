@@ -893,7 +893,7 @@ export class ReviewManager {
 				});
 
 				branchPicker.onDidHide(_ => {
-					reject();
+					reject(new Error('Target branch picker was dismissed'));
 					branchPicker.dispose();
 				});
 

@@ -7,8 +7,12 @@ import { BuildResult } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { GitStatusState, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as React from 'react';
-// eslint-disable-next-line no-duplicate-imports
+ 
 import { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
+import { Dropdown } from './dropdown';
+import { alertIcon, checkIcon, deleteIcon, pendingIcon } from './icon';
+import { nbsp } from './space';
+import { Avatar } from './user';
 import {
 	MergeMethod,
 	PullRequestChecks,
@@ -20,10 +24,6 @@ import { groupBy } from '../../src/common/utils';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
 import { Reviewer } from '../components/reviewer';
-import { Dropdown } from './dropdown';
-import { alertIcon, checkIcon, deleteIcon, pendingIcon } from './icon';
-import { nbsp } from './space';
-import { Avatar } from './user';
 
 // UX-05: check/delete/dot are shared gray glyphs; wrapping them in a text-* class recolors them
 // (CSS fill: currentColor) so the status/policy icons match their summary line, not stay gray.

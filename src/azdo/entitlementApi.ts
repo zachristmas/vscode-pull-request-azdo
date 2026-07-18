@@ -77,7 +77,7 @@ export class UserEntitlementApi extends basem.ClientApiBase implements IUserEnti
 
 				resolve(ret);
 			} catch (err) {
-				reject(err);
+				reject(err instanceof Error ? err : new Error(String(err)));
 			}
 		});
 	}

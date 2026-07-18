@@ -9,17 +9,17 @@ import {
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as React from 'react';
-// eslint-disable-next-line no-duplicate-imports
+ 
 import { useContext, useState } from 'react';
 
+import { checkIcon, copyIcon, editIcon } from './icon';
+import { Spaced } from './space';
+// eslint-disable-next-line import-x/no-named-as-default
+import Timestamp from './timestamp';
+import { AuthorLink, Avatar } from './user';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
 import { useStateProp } from '../common/hooks';
-import { checkIcon, copyIcon, editIcon } from './icon';
-import { Spaced } from './space';
-// eslint-disable-next-line import/no-named-as-default
-import Timestamp from './timestamp';
-import { AuthorLink, Avatar } from './user';
 
 export function Header({
 	canEdit,

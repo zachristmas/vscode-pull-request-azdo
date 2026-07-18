@@ -6,12 +6,12 @@
 import * as path from 'path';
 import { GitCommitRef, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
+import { GitFileChangeNode } from './fileChangeNode';
+import { TreeNode, TreeNodeParent } from './treeNode';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { getGitChangeTypeFromVersionControlChangeType } from '../../common/diffHunk';
 import { toReviewUri } from '../../common/uri';
-import { GitFileChangeNode } from './fileChangeNode';
-import { TreeNode, TreeNodeParent } from './treeNode';
 
 export class CommitNode extends TreeNode implements vscode.TreeItem {
 	public sha: string;

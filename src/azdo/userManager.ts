@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import Logger from '../common/logger';
-import { errorMessage } from '../common/utils';
-import { ITelemetry } from '../common/telemetry';
 import { Azdo, CredentialStore } from './credentials';
 import { getEntitlementApi, IUserEntitlementApi, User } from './entitlementApi';
+import Logger from '../common/logger';
+import { ITelemetry } from '../common/telemetry';
+import { errorMessage } from '../common/utils';
 
 export class AzdoUserManager implements vscode.Disposable {
 	static ID = 'UserManager';

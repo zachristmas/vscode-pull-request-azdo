@@ -4,12 +4,12 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as React from 'react';
-// eslint-disable-next-line no-duplicate-imports
+ 
 import { useContext, useEffect, useState } from 'react';
 import { render } from 'react-dom';
+import { Overview } from './overview';
 import { PullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
-import { Overview } from './overview';
 
 export function main() {
 	render(<Root>{pr => <Overview {...pr} />}</Root>, document.getElementById('app'));

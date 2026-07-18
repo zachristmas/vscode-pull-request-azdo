@@ -6,14 +6,14 @@ import { RepositoriesManager } from '../azdo/repositoriesManager';
  * The liveshare contact service contract
  */
 interface ContactServiceProvider {
-	requestAsync(type: string, parameters: Object, cancellationToken?: vscode.CancellationToken): Promise<Object>;
+	requestAsync(type: string, parameters: object, cancellationToken?: vscode.CancellationToken): Promise<object>;
 
 	readonly onNotified: vscode.Event<NotifyContactServiceEventArgs>;
 }
 
 interface NotifyContactServiceEventArgs {
 	type: string;
-	body?: any | undefined;
+	body?: any;
 }
 
 /**
@@ -43,10 +43,10 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 
 	public async requestAsync(
 		type: string,
-		_parameters: Object,
+		_parameters: object,
 		_cancellationToken?: vscode.CancellationToken,
-	): Promise<Object> {
-		let result = null;
+	): Promise<object> {
+		let result: object;
 
 		switch (type) {
 			case 'initialize':

@@ -5,11 +5,11 @@
 
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { CategoryTreeNode } from './categoryNode';
+import { TreeNode, TreeNodeParent } from './treeNode';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { PRType } from '../../azdo/interface';
 import { ITelemetry } from '../../common/telemetry';
-import { CategoryTreeNode } from './categoryNode';
-import { TreeNode, TreeNodeParent } from './treeNode';
 
 export interface IQueryInfo {
 	label: string;

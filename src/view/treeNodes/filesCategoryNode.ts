@@ -4,10 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { SETTINGS_NAMESPACE } from '../../constants';
 import { DirectoryTreeNode } from './directoryTreeNode';
 import { GitFileChangeNode, RemoteFileChangeNode } from './fileChangeNode';
 import { TreeNode, TreeNodeParent } from './treeNode';
+import { SETTINGS_NAMESPACE } from '../../constants';
 
 export class FilesCategoryNode extends TreeNode implements vscode.TreeItem {
 	public label: string = 'Files';

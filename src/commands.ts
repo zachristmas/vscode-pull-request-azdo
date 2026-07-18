@@ -493,7 +493,7 @@ export function registerCommands(
 				telemetry.sendTelemetryErrorEvent('azdopr.deleteLocalPullRequest.failure', {
 					message: formatError(error),
 				});
-				await vscode.window.showErrorMessage(`Deleting local pull request branch failed: ${error}`);
+				await vscode.window.showErrorMessage(`Deleting local pull request branch failed: ${formatError(error)}`);
 			} else {
 				/* __GDPR__
 				"pr.deleteLocalPullRequest.success" : {}
@@ -956,7 +956,7 @@ export function registerCommands(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.configureRemotes', async () => {
-			// eslint-disable-next-line @typescript-eslint/no-var-requires
+			 
 			const { name, publisher } = require('../package.json') as { name: string; publisher: string };
 			const extensionId = `${publisher}.${name}`;
 

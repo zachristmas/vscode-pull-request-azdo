@@ -15,7 +15,7 @@ async function go() {
 		 * Basic usage
 		 */
 		await runTests({
-			browserType: browserType ? <BrowserType>browserType.slice(browserTypeName.length) : 'chromium',
+			browserType: browserType ? browserType.slice(browserTypeName.length) as BrowserType : 'chromium',
 			extensionDevelopmentPath,
 			extensionTestsPath,
 			waitForDebugger: waitForDebugger ? Number(waitForDebugger.slice(attachArgName.length)) : undefined,

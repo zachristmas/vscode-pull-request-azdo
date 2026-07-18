@@ -4,9 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { API } from '../api/api';
 import { BuiltinGitProvider } from './builtinGit';
 import { LiveShareManager } from './vsls';
+import { API } from '../api/api';
 
 export function registerLiveShareGitProvider(apiImpl: API): LiveShareManager {
 	const liveShareManager = new LiveShareManager(apiImpl);

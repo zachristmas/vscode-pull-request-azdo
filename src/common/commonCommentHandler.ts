@@ -5,6 +5,10 @@
 'use strict';
 import { Comment, CommentThreadStatus, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
+import { getCommentingRanges } from './commentingRanges';
+import Logger from './logger';
+import { fromPRUri, fromReviewUri } from './uri';
+import { formatError } from './utils';
 import { FolderRepositoryManager } from '../azdo/folderRepositoryManager';
 import { IFileChangeNode, IFileChangeNodeWithUri } from '../azdo/interface';
 import { GHPRComment, GHPRCommentThread, TemporaryComment } from '../azdo/prComment';
@@ -16,10 +20,6 @@ import {
 	InMemFileChangeNode,
 	RemoteFileChangeNode,
 } from '../view/treeNodes/fileChangeNode';
-import { getCommentingRanges } from './commentingRanges';
-import Logger from './logger';
-import { formatError } from './utils';
-import { fromPRUri, fromReviewUri } from './uri';
 
 export class CommonCommentHandler {
 	constructor(public pullRequestModel: PullRequestModel, private _folderReposManager: FolderRepositoryManager) {}
@@ -286,7 +286,7 @@ export class CommonCommentHandler {
 		document: vscode.TextDocument,
 		token: vscode.CancellationToken,
 		getFileChanges: () => Promise<IFileChangeNode[]>,
-		fileChanges?: IFileChangeNode[] | undefined,
+		fileChanges?: IFileChangeNode[]  ,
 	): Promise<vscode.Range[] | undefined> {
 		if (document.uri.scheme === URI_SCHEME_PR) {
 			const params = fromPRUri(document.uri);

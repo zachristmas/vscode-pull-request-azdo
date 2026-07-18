@@ -5,13 +5,13 @@
 
 import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
-import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
-import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { CommitsNode } from './commitsCategoryNode';
 import { DescriptionNode } from './descriptionNode';
 import { GitFileChangeNode, RemoteFileChangeNode } from './fileChangeNode';
 import { FilesCategoryNode } from './filesCategoryNode';
 import { BaseTreeNode, TreeNode } from './treeNode';
+import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
+import { PullRequestModel } from '../../azdo/pullRequestModel';
 
 export class RepositoryChangesNode extends DescriptionNode implements vscode.TreeItem {
 	private _filesCategoryNode?: FilesCategoryNode;
