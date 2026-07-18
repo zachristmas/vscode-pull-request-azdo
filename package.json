@@ -12,7 +12,7 @@
 	},
 	"enableProposedApi": false,
 	"preview": true,
-	"version": "1.5.0",
+	"version": "1.5.1",
 	"publisher": "ZacharyChristmas",
 	"engines": {
 		"vscode": "^1.97.0"

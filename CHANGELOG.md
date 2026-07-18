@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+
+- Docs only: README rewritten around the 1.5 feature set, with screenshots of the policy panel, auto-complete, voting, inline review threads, and the merged-PR view. No code changes.
+
 ## 1.5.0
 
 A combined release covering three waves of work: repairing the v1.4 review/complete flows,

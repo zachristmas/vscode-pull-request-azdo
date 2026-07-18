@@ -1,96 +1,115 @@
-> **Maintained fork**: This is an actively maintained fork of [ankitbko/vscode-pull-request-azdo](https://github.com/ankitbko/vscode-pull-request-azdo), carrying the extension forward. All credit for the original extension goes to its author. Install it from the marketplace as [`ZacharyChristmas.azdo-pull-requests-multiproject`](https://marketplace.visualstudio.com/items?itemName=ZacharyChristmas.azdo-pull-requests-multiproject).
->
-> Improvements over the original so far:
->
-> - **Multi-project workspaces** (v1.1.0): open a folder containing repositories from any number of Azure DevOps projects in one org; each repository resolves against the project in its own git remote URL. Also fixes remote auto-detection for HTTPS URLs without a `user@` segment and for project names containing spaces.
-> - **User avatars render** (v1.2.0): avatars are fetched through the authenticated connection and inlined, instead of relying on unauthenticated image URLs that Azure DevOps rejects.
-> - **Quick-win fixes** (v1.3.0): SSH and legacy visualstudio.com remote URL auto-detection; large PRs load all changes (paginated diffs); actionable error when sign-in cannot resolve org/project; case-insensitive repository matching; "mark as viewed" keyed by file path (no more same-name collisions or crashes on deleted files); comment threads anchor to the real selection in the ADO web preview; new "Checkout Pull Request by ID" command.
->
-> Bug reports and feature requests for this fork: [zachristmas/vscode-pull-request-azdo/issues](https://github.com/zachristmas/vscode-pull-request-azdo/issues).
+# Azure DevOps Pull Requests (Multi-Project)
 
-# Review and manage your Azure Devops pull requests directly in VS Code
+Review, unblock, and complete Azure DevOps pull requests without leaving VS Code.
 
-This extension is inspired and based on [Github Pull Request Extension for VS Code](https://github.com/Microsoft/vscode-pull-request-github). The extension only works with _git_ based repository. _TFVC_ is not supported. Below are some the features that extension supports. Read about all the features in [wiki](https://github.com/ankitbko/vscode-pull-request-azdo/wiki).
+> **Maintained fork**: an actively maintained fork of [ankitbko/vscode-pull-request-azdo](https://github.com/ankitbko/vscode-pull-request-azdo), carrying the extension forward. All credit for the original goes to its author. Bug reports and feature requests: [zachristmas/vscode-pull-request-azdo/issues](https://github.com/zachristmas/vscode-pull-request-azdo/issues).
 
-- Authenticating and connecting VS Code to Azure Devops.
-- Listing and browsing PRs from within VS Code.
-- Reviewing PRs from within VS Code with in-editor commenting.
-- Validating PRs from within VS Code with easy checkouts.
-- Suggest edits to the PR Author. Author can apply edits directly from Description page.
-- Mark file as viewed when reviewing PR.
+Works with git repositories on Azure DevOps Services (dev.azure.com). TFVC is not supported.
 
-You can read more about the basic features in my [blog](https://ankitbko.github.io/blog/2021/01/azdo-pr-vscode-extension/).
+![The pull request description page](documentation/images/v15/hero.png)
 
-> **Note From Author**: I created this extension during last 2 weeks of December 2020 as a fun side project. Having never created a VS Code Extension before this was quite a journey. I am currently planning to get this to somewhat stable state before adding more features to it. Please try this extension and report any bugs by raising issue. Since this is a fork of Github PR Extension I will try to backport important updates from upstream to this extension. If you feel there has been an important bug fix or feature update in upstream that you would like in this extension, please raise an Issue here with link to the PR or Issue in upstream.
+## What you can do
 
-> **Disclaimer**: Although I work at Microsoft and this is a fork of Github PR Extension, this extension is not an official release or supported by Microsoft. This is a side project that I will try to maintain in my free time. Any help is always appreciated.
+- Browse, check out, and review PRs from a tree view, including repositories from **multiple Azure DevOps projects** in one workspace
+- Cast real ADO **reviewer votes** (Approve, Approve with suggestions, Wait for author, Reject) from the sidebar, the description page, or the command palette
+- See exactly **which branch policies block completion**: minimum reviewers, comment resolution, required reviewers, work item linking, and build validation, with build click-through and re-queue
+- **Set or cancel auto-complete** with merge strategy, merge commit message, delete-source-branch, and work item transition options; strategy choices respect the branch's "Limit merge types" policy
+- Comment on code with **thread statuses** (Active, Resolved, Won't fix, Closed, Pending) that stay anchored to the right lines across new pushes
+- Manage the whole lifecycle: publish drafts, convert back to draft, complete, and clean up branches afterward
+- Link, view, and remove **work items** on a PR
 
-![PR Diff](documentation/images/pr_modified.jpg)
-![PR Dashboard](documentation/images/pr_dashboard.jpg)
+## See why a PR can't complete
 
-## Getting Started
+The description page shows every policy evaluation for the PR the way the ADO web UI does: what's approved, what's queued, what's rejected, and whether it blocks completion. Failing build validation links to the build and can be re-queued in place.
 
-It's easy to get started with Azure Devops Pull Requests for Visual Studio Code. Simply follow these steps to get started.
+![Policy evaluations and auto-complete](documentation/images/v15/policy-panel.png)
 
-1. Make sure you have VSCode version 1.52.0 or higher.
-1. Reload VS Code after the installation (click the reload button next to the extension).
-1. Open your desired Azure Devops repository.
-1. (Optional) Extension will autodetect the AzDO URL from git remote. In case it fails, you can configure the `azdoPullRequests.projectName` and `azdoPullRequests.orgUrl` setting. You can configure it in workspace settings and commit it so others in your team wouldn't need to do this configuration again. (Look at the next section to understand the format of these settings).
-1. Signin to VS Code using same Microsoft account that you use to signin to Azure Devops. Authentication will work automatically. **PAT token is no longer required**.
-1. You should be good to go!
+When policies are still pending, arm **auto-complete** instead of waiting around. The banner shows who armed it and with which options, and it can be cancelled in one click.
 
-## Features
+## Review with real votes
 
-Learn all about different features of the extension in the [wiki](https://github.com/ankitbko/vscode-pull-request-azdo/wiki).
+Azure DevOps reviews are votes, not GitHub-style approvals, and the extension treats them that way. The "Your review" card in the sidebar shows your current vote and casts a new one with live feedback; required and optional reviewers are listed separately with per-reviewer vote icons.
 
-## Configuring the extension
+![Your review card](documentation/images/v15/your-review-card.png)
+
+Votes are also available from the command palette (`AzDO PR: Approve`, `Approve with Suggestions`, `Wait for Author`, `Reject`, `Reset Vote`) and from the checked-out PR view in the activity bar.
+
+## Comment threads that keep up
+
+Review comments live where the code does: threads render inline in the diff editor at their tracked positions, with reply and status controls in place.
+
+![Inline threads in the diff editor](documentation/images/v15/editor-threads.png)
+
+On the description page the same threads appear as cards with a status pill (Active, Resolved, Won't fix, ...), collapse when resolved, and jump to the diff from the file chip. Thread positions are tracked server-side, so a force-push or follow-up commit moves your comments with the code instead of leaving them stranded.
+
+![Comment threads](documentation/images/v15/thread-cards.png)
+
+## A clear end state
+
+Merged and abandoned PRs show a read-only outcome summary: final state, comment resolution, and your recorded vote. Editing affordances get out of the way, and the extension offers to delete the source branch (remote and local) after a merge.
+
+![Merged pull request](documentation/images/v15/merged-outcome.png)
+
+## The PR list
+
+Local branches with PRs, Created By Me, Assigned To Me, All Active, and All Pull Requests (for finding completed ones), across every repository in the workspace.
+
+![Pull request tree](documentation/images/v15/pr-tree.png)
+
+## Getting started
+
+1. VS Code 1.97 or newer.
+2. Install the extension and reload.
+3. Open a repository whose git remote points at Azure DevOps. Org and project are auto-detected from the remote (HTTPS, SSH, and legacy visualstudio.com URLs all work); the `azdoPullRequests.orgUrl` and `azdoPullRequests.projectName` settings exist as a fallback.
+4. Sign in with the same Microsoft account you use for Azure DevOps, or set a PAT via `azdoPullRequests.patToken`.
+
+## Settings
 
 #### azdoPullRequests.orgUrl
 
 - _type_: string
-- _required_: true
-- _Description_: The organization URL of Azure Devops. You can get it from the URL of the AZDO. This is typically the first segment of URL after host name in AZDO. `https://dev.azure.com/<org_name>` or `https://<org_name>.visualstudio.com`. You will need to enter the complete URL.
-- _Example_: `https://dev.azure.com/anksinha` or `https://anksinha.visualstudio.com`
+- _Description_: The organization URL, e.g. `https://dev.azure.com/<org_name>` or `https://<org_name>.visualstudio.com`. Only needed when auto-detection from the git remote fails.
 
 #### azdoPullRequests.projectName
 
 - _type_: string
-- _required_: true
-- _Description_: The project in the Azure Devops. This is typically the next segment of URL after organization name in AZDO. `https://dev.azure.com/<org_name>/<project_name>` or `https://<org_name>.visualstudio.com/<project_name>`. **Do not enter the complete URL, you only need to enter the _project_name_ part**.
-- _Example_: `prExtension`
+- _Description_: The project name (the URL segment after the organization). Only needed when auto-detection fails.
+
+#### azdoPullRequests.patToken
+
+- _type_: string
+- _Description_: A PAT from Azure DevOps. When provided the extension logs in with it instead of prompting for a Microsoft login.
+
+#### azdoPullRequests.defaultMergeMethod
+
+- _type_: enum (`merge`, `squash`, `rebase`, `rebaseMerge`)
+- _default_: squash
+- _Description_: Pre-selected merge strategy on the complete and auto-complete forms. Strategies disallowed by the branch's "Limit merge types" policy are disabled automatically.
+
+#### azdoPullRequests.diffBase
+
+- _type_: enum (`mergebase`, `head`)
+- _default_: mergebase
+- _Description_: The commit used to compute the diff against the PR's HEAD. See the [wiki](https://github.com/ankitbko/vscode-pull-request-azdo/wiki/Diff-Options-HEAD-vs-Merge-Base).
 
 #### azdoPullRequests.logLevel
 
 - _type_: enum
-- _required_: false
 - _default_: Info
-- _Description_: The level of log to display in AzDO Pull Request Channel in Output window.
+- _Description_: Log level for the AzDO Pull Request channel in the Output window.
 
-#### azdoPullRequests.diffBase
+## Version highlights
 
-- _type_: enum
-- _required_: false
-- _default_: mergebase
-- _Description_: The commit to use to get diff against the PR branch's HEAD. Read more about different options in [wiki](https://github.com/ankitbko/vscode-pull-request-azdo/wiki/Diff-Options-HEAD-vs-Merge-Base)
+- **1.5.0**: branch policy evaluations with build click-through and re-queue; auto-complete with full completion options; policy-aware merge strategy choices; full reviewer vote spectrum with palette commands; comment threads tracked across pushes; draft publish and convert-to-draft; one description panel per PR; outcome summaries on finished PRs; theme-aware UI refresh; repaired completion, work item transition, and branch cleanup flows. See the [CHANGELOG](CHANGELOG.md).
+- **1.1.0 to 1.3.0**: multi-project workspaces, authenticated avatars, SSH and visualstudio.com remote detection, paginated large-PR diffs, checkout by PR ID, viewed-state fixes, comment anchoring fixes.
 
-#### azdoPullRequests.patToken
-- _type_: string
-- _required_: false
-- _default_: ""
-- _Description_: The PAT Token from Azure DevOps, if provided extension will not prompt for Microsoft login instead it will login using provided PAT
+## Known issues
 
-## Known Major Issues
+1. `@mentions` in comment text are not resolved to users, and typing a mention does not notify anyone yet.
+2. Comment reactions (likes) are not supported yet; the ADO web UI shows them, the extension does not.
+3. Some incompatibility with the GitHub Pull Requests extension when both are enabled: if either misbehaves, try disabling the other and reloading the window.
+4. Build validation rows require permission to read the project's build pipelines.
 
-1. Mentions in comments are not resolved to user and no hover support
-1. Can't mention users in comments
-1. **Some incompatibility with Github PR Extension**. If you have both extensions installed and seeing issues with either try disabling the other extension and reloading the window.
-1. In some cases, user avatar image does not show up in Dashboard.
-1. Reactions do not work.
+## Credits
 
-## Questions? Authentication?
-
-See our [wiki](https://github.com/ankitbko/vscode-pull-request-azdo/wiki) for our FAQ.
-
-## Contributing
-
-TODO
+Based on [ankitbko/vscode-pull-request-azdo](https://github.com/ankitbko/vscode-pull-request-azdo) by Ankit Sinha (see his [introductory blog post](https://ankitbko.github.io/blog/2021/01/azdo-pr-vscode-extension/)), which is itself derived from Microsoft's [GitHub Pull Requests](https://github.com/Microsoft/vscode-pull-request-github) extension. Not an official Microsoft product.
