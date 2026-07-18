@@ -6,7 +6,7 @@ A combined release covering three waves of work: repairing the v1.4 review/compl
 adding branch-policy and auto-complete support, and a full UX modernization of the PR webviews.
 
 > **Versioning note:** there is no standalone `1.4.0` tag. The `fix/v1.4-repair` work and the
-> v1.5 feature work ship together as `1.5.0`; the version jumps from `1.0.0` to `1.5.0` deliberately.
+> v1.5 feature work ship together as `1.5.0`; the version jumps from `1.3.0` to `1.5.0` deliberately.
 
 ### Completion & auto-complete
 
