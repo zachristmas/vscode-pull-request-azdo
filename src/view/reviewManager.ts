@@ -4,16 +4,16 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as nodePath from 'path';
-import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { GitPullRequest, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import type { Branch, Repository } from '../api/api';
 import { GitErrorCodes } from '../api/api1';
 import { PullRequestViewProvider } from '../azdo/activityBarViewProvider';
 import { AzdoRepository } from '../azdo/azdoRepository';
-import { FolderRepositoryManager, PullRequestDefaults, titleAndBodyFrom } from '../azdo/folderRepositoryManager';
+import { FolderRepositoryManager, titleAndBodyFrom } from '../azdo/folderRepositoryManager';
 import { PullRequestGitHelper } from '../azdo/pullRequestGitHelper';
 import { IResolvedPullRequestModel, PullRequestModel } from '../azdo/pullRequestModel';
-import { isUserThread, removeLeadingSlash } from '../azdo/utils';
+import { convertBranchRefToBranchName, isUserThread, removeLeadingSlash } from '../azdo/utils';
 import { DiffChangeType, DiffHunk, parseDiffAzdo, parsePatch } from '../common/diffHunk';
 import { GitChangeType, InMemFileChange, SlimFileChange } from '../common/file';
 import Logger from '../common/logger';
@@ -248,13 +248,19 @@ export class ReviewManager {
 				Logger.appendLine(`Review> no matching pull request metadata found for current branch ${branch.name}`);
 				const metadataFromGithub = await this._folderRepoManager.getMatchingPullRequestMetadataFromGitHub();
 				if (metadataFromGithub) {
-					PullRequestGitHelper.associateBranchWithPullRequest(this._repository, metadataFromGithub.model, branch.name!);
+					PullRequestGitHelper.associateBranchWithPullRequest(
+						this._repository,
+						metadataFromGithub.model,
+						branch.name!,
+					);
 					matchingPullRequestMetadata = metadataFromGithub;
 				}
 			}
 
 			if (!matchingPullRequestMetadata) {
-				Logger.appendLine(`Review> no matching pull request metadata found on GitHub for current branch ${branch.name}`);
+				Logger.appendLine(
+					`Review> no matching pull request metadata found on GitHub for current branch ${branch.name}`,
+				);
 				this.clear(true);
 				return;
 			}
@@ -309,7 +315,11 @@ export class ReviewManager {
 			await this.registerCommentController(pr);
 
 			if (!this._webviewViewProvider) {
-				this._webviewViewProvider = new PullRequestViewProvider(this._context.extensionUri, this._folderRepoManager, pr);
+				this._webviewViewProvider = new PullRequestViewProvider(
+					this._context.extensionUri,
+					this._folderRepoManager,
+					pr,
+				);
 				this._context.subscriptions.push(
 					vscode.window.registerWebviewViewProvider(PullRequestViewProvider.viewType, this._webviewViewProvider),
 				);
@@ -448,7 +458,7 @@ export class ReviewManager {
 				activeComments.filter(comment => comment.threadContext?.filePath === fileName),
 				change.status === GitChangeType.DELETE ? change.previousFileSHA : change.fileSHA,
 				headSha,
-				change.previousFileSHA
+				change.previousFileSHA,
 			);
 			nodes.push(changedItem);
 		}
@@ -598,10 +608,10 @@ export class ReviewManager {
 
 	public async publishBranch(branch: Branch): Promise<Branch | undefined> {
 		const potentialTargetRemotes = await this._folderRepoManager.getAllGitHubRemotes();
-		const selectedRemote = (await this.getRemote(
-			potentialTargetRemotes,
-			`Pick a remote to publish the branch '${branch.name}' to:`,
-		))!.remote;
+		// Optional chaining: cancelling the remote quick-pick used to hit a bare `!.remote` TypeError.
+		const selectedRemote = (
+			await this.getRemote(potentialTargetRemotes, `Pick a remote to publish the branch '${branch.name}' to:`)
+		)?.remote;
 
 		if (!selectedRemote || branch.name === undefined) {
 			return;
@@ -631,10 +641,16 @@ export class ReviewManager {
 				potentialTargetRemotes.length === 1
 					? `The branch '${branch.name}' is not published yet, pick a name for the upstream branch`
 					: 'Pick a name for the upstream branch';
-			const validate = async function (value: string) {
+			// The old validator called this._reposManager.getBranch, a member that never existed on
+			// ReviewManager (it only compiled because `function`-scoped `this` is untyped) - the check
+			// silently never ran. Ask the AzDO repository behind the selected remote instead.
+			const validate = async (value: string) => {
 				try {
 					inputBox.busy = true;
-					const remoteBranch = await this._reposManager.getBranch(remote, value);
+					const azdoRepo = this._folderRepoManager.azdoRepositories.find(
+						repo => repo.remote.remoteName === remote.remoteName,
+					);
+					const remoteBranch = await azdoRepo?.getBranchRef(value);
 					if (remoteBranch) {
 						inputBox.validationMessage = `Branch ${value} already exists in ${remote.owner}/${remote.repositoryName}`;
 					} else {
@@ -647,7 +663,7 @@ export class ReviewManager {
 				inputBox.busy = false;
 			};
 			await validate(branch.name!);
-			inputBox.onDidChangeValue(validate.bind(this));
+			inputBox.onDidChangeValue(validate);
 			inputBox.onDidAccept(async () => {
 				inputBox.validationMessage = undefined;
 				inputBox.hide();
@@ -701,7 +717,7 @@ export class ReviewManager {
 		defaultUpstream?: RemoteQuickPickItem,
 	): Promise<RemoteQuickPickItem | undefined> {
 		if (!potentialTargetRemotes.length) {
-			vscode.window.showWarningMessage(`No GitHub remotes found. Add a remote and try again.`);
+			vscode.window.showWarningMessage(`No Azure DevOps remotes found. Add a remote and try again.`);
 			return;
 		}
 
@@ -850,13 +866,13 @@ export class ReviewManager {
 		return method;
 	}
 
-	private async _chooseTargetBranch(
-		targetRemote: RemoteQuickPickItem,
-		pullRequestDefaults: PullRequestDefaults,
-	): Promise<string | undefined> {
-		const base: string = targetRemote.remote
-			? (await this._folderRepoManager.getMetadata(targetRemote.remote.remoteName)).default_branch
-			: pullRequestDefaults.base;
+	private async _chooseTargetBranch(targetRemote: RemoteQuickPickItem): Promise<string | undefined> {
+		// ADO repository metadata exposes defaultBranch as a refs/heads/* ref (the GitHub-era code
+		// read a nonexistent default_branch field here, so the picker prefilled "undefined").
+		const metadata = targetRemote.remote
+			? await this._folderRepoManager.getMetadata(targetRemote.remote.remoteName)
+			: undefined;
+		const base: string = convertBranchRefToBranchName(metadata?.defaultBranch ?? 'refs/heads/main');
 
 		let target: string | undefined;
 		try {
@@ -896,24 +912,19 @@ export class ReviewManager {
 	}
 
 	public async createPullRequest(draft = false): Promise<void> {
-		const pullRequestDefaults = await this._folderRepoManager.getPullRequestDefaults();
-		const githubRemotes = this._folderRepoManager.getGitHubRemotes();
-		const targetRemote = await this.getRemote(
-			githubRemotes,
-			'Select the remote to send the pull request to',
-			new RemoteQuickPickItem(pullRequestDefaults.owner, pullRequestDefaults.repo, 'Parent Repository'),
-		);
+		if (this._repository.state.HEAD === undefined) {
+			vscode.window.showErrorMessage('Cannot create a pull request: the current branch could not be determined.');
+			return;
+		}
 
+		const azdoRemotes = this._folderRepoManager.getGitHubRemotes();
+		const targetRemote = await this.getRemote(azdoRemotes, 'Select the remote repository to create the pull request in');
 		if (!targetRemote) {
 			return;
 		}
 
-		const target = await this._chooseTargetBranch(targetRemote, pullRequestDefaults);
+		const target = await this._chooseTargetBranch(targetRemote);
 		if (!target) {
-			return;
-		}
-
-		if (this._repository.state.HEAD === undefined) {
 			return;
 		}
 
@@ -939,10 +950,21 @@ export class ReviewManager {
 				}
 
 				const branchName = HEAD.upstream!.name;
+				if (branchName === target) {
+					vscode.window.showErrorMessage(
+						`The source and target branch are both '${target}'. Switch to a feature branch before creating a pull request.`,
+					);
+					return;
+				}
 				const headRemote = (await this._folderRepoManager.getAllGitHubRemotes()).find(
 					remote => remote.remoteName === HEAD!.upstream!.remote,
 				);
 				if (!headRemote) {
+					vscode.window.showErrorMessage(
+						`The upstream remote '${
+							HEAD.upstream!.remote
+						}' is not an Azure DevOps remote, so no pull request can be created for it.`,
+					);
 					return;
 				}
 
@@ -1004,26 +1026,25 @@ export class ReviewManager {
 						description = descriptionResult || '';
 				}
 
-				const createParams = {
+				// ADO's create API takes refs on one repository, not GitHub's owner:branch head/base pair.
+				const createParams: GitPullRequest = {
+					sourceRefName: `refs/heads/${branchName}`,
+					targetRefName: `refs/heads/${target}`,
 					title,
-					body: description,
-					base: target,
-					// For cross-repository pull requests, the owner must be listed. Always list to be safe. See https://developer.github.com/v3/pulls/#create-a-pull-request.
-					head: `${headRemote.owner}:${branchName}`,
-					owner: targetRemote!.owner,
-					repo: targetRemote!.name,
-					draft: draft,
+					description,
+					isDraft: draft,
 				};
 
-				const pullRequestModel = await this._folderRepoManager.createPullRequest(createParams);
+				const pullRequestModel = await this._folderRepoManager.createPullRequest(headRemote.remoteName, createParams);
 
 				if (pullRequestModel) {
 					progress.report({ increment: 30, message: `Pull Request #${pullRequestModel.getPullRequestId()} Created` });
 					await this.updateState();
+					await vscode.commands.executeCommand('azdopr.refreshList');
 					await vscode.commands.executeCommand('azdopr.openDescription', pullRequestModel);
 					progress.report({ increment: 30 });
 				} else {
-					// error: Unhandled Rejection at: Promise [object Promise]. Reason: {"message":"Validation Failed","errors":[{"resource":"PullRequest","code":"custom","message":"A pull request already exists for rebornix:tree-sitter."}],"documentation_url":"https://developer.github.com/v3/pulls/#create-a-pull-request"}.
+					// folderRepoManager.createPullRequest already surfaced the error to the user.
 					progress.report({ increment: 90, message: `Failed to create pull request for ${branchName}` });
 				}
 			},

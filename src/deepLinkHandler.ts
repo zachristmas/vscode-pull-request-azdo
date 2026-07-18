@@ -1,0 +1,107 @@
+import * as vscode from 'vscode';
+import { AzdoRepository } from './azdo/azdoRepository';
+import { FolderRepositoryManager } from './azdo/folderRepositoryManager';
+import { PullRequestModel } from './azdo/pullRequestModel';
+import { PullRequestOverviewPanel } from './azdo/pullRequestOverview';
+import { parseAzdoRemoteUrl } from './azdo/remoteUrlParser';
+import { RepositoriesManager } from './azdo/repositoriesManager';
+import { AzdoUserManager } from './azdo/userManager';
+import { AzdoWorkItem } from './azdo/workItem';
+import { parsePullRequestDeepLink, PullRequestDeepLinkParams } from './common/deepLink';
+import Logger from './common/logger';
+
+const ID = 'DeepLinkHandler';
+
+interface DeepLinkTarget {
+	folderManager: FolderRepositoryManager;
+	azdoRepository: AzdoRepository;
+}
+
+// Normalizes both org-url shapes (https://dev.azure.com/<org> and legacy
+// https://<org>.visualstudio.com) down to the bare org name for comparison.
+function orgNameFromUrl(orgUrl: string): string | undefined {
+	const trimmed = orgUrl.trim().replace(/\/+$/, '');
+	const devAzure = trimmed.match(/^https?:\/\/dev\.azure\.com\/([^/]+)$/i);
+	if (devAzure) {
+		try {
+			return decodeURIComponent(devAzure[1]).toLowerCase();
+		} catch {
+			return devAzure[1].toLowerCase();
+		}
+	}
+	const legacy = trimmed.match(/^https?:\/\/([^./]+)\.visualstudio\.com(?:\/DefaultCollection)?$/i);
+	if (legacy) {
+		return legacy[1].toLowerCase();
+	}
+	return undefined;
+}
+
+function findDeepLinkTarget(reposManager: RepositoriesManager, params: PullRequestDeepLinkParams): DeepLinkTarget | undefined {
+	const wantedOrg = orgNameFromUrl(params.orgUrl) ?? params.orgUrl.trim().replace(/\/+$/, '').toLowerCase();
+	const wantedRepo = params.repo.toLowerCase();
+	const wantedProject = params.project.toLowerCase();
+
+	const candidates: { target: DeepLinkTarget; projectMatches: boolean }[] = [];
+	for (const folderManager of reposManager.folderManagers) {
+		for (const azdoRepository of folderManager.azdoRepositories) {
+			const parsed = parseAzdoRemoteUrl(azdoRepository.remote.url);
+			if (!parsed) {
+				continue;
+			}
+			const org = orgNameFromUrl(parsed.orgUrl) ?? parsed.orgUrl.toLowerCase();
+			if (org !== wantedOrg || parsed.repositoryName.toLowerCase() !== wantedRepo) {
+				continue;
+			}
+			candidates.push({
+				target: { folderManager, azdoRepository },
+				projectMatches: parsed.projectName.toLowerCase() === wantedProject,
+			});
+		}
+	}
+
+	// Repo names are only unique per project, so prefer an exact project match; a same-named repo
+	// in another project of the same org is still a better guess than failing outright.
+	return (candidates.find(candidate => candidate.projectMatches) ?? candidates[0])?.target;
+}
+
+export async function handleDeepLinkUri(
+	uri: vscode.Uri,
+	reposManager: RepositoriesManager,
+	extensionPath: string,
+	workItem: AzdoWorkItem,
+	azdoUserManager: AzdoUserManager,
+): Promise<void> {
+	const params = parsePullRequestDeepLink(uri);
+	if (!params) {
+		Logger.appendLine(`Ignoring unrecognized deep link: ${uri.toString()}`, ID);
+		return;
+	}
+	Logger.appendLine(`Handling deep link for PR ${params.prNumber} in ${params.repo}`, ID);
+
+	const target = findDeepLinkTarget(reposManager, params);
+	if (!target) {
+		vscode.window.showErrorMessage(
+			`No open workspace folder has a remote for '${params.repo}'. Open the folder containing ${params.repo} first, then follow the link again.`,
+		);
+		return;
+	}
+
+	const pullRequest = await target.azdoRepository.getPullRequest(params.prNumber);
+	if (!pullRequest) {
+		vscode.window.showErrorMessage(`Pull request ${params.prNumber} could not be loaded from '${params.repo}'.`);
+		return;
+	}
+
+	await PullRequestOverviewPanel.createOrShow(extensionPath, target.folderManager, pullRequest, workItem, azdoUserManager);
+
+	if (params.filePath) {
+		try {
+			await PullRequestModel.openDiffForFile(target.folderManager, pullRequest, params.filePath, params.line);
+		} catch (e) {
+			Logger.appendLine(`Deep link file diff failed: ${e}`, ID);
+			vscode.window.showWarningMessage(
+				`Opened pull request ${params.prNumber}, but the diff for '${params.filePath}' could not be opened.`,
+			);
+		}
+	}
+}

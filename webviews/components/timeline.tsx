@@ -279,6 +279,9 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 	};
 
 	const hasFile = !!thread.threadContext && !!thread.threadContext.filePath;
+	// Same threadContext-derived position as positionKey above; position-less threads (file-level
+	// comments) keep the bare path chip.
+	const threadLine = thread.threadContext?.rightFileStart?.line ?? thread.threadContext?.leftFileStart?.line;
 	const commentCount = thread.comments.length;
 
 	return (
@@ -289,6 +292,7 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 						// item 2: real button so the diff opens via keyboard too (was a click-only <a>).
 						<button type="button" className="thread-file-chip" onClick={() => openDiff(thread)}>
 							{thread.threadContext.filePath}
+							{threadLine !== undefined ? `:${threadLine}` : ''}
 						</button>
 					) : null}
 					{hasStatus ? <ThreadStatusPill status={status} onChange={onThreadStatusChange} /> : null}

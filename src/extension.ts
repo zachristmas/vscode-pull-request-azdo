@@ -17,12 +17,14 @@ import { RepositoriesManager } from './azdo/repositoriesManager';
 import { AzdoUserManager } from './azdo/userManager';
 import { AzdoWorkItem } from './azdo/workItem';
 import { registerCommands } from './commands';
+import { parsePullRequestDeepLink } from './common/deepLink';
 import { LocalStorageService } from './common/localStorageService';
 import Logger from './common/logger';
 import * as PersistentState from './common/persistentState';
 import { Resource } from './common/resources';
 import { handler as uriHandler } from './common/uri';
 import { onceEvent } from './common/utils';
+import { handleDeepLinkUri } from './deepLinkHandler';
 import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from './constants';
 import { registerBuiltinGitProvider, registerLiveShareGitProvider } from './gitProviders/api';
 import { MockGitProvider } from './gitProviders/mockGitProvider';
@@ -42,6 +44,11 @@ const fetch = require('node-fetch');
 fetch.Promise = PolyfillPromise;
 
 let telemetry: TelemetryReporter;
+
+// Deep links can arrive before init() has built the repositories manager (activation is still
+// running, or no repository is open yet). Buffer them and drain once the processor is wired up.
+const pendingDeepLinkUris: vscode.Uri[] = [];
+let deepLinkProcessor: ((uri: vscode.Uri) => void) | undefined;
 
 async function init(
 	context: vscode.ExtensionContext,
@@ -75,7 +82,6 @@ async function init(
 		}
 	});
 
-	context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
 	context.subscriptions.push(new FileTypeDecorationProvider());
 	// Sort the repositories to match folders in a multiroot workspace (if possible).
 	const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -127,6 +133,13 @@ async function init(
 	context.subscriptions.push(reviewsManager);
 	tree.initialize(reposManager);
 	registerCommands(context, reposManager, reviewManagers, workItem, userManager, telemetry, credentialStore, tree);
+
+	deepLinkProcessor = uri => {
+		handleDeepLinkUri(uri, reposManager, context.extensionPath, workItem, userManager).catch(e => {
+			Logger.appendLine(`Handling vscode:// deep link failed: ${e}`);
+		});
+	};
+	pendingDeepLinkUris.splice(0).forEach(deepLinkProcessor);
 	const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
 	await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 
@@ -194,6 +207,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	context.subscriptions.push(telemetry);
 
 	PersistentState.init(context);
+
+	// The URI handler must be registered during activation (not init) so vscode:// deep links are
+	// captured even while repositories are still being discovered.
+	context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
+	context.subscriptions.push(
+		uriHandler.event(uri => {
+			if (deepLinkProcessor) {
+				deepLinkProcessor(uri);
+				return;
+			}
+			pendingDeepLinkUris.push(uri);
+			if (apiImpl.repositories.length === 0) {
+				// Nothing will drain the queue until a repository opens; tell the user what to do.
+				const params = parsePullRequestDeepLink(uri);
+				vscode.window.showErrorMessage(
+					params
+						? `No workspace folder with a clone of '${params.repo}' is open. Open the folder containing ${params.repo} first, then follow the link again.`
+						: 'Open a workspace folder containing an Azure DevOps repository first, then follow the link again.',
+				);
+			}
+		}),
+	);
 
 	// const session = await registerGithubExtension();
 

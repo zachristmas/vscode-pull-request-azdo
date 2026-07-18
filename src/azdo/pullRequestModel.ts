@@ -1212,22 +1212,25 @@ export class PullRequestModel implements IPullRequestModel {
 		return patch;
 	}
 
-	static async openDiffFromComment(
+	/**
+	 * Open the PR diff editor for a file in this PR, optionally landing the cursor on a 1-based
+	 * line ("Ln" as the editor shows it). Used by the vscode:// deep-link handler.
+	 */
+	static async openDiffForFile(
 		folderManager: FolderRepositoryManager,
 		pullRequestModel: PullRequestModel,
-		comment: GitPullRequestCommentThread,
+		filePath: string,
+		line?: number,
 	): Promise<void> {
+		const targetPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
 		const fileChanges = await pullRequestModel.getFileChangesInfo();
-		// TODO merge base is here also
 		const mergeBase = pullRequestModel.getDiffTarget();
 		const contentChanges = await parseDiffAzdo(fileChanges, folderManager.repository, mergeBase);
 		const change = contentChanges.find(
-			fileChange =>
-				fileChange.fileName === comment.threadContext?.filePath ||
-				fileChange.previousFileName === comment.threadContext?.filePath,
+			fileChange => fileChange.fileName === targetPath || fileChange.previousFileName === targetPath,
 		);
 		if (!change) {
-			throw new Error(`Can't find matching file`);
+			throw new Error(`Can't find the file '${targetPath}' in pull request ${pullRequestModel.getPullRequestId()}`);
 		}
 
 		let headUri, baseUri: vscode.Uri;
@@ -1275,13 +1278,34 @@ export class PullRequestModel implements IPullRequestModel {
 			);
 		}
 
-		const pathSegments = comment.threadContext?.filePath?.split('/');
+		const opts: vscode.TextDocumentShowOptions = {};
+		if (line !== undefined && line > 0) {
+			// 1-based visible line -> 0-based Range
+			opts.selection = new vscode.Range(line - 1, 0, line - 1, 0);
+		}
+
+		const pathSegments = targetPath.split('/');
 		vscode.commands.executeCommand(
 			'vscode.diff',
 			baseUri,
 			headUri,
 			`${pathSegments[pathSegments.length - 1]} (Pull Request)`,
-			{},
+			opts,
 		);
+	}
+
+	static async openDiffFromComment(
+		folderManager: FolderRepositoryManager,
+		pullRequestModel: PullRequestModel,
+		comment: GitPullRequestCommentThread,
+	): Promise<void> {
+		const filePath = comment.threadContext?.filePath;
+		if (!filePath) {
+			throw new Error(`Can't find matching file`);
+		}
+		// vscode.diff used to receive an empty options object here, so long files opened at Ln 1 and
+		// the user had to hunt for the thread. getPositionFromThread returns the thread's tracked
+		// 1-based line; openDiffForFile turns it into the editor selection.
+		return this.openDiffForFile(folderManager, pullRequestModel, filePath, getPositionFromThread(comment));
 	}
 }
