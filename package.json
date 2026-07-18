@@ -13,6 +13,14 @@
 	"enableProposedApi": false,
 	"preview": true,
 	"version": "1.6.0",
+	"packageManager": "pnpm@10.3.0",
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"@vscode/vsce-sign",
+			"esbuild",
+			"keytar"
+		]
+	},
 	"publisher": "ZacharyChristmas",
 	"engines": {
 		"vscode": "^1.97.0"
@@ -902,10 +910,10 @@
 		]
 	},
 	"scripts": {
-		"postinstall": "yarn update-dts",
-		"vscode:prepublish": "yarn run bundle",
-		"browsertest:preprocess": "yarn run compile && tsc ./src/test/browser/runTests.ts --outDir ./dist/browser/test --rootDir ./src/test/browser --target es6 --module commonjs",
-		"browsertest": "yarn run browsertest:preprocess && node ./dist/browser/test/runTests.js",
+		"postinstall": "pnpm run update-dts",
+		"vscode:prepublish": "pnpm run bundle",
+		"browsertest:preprocess": "pnpm run compile && tsc ./src/test/browser/runTests.ts --outDir ./dist/browser/test --rootDir ./src/test/browser --target es6 --module commonjs",
+		"browsertest": "pnpm run browsertest:preprocess && node ./dist/browser/test/runTests.js",
 		"bundle": "webpack --mode production --env esbuild",
 		"bundle:node": "webpack --mode production --config-name extension:node --config-name webviews",
 		"bundle:web": "webpack --mode production --config-name extension:webworker --config-name webviews",
@@ -916,10 +924,10 @@
 		"compile:web": "webpack --mode development --config-name extension:webworker --config-name webviews",
 		"lint": "eslint --fix --cache --config .eslintrc.json --ignore-pattern src/env/browser/**/* \"{src,webviews}/**/*.ts?\"",
 		"lint:browser": "eslint --fix --cache --cache-location .eslintcache.browser --config .eslintrc.browser.json --ignore-pattern src/env/node/**/* \"{src,webviews}/**/*.ts?\"",
-		"package": "vsce package --yarn",
+		"package": "vsce package --no-dependencies",
 		"pretty": "prettier --config .prettierrc --loglevel warn --write .",
-		"test": "yarn run test:preprocess && node ./out/src/test/runTests.js",
-		"test:preprocess": "yarn run compile:test && yarn run test:preprocess-svg",
+		"test": "pnpm run test:preprocess && node ./out/src/test/runTests.js",
+		"test:preprocess": "pnpm run compile:test && pnpm run test:preprocess-svg",
 		"test:preprocess-svg": "node scripts/preprocess-svg --in ../resources/ --out out/resources",
 		"update-dts": "cd src/@types && npx vscode-dts master && npx vscode-dts dev",
 		"watch": "webpack --watch --mode development --env esbuild",
@@ -1028,6 +1036,7 @@
 		"ssh-config": "^2.0.0-alpha.3",
 		"tar": "^6.2.1",
 		"tunnel": "0.0.6",
+		"typed-rest-client": "^1.8.4",
 		"uuid": "8.3.2",
 		"vscode-extension-telemetry": "^0.1.6",
 		"vsls": "^0.3.967"

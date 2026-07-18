@@ -21,7 +21,8 @@ const webpack = require('webpack');
 async function resolveTSConfig(configFile) {
 	const data = await new Promise((resolve, reject) => {
 		execFile(
-			'yarn',
+			// npx resolves the local tsc regardless of package manager (yarn is gone; pnpm exec would pin us again)
+			'npx',
 			['tsc', `-p ${configFile}`, '--showConfig'],
 			{ cwd: __dirname, encoding: 'utf8', shell: true },
 			function (error, stdout, stderr) {
@@ -174,14 +175,12 @@ async function getExtensionConfig(target, mode, env) {
 	];
 
 	if (target === 'webworker') {
-		plugins.push(new webpack.ProvidePlugin({
-			process: path.join(
-				__dirname,
-				'node_modules',
-				'process',
-				'browser.js'),
-			Buffer: ['buffer', 'Buffer'],
-		}));
+		plugins.push(
+			new webpack.ProvidePlugin({
+				process: path.join(__dirname, 'node_modules', 'process', 'browser.js'),
+				Buffer: ['buffer', 'Buffer'],
+			}),
+		);
 	}
 
 	const entry = {
@@ -322,38 +321,33 @@ async function getExtensionConfig(target, mode, env) {
 					? {
 							path: require.resolve('path-browserify'),
 							url: require.resolve('url'),
-							stream: require.resolve("stream-browserify"),
+							stream: require.resolve('stream-browserify'),
 							// zlib: require.resolve("browserify-zlib"),
 							// crypto: require.resolve("crypto-browserify"),
-							http: require.resolve("stream-http"),
-							https: require.resolve("https-browserify"),
+							http: require.resolve('stream-http'),
+							https: require.resolve('https-browserify'),
 							// util: require.resolve("util/"),
-							buffer: require.resolve("buffer/"),
+							buffer: require.resolve('buffer/'),
 							// assert: require.resolve("assert/"),
 							// stream:false,
 							zlib: false,
-							crypto:false,
+							crypto: false,
 							// http: false,
 							//https:false,
 							util: false,
 							// buffer:false,
-							'assert': require.resolve('assert'),
-							'os': require.resolve('os-browserify/browser'),
-							"constants": require.resolve("constants-browserify"),
-							fs: path.resolve(
-								__dirname,
-								'src',
-								'env',
-								'browser',
-								'fs',
-							),
+							assert: require.resolve('assert'),
+							os: require.resolve('os-browserify/browser'),
+							constants: require.resolve('constants-browserify'),
+							fs: path.resolve(__dirname, 'src', 'env', 'browser', 'fs'),
 							net: false,
-							tls: false
-
+							tls: false,
 					  }
 					: undefined,
+			// symlinks must stay on (the default): pnpm links every package into its virtual
+			// store, and with symlinks:false webpack resolves dependencies-of-dependencies
+			// against the root node_modules where pnpm deliberately doesn't hoist them.
 			extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
-			symlinks: false,
 		},
 		externals: {
 			vscode: 'commonjs vscode',
