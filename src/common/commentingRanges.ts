@@ -61,14 +61,16 @@ export function mapThreadsToBase(threads: GitPullRequestCommentThread[], isBase:
 	// ITER-01: prefer the tracked threadContext side; fall back to creation-time trackingCriteria only when
 	// the thread has no threadContext (mirrors getDiffSide/getPositionFromThread in azdo/utils.ts).
 	return isBase
-		? threads.filter(c =>
-				c.threadContext !== undefined
-					? c.threadContext?.leftFileStart !== undefined
-					: c.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart !== undefined,
+		? threads.filter(
+				c =>
+					(c.threadContext !== undefined
+						? c.threadContext?.leftFileStart
+						: c.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart) !== undefined,
 		  )
-		: threads.filter(c =>
-				c.threadContext !== undefined
-					? c.threadContext?.rightFileStart !== undefined
-					: c.pullRequestThreadContext?.trackingCriteria?.origRightFileStart !== undefined,
+		: threads.filter(
+				c =>
+					(c.threadContext !== undefined
+						? c.threadContext?.rightFileStart
+						: c.pullRequestThreadContext?.trackingCriteria?.origRightFileStart) !== undefined,
 		  );
 }

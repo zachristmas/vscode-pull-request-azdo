@@ -5,7 +5,7 @@
 
 import * as React from 'react';
 
-export const nbsp = String.fromCharCode(0xa0);
+export const nbsp = String.fromCodePoint(0xa0);
 
 export const Spaced = ({ children }: { children: React.ReactNode }) => {
 	const count = React.Children.count(children);

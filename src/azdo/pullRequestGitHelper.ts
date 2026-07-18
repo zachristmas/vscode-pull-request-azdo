@@ -26,7 +26,7 @@ export interface PullRequestMetadata {
 }
 
 export const PullRequestGitHelper = {
-	ID : 'PullRequestGitHelper',
+	ID: 'PullRequestGitHelper',
 	async checkoutFromFork(
 		repository: Repository,
 		pullRequest: PullRequestModel & IResolvedPullRequestModel,
@@ -317,7 +317,7 @@ export const PullRequestGitHelper = {
 		const remotes = parseRepositoryRemotes(repository);
 
 		// eslint-disable-next-line no-loop-func
-		while (remotes.find(e => e.remoteName === uniqueName)) {
+		while (remotes.some(e => e.remoteName === uniqueName)) {
 			number += 1;
 			uniqueName = `${name}${number}`;
 		}

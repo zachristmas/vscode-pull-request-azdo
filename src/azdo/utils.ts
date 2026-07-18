@@ -241,7 +241,7 @@ export function computeMergeMethodsAvailability(configurations: PolicyConfigurat
 					RebaseMerge: !!settings.allowRebaseMerge,
 			  };
 		(Object.keys(availability) as MergeMethod[]).forEach(method => {
-			availability[method] = availability[method] && allowed[method];
+			availability[method] &&= allowed[method];
 		});
 	});
 
@@ -304,7 +304,7 @@ export function convertBranchRefToBranchName(branchRef: string): string {
 	if (splitref.length < 2) {
 		return branchRef;
 	}
-	if (splitref[1] === 'heads' || splitref[1] === 'tags' || splitref[1] === 'remotes') {
+	if (['heads', 'tags', 'remotes'].includes(splitref[1])) {
 		return splitref.slice(2).join('/');
 	}
 	return splitref.slice(1).join('/');
@@ -370,65 +370,65 @@ export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 		// }
 
 		switch (block.changeType) {
-		case LineDiffBlockChangeType.Add: {
-			for (let i = 0; i < block.modifiedLinesCount!; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
-				positionInHunk++;
-			}
-		
-		break;
-		}
-		case LineDiffBlockChangeType.Delete: {
-			for (let i = 0; i < block.originalLinesCount!; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
-				positionInHunk++;
-			}
-		
-		break;
-		}
-		case LineDiffBlockChangeType.Edit: {
-			// Add no change lines for overflow BEFORE the actual change
-			for (let i = overflowStartLineNumber; i < newLineNumber; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
-				positionInHunk++;
-			}
-
-			const overlap = Math.min(block.originalLinesCount!, block.modifiedLinesCount!);
-			for (let i = 0; i < overlap; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
-				positionInHunk++;
-			}
-
-			for (let i = 0; i < overlap; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
-				positionInHunk++;
-			}
-
-			for (let i = 0; i < Math.abs(block.originalLinesCount! - block.modifiedLinesCount!); i++) {
-				let type = DiffChangeType.Context;
-				let o = oldLineNumber + overlap + i;
-				let m = newLineNumber + overlap + i;
-				if (i + overlap >= block.originalLinesCount!) {
-					type = DiffChangeType.Add;
-					o = -1;
+			case LineDiffBlockChangeType.Add: {
+				for (let i = 0; i < block.modifiedLinesCount!; i++) {
+					hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
+					positionInHunk++;
 				}
-				if (i + overlap >= block.modifiedLinesCount!) {
-					type = DiffChangeType.Delete;
-					m = -1;
-				}
-				hunk.diffLines.push(new DiffLine(type, o, m, positionInHunk));
-				positionInHunk++;
-			}
 
-			// Add no change lines for overflow AFTER the actual change
-			for (let i = newLineNumber + block.modifiedLinesCount!; i < overflowEndLineNumber; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
-				positionInHunk++;
+				break;
 			}
-		
-		break;
-		}
-		// No default
+			case LineDiffBlockChangeType.Delete: {
+				for (let i = 0; i < block.originalLinesCount!; i++) {
+					hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
+					positionInHunk++;
+				}
+
+				break;
+			}
+			case LineDiffBlockChangeType.Edit: {
+				// Add no change lines for overflow BEFORE the actual change
+				for (let i = overflowStartLineNumber; i < newLineNumber; i++) {
+					hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
+					positionInHunk++;
+				}
+
+				const overlap = Math.min(block.originalLinesCount!, block.modifiedLinesCount!);
+				for (let i = 0; i < overlap; i++) {
+					hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
+					positionInHunk++;
+				}
+
+				for (let i = 0; i < overlap; i++) {
+					hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
+					positionInHunk++;
+				}
+
+				for (let i = 0; i < Math.abs(block.originalLinesCount! - block.modifiedLinesCount!); i++) {
+					let type = DiffChangeType.Context;
+					let o = oldLineNumber + overlap + i;
+					let m = newLineNumber + overlap + i;
+					if (i + overlap >= block.originalLinesCount!) {
+						type = DiffChangeType.Add;
+						o = -1;
+					}
+					if (i + overlap >= block.modifiedLinesCount!) {
+						type = DiffChangeType.Delete;
+						m = -1;
+					}
+					hunk.diffLines.push(new DiffLine(type, o, m, positionInHunk));
+					positionInHunk++;
+				}
+
+				// Add no change lines for overflow AFTER the actual change
+				for (let i = newLineNumber + block.modifiedLinesCount!; i < overflowEndLineNumber; i++) {
+					hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
+					positionInHunk++;
+				}
+
+				break;
+			}
+			// No default
 		}
 
 		diff.push(hunk);
@@ -454,18 +454,19 @@ export function getRelatedUsersFromPullrequest(
 		commits = pr.commits;
 	}
 
-	const related_users: { login: string; name?: string; email?: string }[] = [ {
-		login: pr.createdBy?.uniqueName ?? pr.createdBy?.id ?? '',
-		email: pr.createdBy?.uniqueName,
-		name: pr.createdBy?.displayName,
-	}];
-
+	const related_users: { login: string; name?: string; email?: string }[] = [
+		{
+			login: pr.createdBy?.uniqueName ?? pr.createdBy?.id ?? '',
+			email: pr.createdBy?.uniqueName,
+			name: pr.createdBy?.displayName,
+		},
+	];
 
 	related_users.push(
 		...(pr.reviewers ?? []).map(r => {
 			return { name: r.displayName, login: r.uniqueName ?? r.id ?? '', email: r.uniqueName };
 		}),
-		...([] as IdentityRef[]).concat(...(threads?.map(t => t.comments?.map(c => c.author!) || []) || [])).map(r => {
+		...(threads?.map(t => t.comments?.map(c => c.author!) || []) || []).flat().map(r => {
 			return { name: r.displayName, login: r.uniqueName ?? r.id ?? '', email: r.uniqueName };
 		}),
 		...(commits
@@ -534,12 +535,14 @@ export function generateCommentReactions(reactions: Reaction[] | undefined) {
 
 		const matchedReaction = reactions.find(re => re.label === reaction.label);
 
-		return matchedReaction ? {
-				label: matchedReaction.label,
-				authorHasReacted: matchedReaction.viewerHasReacted,
-				count: matchedReaction.count,
-				iconPath: reaction.icon || '',
-			} : { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
+		return matchedReaction
+			? {
+					label: matchedReaction.label,
+					authorHasReacted: matchedReaction.viewerHasReacted,
+					count: matchedReaction.count,
+					iconPath: reaction.icon || '',
+			  }
+			: { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
 	});
 }
 export function updateCommentReactions(comment: vscode.Comment, reactions: Reaction[] | undefined) {
@@ -605,7 +608,9 @@ export function updateCommentReviewState(thread: GHPRCommentThread, newDraftMode
 }
 
 export function updateCommentThreadLabel(thread: GHPRCommentThread) {
-	thread.label = thread.comments.length ? `Status: ${CommentThreadStatus[thread.rawThread?.status ?? 0]}` : 'Start discussion';
+	thread.label = thread.comments.length
+		? `Status: ${CommentThreadStatus[thread.rawThread?.status ?? 0]}`
+		: 'Start discussion';
 }
 
 export function createVSCodeCommentThread(thread: ThreadData, commentController: vscode.CommentController): GHPRCommentThread {
@@ -648,12 +653,13 @@ export class UserCompletion extends vscode.CompletionItem {
 }
 
 export function isCommentResolved(status: CommentThreadStatus | undefined): boolean {
-	return (
-		status === CommentThreadStatus.ByDesign ||
-		status === CommentThreadStatus.Closed ||
-		status === CommentThreadStatus.Fixed ||
-		status === CommentThreadStatus.WontFix
-	);
+	const resolvedStatuses: (CommentThreadStatus | undefined)[] = [
+		CommentThreadStatus.ByDesign,
+		CommentThreadStatus.Closed,
+		CommentThreadStatus.Fixed,
+		CommentThreadStatus.WontFix,
+	];
+	return resolvedStatuses.includes(status);
 }
 
 export function convertRawFileChangeToFileChangeNode(fileChange: IRawFileChange): IFileChangeNode {

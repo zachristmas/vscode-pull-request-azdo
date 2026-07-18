@@ -96,20 +96,20 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 			// it is safe to ignore and leave currentLoginUser undefined.
 		}
 		// Note: only suggest if the current user is part of the aggregated mentionable users
-			if (currentLoginUser && accounts.some(u => u.id === currentLoginUser) ) {
-				this.notifySuggestedUsers(
-					accounts
-						.filter(u => u.email && u.id)
-						.map(u => {
-							return {
-								id: u.id!,
-								displayName: u.name ? u.name : u.email,
-								email: u.email,
-							};
-						}),
-					true,
-				);
-			}
+		if (currentLoginUser && accounts.some(u => u.id === currentLoginUser)) {
+			this.notifySuggestedUsers(
+				accounts
+					.filter(u => u.email && u.id)
+					.map(u => {
+						return {
+							id: u.id!,
+							displayName: u.name || u.email,
+							email: u.email,
+						};
+					}),
+				true,
+			);
+		}
 	}
 
 	private async getCurrentUserLogin(): Promise<string | undefined> {

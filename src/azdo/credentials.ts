@@ -232,7 +232,7 @@ export class CredentialStore implements vscode.Disposable {
 				let isPatTokenAuth = true;
 				let token = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PATTOKEN_SETTINGS);
 
-				if (token === undefined || token === null || token === '') {
+				if (!token) {
 					const session = await this.getSession(this._sessionOptions);
 					if (!session) {
 						Logger.appendLine('Auth> Unable to get session', CredentialStore.ID);
@@ -253,7 +253,8 @@ export class CredentialStore implements vscode.Disposable {
 				}
 
 				const azdo = new Azdo(orgConfig.orgUrl, orgConfig.projectName, token, isPatTokenAuth);
-				azdo.authenticatedUser = (await azdo.connection.connect()).authenticatedUser;
+				const connectionData = await azdo.connection.connect();
+				azdo.authenticatedUser = connectionData.authenticatedUser;
 				initAvatarCache(azdo.connection);
 
 				Logger.debug(`Auth> Successful: Logged userid: ${azdo?.authenticatedUser?.id}`, CredentialStore.ID);

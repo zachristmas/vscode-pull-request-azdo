@@ -374,15 +374,17 @@ export class PullRequestModel implements IPullRequestModel {
 		let tc: CommentThreadContext;
 
 		const endLine = threadContext?.endLine ?? threadContext?.line;
-		tc = threadContext?.isLeft ? {
-				filePath: threadContext?.filePath,
-				leftFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
-				leftFileEnd: { line: endLine, offset: threadContext?.endOffset },
-			} : {
-				filePath: threadContext?.filePath,
-				rightFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
-				rightFileEnd: { line: endLine, offset: threadContext?.endOffset },
-			};
+		tc = threadContext?.isLeft
+			? {
+					filePath: threadContext?.filePath,
+					leftFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
+					leftFileEnd: { line: endLine, offset: threadContext?.endOffset },
+			  }
+			: {
+					filePath: threadContext?.filePath,
+					rightFileStart: { line: threadContext?.line, offset: threadContext?.startOffset },
+					rightFileEnd: { line: endLine, offset: threadContext?.endOffset },
+			  };
 
 		const thread: GitPullRequestCommentThread = {
 			comments: [
@@ -491,7 +493,7 @@ export class PullRequestModel implements IPullRequestModel {
 		});
 
 		this._reviewThreadsCache.forEach(thread => {
-			if (!newReviewThreads.find(t => t.id === thread.id)) {
+			if (newReviewThreads.every(t => t.id !== thread.id)) {
 				removed.push(thread);
 			}
 		});
@@ -509,9 +511,8 @@ export class PullRequestModel implements IPullRequestModel {
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
 
-		const threads = (await git?.getThreads(repoId, this.getPullRequestId(), undefined, iteration, baseIteration))?.filter(
-			t => !t.isDeleted,
-		);
+		const allThreads = await git?.getThreads(repoId, this.getPullRequestId(), undefined, iteration, baseIteration);
+		const threads = allThreads?.filter(t => !t.isDeleted);
 		await resolveAvatarsDeep(threads);
 		return threads;
 	}
@@ -674,7 +675,7 @@ export class PullRequestModel implements IPullRequestModel {
 				PullRequestModel.ID,
 			);
 
-			if (!!commit.changes && !forceRefresh) {
+			if (!forceRefresh && !!commit.changes) {
 				Logger.debug(
 					`Fetch file changes of commit ${commit.commitId} in PR #${this.getPullRequestId()} - cache hit`,
 					PullRequestModel.ID,
@@ -750,7 +751,7 @@ export class PullRequestModel implements IPullRequestModel {
 			if (!result) {
 				result = batch;
 			} else {
-				result.changes = (result.changes ?? []).concat(batch.changes ?? []);
+				result.changes = [...(result.changes ?? []), ...(batch.changes ?? [])];
 			}
 			const received = batch.changes?.length ?? 0;
 			if (received < pageSize) {
@@ -771,13 +772,14 @@ export class PullRequestModel implements IPullRequestModel {
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
 
+		const metadata = await azdoRepo.getMetadata();
 		return git!.getFileDiffs(
 			{
 				baseVersionCommit: baseVersionCommit,
 				targetVersionCommit: targetVersionCommit,
 				fileDiffParams: fileDiffParams,
 			},
-			(await azdoRepo.getMetadata())?.project?.name ?? this.azdoRepository.azdo!.projectName,
+			metadata?.project?.name ?? this.azdoRepository.azdo!.projectName,
 			repoId,
 		);
 	}
@@ -858,7 +860,8 @@ export class PullRequestModel implements IPullRequestModel {
 	async getPolicyEvaluations(): Promise<PullRequestPolicyEvaluation[]> {
 		try {
 			const azdoRepo = await this.azdoRepository.ensure();
-			const projectId = (await azdoRepo.getMetadata())?.project?.id;
+			const metadata = await azdoRepo.getMetadata();
+			const projectId = metadata?.project?.id;
 			if (!projectId) {
 				Logger.appendLine(
 					`Fetch policy evaluations for PR #${this.getPullRequestId()} skipped - no project id`,
@@ -915,9 +918,7 @@ export class PullRequestModel implements IPullRequestModel {
 		const buildIds = [
 			...new Set([...contextByEvaluationId.values()].map(c => c.buildId).filter((id): id is number => !!id)),
 		];
-		const builds = buildApi
-			? await Promise.all(buildIds.map(id => buildApi.getBuild(projectId, id).catch(() => {})))
-			: [];
+		const builds = buildApi ? await Promise.all(buildIds.map(id => buildApi.getBuild(projectId, id).catch(() => {}))) : [];
 		const buildById = new Map(builds.filter((b): b is Build => !!b).map(b => [b.id!, b]));
 
 		buildEvaluations.forEach(evaluation => {
@@ -940,7 +941,8 @@ export class PullRequestModel implements IPullRequestModel {
 	 */
 	async requeuePolicyEvaluation(evaluationId: string): Promise<PullRequestPolicyEvaluation[]> {
 		const azdoRepo = await this.azdoRepository.ensure();
-		const projectId = (await azdoRepo.getMetadata())?.project?.id;
+		const metadata = await azdoRepo.getMetadata();
+		const projectId = metadata?.project?.id;
 		if (!projectId) {
 			return this.getPolicyEvaluations();
 		}
@@ -988,7 +990,8 @@ export class PullRequestModel implements IPullRequestModel {
 		// source branch is a fast-forward descendant of target with no divergent commits on either
 		// side. The unguarded [0].commitId here used to throw in that case, which getChildren()'s
 		// catch swallowed silently, leaving the PR's tree node with no children and no visible error.
-		this.mergeBase = (await this.getMergeBase(base.version!, target.version!))?.[0]?.commitId;
+		const mergeBases = await this.getMergeBase(base.version!, target.version!);
+		this.mergeBase = mergeBases?.[0]?.commitId;
 
 		const diffBase = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('diffBase');
 		const useCommonCommit = diffBase !== DiffBaseConfig.head;
@@ -1002,7 +1005,7 @@ export class PullRequestModel implements IPullRequestModel {
 		// fallback getDiffTarget() already uses for the 'head' diffBase mode), so fall all the way
 		// back to it rather than propagating undefined.
 		const commonCommit = commitDiffs?.commonCommit || this.mergeBase || base.version;
-		this.mergeBase = this.mergeBase || commonCommit;
+		this.mergeBase ||= commonCommit;
 		Logger.debug(
 			`Fetching file changes for PR #${this.getPullRequestId()}. base: ${base.version}, mergeBase: ${
 				this.mergeBase
@@ -1035,8 +1038,7 @@ export class PullRequestModel implements IPullRequestModel {
 
 		const result: IRawFileChange[] = [];
 
-		for (const diff of ([] as FileDiff[]).concat(...diffsPromisesResult)) {
-			// flatten
+		for (const diff of diffsPromisesResult.flat()) {
 			const change_map = changes.find(c => c.item?.path === (diff.path!.length > 0 ? diff.path : diff.originalPath));
 			result.push({
 				diffHunks: getDiffHunkFromFileDiff(diff),
@@ -1154,26 +1156,27 @@ export class PullRequestModel implements IPullRequestModel {
 					params.originalPath = change.sourceServerItem;
 				}
 				switch (change.changeType!) {
-				case VersionControlChangeType.Rename: {
-					params.path = change.item!.path;
-				
-				break;
-				}
-				case VersionControlChangeType.Edit: {
-					params.path = change.item!.path;
-					params.originalPath = change.item?.path;
-				
-				break;
-				}
-				case VersionControlChangeType.Add: {
-					params.path = change.item!.path;
-					// tslint:disable-next-line: no-bitwise
-				
-				break;
-				}
-				default: if (change.changeType! & VersionControlChangeType.Delete) {
-					params.originalPath = change.item!.path;
-				}
+					case VersionControlChangeType.Rename: {
+						params.path = change.item!.path;
+
+						break;
+					}
+					case VersionControlChangeType.Edit: {
+						params.path = change.item!.path;
+						params.originalPath = change.item?.path;
+
+						break;
+					}
+					case VersionControlChangeType.Add: {
+						params.path = change.item!.path;
+						// tslint:disable-next-line: no-bitwise
+
+						break;
+					}
+					default:
+						if (change.changeType! & VersionControlChangeType.Delete) {
+							params.originalPath = change.item!.path;
+						}
 				}
 				return params;
 			});
@@ -1303,13 +1306,7 @@ export class PullRequestModel implements IPullRequestModel {
 		}
 
 		const pathSegments = targetPath.split('/');
-		vscode.commands.executeCommand(
-			'vscode.diff',
-			baseUri,
-			headUri,
-			`${pathSegments.at(-1)} (Pull Request)`,
-			opts,
-		);
+		vscode.commands.executeCommand('vscode.diff', baseUri, headUri, `${pathSegments.at(-1)} (Pull Request)`, opts);
 	}
 
 	static async openDiffFromComment(

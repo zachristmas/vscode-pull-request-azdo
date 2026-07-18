@@ -46,7 +46,7 @@ export class RepositoryChangesNode extends DescriptionNode implements vscode.Tre
 	}
 
 	private revealActiveEditorInTree(activeEditorUri: string | undefined): void {
-		if (!(this.parent.view.visible && activeEditorUri)) {
+		if (!(activeEditorUri && this.parent.view.visible)) {
 			return;
 		}
 

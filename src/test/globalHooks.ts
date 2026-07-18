@@ -15,12 +15,12 @@ beforeEach(function () {
 	console.log = function captureLog(...args: unknown[]) {
 		original.log.apply(console, args);
 		const formatted = format(...args);
-		currentTest.consoleOutputs = (currentTest.consoleOutputs || []).concat(formatted);
+		currentTest.consoleOutputs = [...(currentTest.consoleOutputs || []), formatted];
 	};
 	console.error = function captureError(...args: unknown[]) {
 		original.error.apply(console, args);
 		const formatted = format(...args);
-		currentTest.consoleErrors = (currentTest.consoleErrors || []).concat(formatted);
+		currentTest.consoleErrors = [...(currentTest.consoleErrors || []), formatted];
 	};
 });
 

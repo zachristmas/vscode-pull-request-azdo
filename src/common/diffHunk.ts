@@ -95,7 +95,7 @@ export function* LineReader(text: string): IterableIterator<string> {
 			index++;
 		}
 
-		yield text.substr(startIndex, length);
+		yield text.slice(startIndex, startIndex + length);
 	}
 }
 
@@ -135,7 +135,7 @@ export function* parseDiffHunk(diffHunkPatch: string): IterableIterator<DiffHunk
 
 			if (type === DiffChangeType.Control) {
 				if (diffHunk.diffLines && diffHunk.diffLines.length) {
-					diffHunk.diffLines[diffHunk.diffLines.length - 1].endwithLineBreak = false;
+					diffHunk.diffLines.at(-1)!.endwithLineBreak = false;
 				}
 			} else {
 				diffHunk.diffLines.push(

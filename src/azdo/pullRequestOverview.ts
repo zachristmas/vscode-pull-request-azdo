@@ -623,7 +623,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				disposables.push(
 					quickpick.onDidChangeValue(async value => {
 						const id = Number.parseInt(value);
-						if (Number.isInteger(id) && quickpick.items.every(w => w.label !== value)) {
+						if (Number.isSafeInteger(id) && quickpick.items.every(w => w.label !== value)) {
 							quickpick.busy = true;
 							const wt = await this._workItem.getWorkItemById(id);
 							if (!!wt) {

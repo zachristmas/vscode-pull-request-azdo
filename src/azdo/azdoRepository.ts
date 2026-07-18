@@ -145,7 +145,8 @@ export class AzdoRepository implements vscode.Disposable {
 	}
 
 	async getRepositoryId(): Promise<string | undefined> {
-		return (await this.getMetadata())?.id;
+		const metadata = await this.getMetadata();
+		return metadata?.id;
 	}
 
 	private unresolvedRepositoryMessage(): string {

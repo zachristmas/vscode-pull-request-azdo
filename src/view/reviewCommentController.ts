@@ -297,7 +297,10 @@ export class ReviewCommentController
 						if (thread.isOutdated) {
 							// newThread = this.createOutdatedCommentThread(path, thread);
 						} else {
-							newThread = thread.diffSide === DiffSide.RIGHT ? (await this.createWorkspaceCommentThread(uri, removeLeadingSlash(path), thread)) : this.createReviewCommentThread(uri, path, thread);
+							newThread =
+								thread.diffSide === DiffSide.RIGHT
+									? await this.createWorkspaceCommentThread(uri, removeLeadingSlash(path), thread)
+									: this.createReviewCommentThread(uri, path, thread);
 						}
 					}
 
@@ -354,9 +357,9 @@ export class ReviewCommentController
 		}
 
 		for (const element of a) {
-			const findRet = b.find(editor => editor.document.uri.toString() === element.document.uri.toString());
+			const matchFound = b.some(editor => editor.document.uri.toString() === element.document.uri.toString());
 
-			if (!findRet) {
+			if (!matchFound) {
 				return false;
 			}
 		}
@@ -376,8 +379,9 @@ export class ReviewCommentController
 			return false;
 		}
 
-		return (thread.uri.scheme === currentWorkspace.uri.scheme &&
-			thread.uri.fsPath.startsWith(this._repository.rootUri.fsPath));
+		return (
+			thread.uri.scheme === currentWorkspace.uri.scheme && thread.uri.fsPath.startsWith(this._repository.rootUri.fsPath)
+		);
 	}
 
 	async provideCommentingRanges(
@@ -479,9 +483,9 @@ export class ReviewCommentController
 
 			// local file
 
-				if (fileChange.filePath.scheme !== URI_SCHEME_REVIEW && fileChange.commitId === query.commit) {
-					return true;
-				}
+			if (fileChange.filePath.scheme !== URI_SCHEME_REVIEW && fileChange.commitId === query.commit) {
+				return true;
+			}
 
 			try {
 				const q = JSON.parse(fileChange.filePath.query);

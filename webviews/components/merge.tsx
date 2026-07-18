@@ -262,10 +262,12 @@ export function pendingBlockingPolicies(policies?: PullRequestPolicyEvaluation[]
 	return (policies ?? []).filter(
 		p =>
 			p.isBlocking &&
-			(p.status === PolicyEvaluationStatus.Queued ||
-				p.status === PolicyEvaluationStatus.Running ||
-				p.status === PolicyEvaluationStatus.Rejected ||
-				p.status === PolicyEvaluationStatus.Broken),
+			[
+				PolicyEvaluationStatus.Queued,
+				PolicyEvaluationStatus.Running,
+				PolicyEvaluationStatus.Rejected,
+				PolicyEvaluationStatus.Broken,
+			].includes(p.status),
 	);
 }
 
@@ -282,11 +284,8 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 	const pending = pendingBlockingPolicies(policies);
 	const [showDetails, toggleDetails] = useReducer(
 		show => !show,
-		(policies ?? []).some(
-			p =>
-				p.status === PolicyEvaluationStatus.Rejected ||
-				p.status === PolicyEvaluationStatus.Broken ||
-				p.status === PolicyEvaluationStatus.Running,
+		(policies ?? []).some(p =>
+			[PolicyEvaluationStatus.Rejected, PolicyEvaluationStatus.Broken, PolicyEvaluationStatus.Running].includes(p.status),
 		),
 	) as [boolean, () => void];
 
@@ -586,7 +585,7 @@ export const PrActions = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean
 		return <SetAutoComplete {...pr} />;
 	}
 
-	if (mergeable === PullRequestMergeability.Succeeded && hasWritePermission) {
+	if (hasWritePermission && mergeable === PullRequestMergeability.Succeeded) {
 		return isSimple ? <MergeSimple {...pr} /> : <Merge {...pr} />;
 	}
 

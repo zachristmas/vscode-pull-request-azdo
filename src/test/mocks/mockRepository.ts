@@ -109,11 +109,11 @@ export class MockRepository implements Repository {
 		return Promise.reject(new Error(`Unexpected getCommit(${ref})`));
 	}
 
-	apply(patch: string, reverse?: boolean  ): Promise<void> {
+	apply(patch: string, reverse?: boolean): Promise<void> {
 		return Promise.reject(new Error(`Unexpected apply(..., ${reverse})`));
 	}
 
-	diff(cached?: boolean  ): Promise<string> {
+	diff(cached?: boolean): Promise<string> {
 		return Promise.reject(new Error(`Unexpected diff(${cached})`));
 	}
 
@@ -137,7 +137,7 @@ export class MockRepository implements Repository {
 		return Promise.reject(new Error('Unexpected hashObject(...)'));
 	}
 
-	async createBranch(name: string, checkout: boolean, ref?: string  ): Promise<void> {
+	async createBranch(name: string, checkout: boolean, ref?: string): Promise<void> {
 		if (this._branches.some(b => b.name === name)) {
 			throw new Error(`A branch named ${name} already exists`);
 		}
@@ -198,7 +198,7 @@ export class MockRepository implements Repository {
 				name: remoteRef,
 			},
 		};
-		this._branches.splice(index, 1, replacement);
+		this._branches[index] = replacement;
 
 		if (this._state.HEAD === existing) {
 			this._state.HEAD = replacement;
@@ -266,7 +266,7 @@ export class MockRepository implements Repository {
 		this._expectedFetches.splice(index, 1);
 	}
 
-	async pull(unshallow?: boolean  ): Promise<void> {
+	async pull(unshallow?: boolean): Promise<void> {
 		const index = this._expectedPulls.findIndex(f => f.unshallow === unshallow);
 		if (index === -1) {
 			throw new Error(`Unexpected pull(${unshallow})`);
@@ -274,11 +274,7 @@ export class MockRepository implements Repository {
 		this._expectedPulls.splice(index, 1);
 	}
 
-	async push(
-		remoteName?: string  ,
-		branchName?: string  ,
-		setUpstream?: boolean  ,
-	): Promise<void> {
+	async push(remoteName?: string, branchName?: string, setUpstream?: boolean): Promise<void> {
 		const index = this._expectedPushes.findIndex(
 			f => f.remoteName === remoteName && f.branchName === branchName && f.setUpstream === setUpstream,
 		);

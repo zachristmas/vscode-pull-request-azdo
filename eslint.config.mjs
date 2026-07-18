@@ -193,6 +193,7 @@ export default tseslint.config(
 			'sonarjs/todo-tag': 'off',
 			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
 			'sonarjs/no-ignored-exceptions': 'error',
+			'sonarjs/no-misleading-array-reverse': 'error',
 			'sonarjs/no-nested-conditional': 'error',
 			'sonarjs/no-redundant-jump': 'error',
 			'sonarjs/no-redundant-optional': 'error',
@@ -206,6 +207,10 @@ export default tseslint.config(
 		plugins: { unicorn },
 		rules: {
 			...downgradeToWarn(unicorn.configs.recommended.rules),
+			// Demands ES2025 Iterator#toArray(): no types in the es2022 lib and no runtime
+			// support on the Node 20 extension host. The flagged [...map.values()] spreads
+			// are the correct idiom for this target.
+			'unicorn/prefer-iterator-to-array': 'off',
 			// This is a CJS extension host; module strategy changes with the TS 7 /
 			// moduleResolution rework, not here. (The redundant 'use strict' directives the
 			// rule flagged were deleted anyway - tsc alwaysStrict emits its own.)
@@ -236,6 +241,25 @@ export default tseslint.config(
 			'unicorn/class-reference-in-static-methods': 'error',
 			'unicorn/consistent-assert': 'error',
 			'unicorn/import-style': 'error',
+			'unicorn/logical-assignment-operators': 'error',
+			'unicorn/no-await-expression-member': 'error',
+			'unicorn/no-confusing-array-splice': 'error',
+			'unicorn/no-unreadable-for-of-expression': 'error',
+			'unicorn/operator-assignment': 'error',
+			'unicorn/prefer-array-find': 'error',
+			'unicorn/prefer-array-from-map': 'error',
+			'unicorn/prefer-array-some': 'error',
+			'unicorn/prefer-at': 'error',
+			'unicorn/prefer-code-point': 'error',
+			'unicorn/prefer-else-if': 'error',
+			'unicorn/prefer-includes-over-repeated-comparisons': 'error',
+			'unicorn/prefer-logical-operator-over-ternary': 'error',
+			'unicorn/prefer-minimal-ternary': 'error',
+			'unicorn/prefer-number-is-safe-integer': 'error',
+			'unicorn/prefer-query-selector': 'error',
+			'unicorn/prefer-simple-condition-first': 'error',
+			'unicorn/prefer-spread': 'error',
+			'unicorn/prefer-string-slice': 'error',
 			'unicorn/no-static-only-class': 'error',
 			'unicorn/no-useless-template-literals': 'error',
 			'unicorn/consistent-existence-index-check': 'error',

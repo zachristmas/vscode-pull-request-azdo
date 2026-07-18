@@ -118,10 +118,10 @@ export class PRContext {
 			console.error('No comments to delete for review:', pullRequestReviewId, review);
 			return;
 		}
-		this.pr.events.splice(index, 1, {
+		this.pr.events[index] = {
 			...review,
 			comments: review.comments.filter(c => c.id !== id),
-		});
+		};
 		this.updatePR(this.pr);
 	};
 

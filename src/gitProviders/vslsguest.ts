@@ -107,8 +107,8 @@ export class VSLSGuest implements IGit, vscode.Disposable {
 		this._onDidCloseRepository.fire(repository);
 	}
 
-	public getRepository(folder: vscode.WorkspaceFolder): Repository {
-		return this._openRepositories.filter(repository => (repository as any).workspaceFolder === folder)[0];
+	public getRepository(folder: vscode.WorkspaceFolder): Repository | undefined {
+		return this._openRepositories.find(repository => (repository as any).workspaceFolder === folder);
 	}
 
 	public dispose() {

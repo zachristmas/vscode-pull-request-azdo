@@ -565,7 +565,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			return (this._fetchAssignableUsersPromise = new Promise(resolve => {
 				const promises = this._azdoRepositories.map(async repo => {
 					const data = await repo.getAssignableUsers();
-					cache[repo.remote.remoteName] = data.sort(loginComparator);
+					data.sort(loginComparator);
+					cache[repo.remote.remoteName] = data;
 					allAssignableUsers.push(...data);
 				});
 
@@ -769,7 +770,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		const addPage = (page: PullRequestModel[] | undefined) => {
 			pagesFetched++;
 			if (page) {
-				itemData.items = itemData.items.concat(page as any);
+				itemData.items = [...itemData.items, ...page] as any;
 				itemData.hasMorePages = false;
 			}
 		};
@@ -789,45 +790,45 @@ export class FolderRepositoryManager implements vscode.Disposable {
 				switch (pagedDataType) {
 					case PagedDataType.PullRequest: {
 						switch (type) {
-						case PRType.AllActive: {
-							return { items: await azdoRepository.getAllActivePullRequests(), hasMorePages: false };
-						}
-						case PRType.CreatedByMe: {
-							return {
-								items: await azdoRepository.getPullRequests({
-									creatorId: this.getCurrentUser()?.id,
-									status: PullRequestStatus.Active,
-								}),
-								hasMorePages: false,
-							};
-						}
-						case PRType.AssignedToMe: {
-							return {
-								items: await azdoRepository.getPullRequests({
-									reviewerId: this.getCurrentUser()?.id,
-									status: PullRequestStatus.Active,
-								}),
-								hasMorePages: false,
-							};
-						}
-						case PRType.AllStatuses: {
-							// Every other category here hardcodes status: Active, so a completed or
-							// abandoned PR has no tree category to browse back to at all - the PR panel
-							// itself still refreshes to show the completed state if left open, but there
-							// was no way to reopen one once its panel was closed (found while verifying
-							// AC-08's post-completion cleanup prompt, which needs a completed PR to click
-							// into). PullRequestStatus.All is documented as "used in pull request search
-							// criteria to include all statuses" (GitInterfaces.d.ts:2853).
-							return {
-								items: await azdoRepository.getPullRequests({
-									status: PullRequestStatus.All,
-								}),
-								hasMorePages: false,
-							};
-						}
-						default: {
-							return { items: await azdoRepository.getPullRequests(prSearchCriteria!), hasMorePages: false };
-						}
+							case PRType.AllActive: {
+								return { items: await azdoRepository.getAllActivePullRequests(), hasMorePages: false };
+							}
+							case PRType.CreatedByMe: {
+								return {
+									items: await azdoRepository.getPullRequests({
+										creatorId: this.getCurrentUser()?.id,
+										status: PullRequestStatus.Active,
+									}),
+									hasMorePages: false,
+								};
+							}
+							case PRType.AssignedToMe: {
+								return {
+									items: await azdoRepository.getPullRequests({
+										reviewerId: this.getCurrentUser()?.id,
+										status: PullRequestStatus.Active,
+									}),
+									hasMorePages: false,
+								};
+							}
+							case PRType.AllStatuses: {
+								// Every other category here hardcodes status: Active, so a completed or
+								// abandoned PR has no tree category to browse back to at all - the PR panel
+								// itself still refreshes to show the completed state if left open, but there
+								// was no way to reopen one once its panel was closed (found while verifying
+								// AC-08's post-completion cleanup prompt, which needs a completed PR to click
+								// into). PullRequestStatus.All is documented as "used in pull request search
+								// criteria to include all statuses" (GitInterfaces.d.ts:2853).
+								return {
+									items: await azdoRepository.getPullRequests({
+										status: PullRequestStatus.All,
+									}),
+									hasMorePages: false,
+								};
+							}
+							default: {
+								return { items: await azdoRepository.getPullRequests(prSearchCriteria!), hasMorePages: false };
+							}
 						}
 					}
 				}
@@ -836,7 +837,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			if (options.fetchNextPage) {
 				// Case 2. Fetch a single new page, and increment the global number of pages fetched for this query.
 				pageInformation.pullRequestPage++;
-				addPage((await fetchPage(pageInformation.pullRequestPage))?.items);
+				const nextPage = await fetchPage(pageInformation.pullRequestPage);
+				addPage(nextPage?.items);
 				setTotalFetchedPages(getTotalFetchedPages() + 1);
 			} else {
 				// Case 1&3. Fetch all the pages we have fetched in the past, or in case 1, just a single page.
@@ -847,7 +849,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 				}
 
 				const pages = await Promise.all(
-					Array.from({ length: pageInformation.pullRequestPage }).map((_, j) => fetchPage(j + 1)),
+					Array.from({ length: pageInformation.pullRequestPage }, (_, j) => fetchPage(j + 1)),
 				);
 				pages.forEach(page => addPage(page?.items));
 			}
@@ -972,7 +974,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			// If the upstream wasn't listed in the remotes setting, create a GitHubRepository
 			// object for it if is does point to GitHub.
 			if (!upstream) {
-				const remote = (await this.getAllGitHubRemotes()).find(r => r.remoteName === upstreamRef.remote);
+				const allGitHubRemotes = await this.getAllGitHubRemotes();
+				const remote = allGitHubRemotes.find(r => r.remoteName === upstreamRef.remote);
 				if (remote) {
 					return new AzdoRepository(remote, this._credentialStore, this._fileReviewedStatusService, this._telemetry);
 				}
@@ -1021,8 +1024,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 			if (!params.title || !params.description) {
 				const { title, body } = titleAndBodyFrom(await this.getHeadCommitMessage());
-				params.title = params.title || title;
-				params.description = params.description || body;
+				params.title ||= title;
+				params.description ||= body;
 			}
 
 			const pullRequestModel = await repo.createPullRequest(params);
@@ -1152,9 +1155,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 				const value = branchInfos.get(branchName);
 				if (matches[2] === 'remote') {
 					value!['remote'] = config.value;
-				}
-
-				if (matches[2] === 'github-pr-owner-number') {
+				} else if (matches[2] === 'github-pr-owner-number') {
 					const metadata = PullRequestGitHelper.parsePullRequestMetadata(config.value);
 					value!['metadata'] = metadata;
 				}
@@ -1260,9 +1261,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 				if (matches[2] === 'github-pr-remote') {
 					value!.createdForPullRequest = config.value === 'true';
-				}
-
-				if (matches[2] === 'url') {
+				} else if (matches[2] === 'url') {
 					value!.url = config.value;
 				}
 			}
@@ -1384,7 +1383,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		try {
 			const azdoRepo = await pullRequest.azdoRepository.ensure();
 			const repoId = await azdoRepo.getRepositoryId();
-			const projectId = (await azdoRepo.getMetadata())?.project?.id;
+			const metadata = await azdoRepo.getMetadata();
+			const projectId = metadata?.project?.id;
 			const targetRefName = pullRequest.item.targetRefName;
 			if (!repoId || !projectId || !targetRefName) {
 				return ALL_ENABLED;
@@ -1550,12 +1550,12 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		} catch (e) {
 			const errCode = gitErrorCode(e);
 			// for known git errors, we should provide actions for users to continue.
-				if (errCode && errCode === GitErrorCodes.DirtyWorkTree) {
-					vscode.window.showErrorMessage(
-						'Your local changes would be overwritten by checkout, please commit your changes or stash them before you switch branches',
-					);
-					return;
-				}
+			if (errCode && errCode === GitErrorCodes.DirtyWorkTree) {
+				vscode.window.showErrorMessage(
+					'Your local changes would be overwritten by checkout, please commit your changes or stash them before you switch branches',
+				);
+				return;
+			}
 
 			vscode.window.showErrorMessage(`Exiting failed: ${e}`);
 		}

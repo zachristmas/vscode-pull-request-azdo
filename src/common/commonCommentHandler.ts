@@ -14,11 +14,7 @@ import { GHPRComment, GHPRCommentThread, TemporaryComment } from '../azdo/prComm
 import { PullRequestModel } from '../azdo/pullRequestModel';
 import { getCommentThreadStatusKeys, updateCommentThreadLabel } from '../azdo/utils';
 import { URI_SCHEME_PR, URI_SCHEME_REVIEW } from '../constants';
-import {
-	GitFileChangeNode,
-	InMemFileChangeNode,
-	RemoteFileChangeNode,
-} from '../view/treeNodes/fileChangeNode';
+import { GitFileChangeNode, InMemFileChangeNode, RemoteFileChangeNode } from '../view/treeNodes/fileChangeNode';
 
 export class CommonCommentHandler {
 	constructor(public pullRequestModel: PullRequestModel, private _folderReposManager: FolderRepositoryManager) {}
@@ -83,11 +79,13 @@ export class CommonCommentHandler {
 	public async editComment(
 		thread: GHPRCommentThread,
 		comment: GHPRComment,
-		getFileChanges: (isOutdated: boolean) => Promise<(IFileChangeNodeWithUri)[]>,
+		getFileChanges: (isOutdated: boolean) => Promise<IFileChangeNodeWithUri[]>,
 	): Promise<Comment | undefined> {
 		const temporaryCommentId = this.optimisticallyEditComment(thread, comment);
 		try {
-			const fileChange = await this.findMatchingFileNode(thread.uri, getFileChanges) as (InMemFileChangeNode | GitFileChangeNode);
+			const fileChange = (await this.findMatchingFileNode(thread.uri, getFileChanges)) as
+				| InMemFileChangeNode
+				| GitFileChangeNode;
 			const rawComment = await this.pullRequestModel.editThread(
 				comment.body instanceof vscode.MarkdownString ? comment.body.value : comment.body,
 				thread.threadId,
@@ -96,7 +94,7 @@ export class CommonCommentHandler {
 
 			const index = fileChange.comments.findIndex(c => c.id?.toString() === comment.commentId);
 			if (index !== -1) {
-				fileChange.comments.splice(index, 1, rawComment);
+				fileChange.comments[index] = rawComment;
 			}
 
 			this.replaceTemporaryComment(thread, rawComment!, temporaryCommentId);
@@ -195,7 +193,7 @@ export class CommonCommentHandler {
 
 	private async findMatchingFileNode(
 		uri: vscode.Uri,
-		getFileChanges: (isOutdated: boolean) => Promise<(IFileChangeNodeWithUri)[]>,
+		getFileChanges: (isOutdated: boolean) => Promise<IFileChangeNodeWithUri[]>,
 	): Promise<IFileChangeNodeWithUri> {
 		let fileName: string;
 		let isOutdated = false;
@@ -212,7 +210,9 @@ export class CommonCommentHandler {
 		const fileChangesToSearch = await getFileChanges(isOutdated);
 
 		const matchedFile = fileChangesToSearch.find(fileChange => {
-			return uri.scheme === URI_SCHEME_REVIEW || uri.scheme === URI_SCHEME_PR ? fileChange.fileName === fileName : fileChange.filePath.path === uri.path;
+			return uri.scheme === URI_SCHEME_REVIEW || uri.scheme === URI_SCHEME_PR
+				? fileChange.fileName === fileName
+				: fileChange.filePath.path === uri.path;
 		});
 
 		if (!matchedFile) {
@@ -281,7 +281,7 @@ export class CommonCommentHandler {
 		document: vscode.TextDocument,
 		token: vscode.CancellationToken,
 		getFileChanges: () => Promise<IFileChangeNode[]>,
-		fileChanges?: IFileChangeNode[]  ,
+		fileChanges?: IFileChangeNode[],
 	): Promise<vscode.Range[] | undefined> {
 		if (document.uri.scheme !== URI_SCHEME_PR) {
 			return;
@@ -292,7 +292,7 @@ export class CommonCommentHandler {
 		if (!params || params.prNumber !== this.pullRequestModel.getPullRequestId()) {
 			return;
 		}
-		const changes = !fileChanges ? await getFileChanges() : fileChanges;
+		const changes = fileChanges || (await getFileChanges());
 
 		const fileChange = changes.find(change => change.fileName === params.fileName);
 

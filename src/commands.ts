@@ -67,7 +67,8 @@ async function chooseItem<T>(
 			itemValue: currentItem,
 		};
 	});
-	return (await vscode.window.showQuickPick(items, { placeHolder }))?.itemValue;
+	const selection = await vscode.window.showQuickPick(items, { placeHolder });
+	return selection?.itemValue;
 }
 
 /**
@@ -898,7 +899,7 @@ export function registerCommands(
 					});
 
 				if (sortedOutdatedComments.length) {
-					const lastHunk = fileChange.diffHunks[fileChange.diffHunks.length - 1];
+					const lastHunk = fileChange.diffHunks.at(-1)!;
 					// const diffLine =  getDiffLineByPosition(fileChange.diffHunks, sortedOutdatedComments[0].originalPosition!);
 					const diffLine = lastHunk.diffLines.at(-1);
 

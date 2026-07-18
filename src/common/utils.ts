@@ -76,7 +76,7 @@ export function isDescendant(parent: string, descendant: string): boolean {
 		return true;
 	}
 
-	if (parent.charAt(parent.length - 1) !== path.sep) {
+	if (parent.at(-1) !== path.sep) {
 		parent += path.sep;
 	}
 
@@ -160,7 +160,7 @@ export function formatError(e: any): string {
 			.join(', ');
 	}
 	if (furtherInfo) {
-		errorMessage = `${errorMessage}: ${furtherInfo}`;
+		errorMessage += `: ${furtherInfo}`;
 	}
 
 	return errorMessage;
@@ -245,7 +245,7 @@ export class PathIterator implements IKeyIterator {
 		this._from = this._to;
 		let justSeps = true;
 		for (; this._to < this._value.length; this._to++) {
-			const ch = this._value.charCodeAt(this._to);
+			const ch = this._value.codePointAt(this._to);
 			if (ch === 47 /* CharCode.Slash */ || ch === 92 /* CharCode.Backslash */) {
 				if (justSeps) {
 					this._from++;
@@ -265,7 +265,7 @@ export class PathIterator implements IKeyIterator {
 		let thisPos = this._from;
 
 		while (aPos < aLen && thisPos < this._to) {
-			const cmp = a.charCodeAt(aPos) - this._value.charCodeAt(thisPos);
+			const cmp = a.codePointAt(aPos)! - this._value.codePointAt(thisPos)!;
 			if (cmp !== 0) {
 				return cmp;
 			}
@@ -283,7 +283,7 @@ export class PathIterator implements IKeyIterator {
 	}
 
 	value(): string {
-		return this._value.substring(this._from, this._to);
+		return this._value.slice(this._from, this._to);
 	}
 }
 

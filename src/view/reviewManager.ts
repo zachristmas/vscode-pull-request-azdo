@@ -264,7 +264,7 @@ export class ReviewManager {
 			}
 
 			const hasPushedChanges = branch.commit !== this._lastCommitSha && branch.ahead === 0 && branch.behind === 0;
-			if (this._prNumber === matchingPullRequestMetadata.prNumber && !hasPushedChanges) {
+			if (!hasPushedChanges && this._prNumber === matchingPullRequestMetadata.prNumber) {
 				vscode.commands.executeCommand('azdopr.refreshList');
 				return;
 			}
@@ -335,16 +335,16 @@ export class ReviewManager {
 			this.statusBarItem.show();
 			vscode.commands.executeCommand('azdopr.refreshList');
 			if (!silent && this._context.workspaceState.get(FOCUS_REVIEW_MODE) && this.localFileChanges.length > 0) {
-					let fileChangeToShow: GitFileChangeNode | undefined;
-					for (const fileChange of this.localFileChanges) {
-						if (fileChange.status === GitChangeType.MODIFY) {
-							fileChangeToShow = fileChange;
-							break;
-						}
+				let fileChangeToShow: GitFileChangeNode | undefined;
+				for (const fileChange of this.localFileChanges) {
+					if (fileChange.status === GitChangeType.MODIFY) {
+						fileChangeToShow = fileChange;
+						break;
 					}
-					fileChangeToShow ??= this.localFileChanges[0];
-					await fileChangeToShow.openDiff(this._folderRepoManager);
 				}
+				fileChangeToShow ??= this.localFileChanges[0];
+				await fileChangeToShow.openDiff(this._folderRepoManager);
+			}
 		} finally {
 			this._validateStatusInProgress = undefined;
 		}
@@ -564,12 +564,12 @@ export class ReviewManager {
 
 			const errCode = gitErrorCode(e);
 			// for known git errors, we should provide actions for users to continue.
-				if (errCode && (errCode === GitErrorCodes.LocalChangesOverwritten || errCode === GitErrorCodes.DirtyWorkTree)) {
-					vscode.window.showErrorMessage(
-						'Your local changes would be overwritten by checkout, please commit your changes or stash them before you switch branches',
-					);
-					return;
-				}
+			if (errCode && (errCode === GitErrorCodes.LocalChangesOverwritten || errCode === GitErrorCodes.DirtyWorkTree)) {
+				vscode.window.showErrorMessage(
+					'Your local changes would be overwritten by checkout, please commit your changes or stash them before you switch branches',
+				);
+				return;
+			}
 
 			vscode.window.showErrorMessage(formatError(e));
 			// todo, we should try to recover, for example, git checkout succeeds but set config fails.
@@ -600,9 +600,11 @@ export class ReviewManager {
 	public async publishBranch(branch: Branch): Promise<Branch | undefined> {
 		const potentialTargetRemotes = await this._folderRepoManager.getAllGitHubRemotes();
 		// Optional chaining: cancelling the remote quick-pick used to hit a bare `!.remote` TypeError.
-		const selectedRemote = (
-			await this.getRemote(potentialTargetRemotes, `Pick a remote to publish the branch '${branch.name}' to:`)
-		)?.remote;
+		const pickedRemote = await this.getRemote(
+			potentialTargetRemotes,
+			`Pick a remote to publish the branch '${branch.name}' to:`,
+		);
+		const selectedRemote = pickedRemote?.remote;
 
 		if (!selectedRemote || branch.name === undefined) {
 			return;
@@ -642,7 +644,9 @@ export class ReviewManager {
 						repo => repo.remote.remoteName === remote.remoteName,
 					);
 					const remoteBranch = await azdoRepo?.getBranchRef(value);
-					inputBox.validationMessage = remoteBranch ? `Branch ${value} already exists in ${remote.owner}/${remote.repositoryName}` : undefined;
+					inputBox.validationMessage = remoteBranch
+						? `Branch ${value} already exists in ${remote.owner}/${remote.repositoryName}`
+						: undefined;
 				} catch {
 					inputBox.validationMessage = undefined;
 				}
@@ -708,13 +712,13 @@ export class ReviewManager {
 			return;
 		}
 
-		if (potentialTargetRemotes.length === 1 && !defaultUpstream) {
+		if (!defaultUpstream && potentialTargetRemotes.length === 1) {
 			return RemoteQuickPickItem.fromRemote(potentialTargetRemotes[0]);
 		}
 
 		if (
-			potentialTargetRemotes.length === 1 &&
 			defaultUpstream &&
+			potentialTargetRemotes.length === 1 &&
 			defaultUpstream.owner === potentialTargetRemotes[0].owner &&
 			defaultUpstream.name === potentialTargetRemotes[0].repositoryName
 		) {
@@ -943,9 +947,8 @@ export class ReviewManager {
 					);
 					return;
 				}
-				const headRemote = (await this._folderRepoManager.getAllGitHubRemotes()).find(
-					remote => remote.remoteName === HEAD!.upstream!.remote,
-				);
+				const allGitHubRemotes = await this._folderRepoManager.getAllGitHubRemotes();
+				const headRemote = allGitHubRemotes.find(remote => remote.remoteName === HEAD!.upstream!.remote);
 				if (!headRemote) {
 					vscode.window.showErrorMessage(
 						`The upstream remote '${
@@ -1081,9 +1084,7 @@ export class ReviewManager {
 		let changedItems = gitFileChangeNodeFilter(this._localFileChanges)
 			.filter(change => change.fileName === path)
 			.filter(
-				fileChange =>
-					fileChange.commitId === commit ||
-					(fileChange.parentSha ? fileChange.parentSha : `${fileChange.commitId}^`) === commit,
+				fileChange => fileChange.commitId === commit || (fileChange.parentSha || `${fileChange.commitId}^`) === commit,
 			);
 
 		if (changedItems.length) {
@@ -1092,15 +1093,13 @@ export class ReviewManager {
 			const ret = changedItem.diffHunks.map(diffHunk =>
 				diffHunk.diffLines.filter(diffLine => diffLine.type !== diffChangeTypeFilter).map(diffLine => diffLine.text),
 			);
-			return ret.reduce((prev, curr) => prev.concat(...curr), []).join('\n');
+			return ret.flat().join('\n');
 		}
 
 		changedItems = gitFileChangeNodeFilter(this._obsoleteFileChanges)
 			.filter(change => change.fileName === path)
 			.filter(
-				fileChange =>
-					fileChange.commitId === commit ||
-					(fileChange.parentSha ? fileChange.parentSha : `${fileChange.commitId}^`) === commit,
+				fileChange => fileChange.commitId === commit || (fileChange.parentSha || `${fileChange.commitId}^`) === commit,
 			);
 
 		if (changedItems.length) {

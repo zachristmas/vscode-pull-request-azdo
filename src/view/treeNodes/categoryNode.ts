@@ -207,7 +207,7 @@ export class CategoryTreeNode extends TreeNode implements vscode.TreeItem {
 						{ fetchNextPage: true },
 						this._categoryQuery,
 					);
-					this.prs = this.prs.concat(response.items);
+					this.prs = [...this.prs, ...response.items];
 					hasMorePages = response.hasMorePages;
 					hasUnsearchedRepositories = response.hasUnsearchedRepositories;
 				} catch (e) {

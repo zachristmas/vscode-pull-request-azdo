@@ -358,9 +358,7 @@ export class PRNode extends TreeNode {
 				(this._isLocal ? ':local' : '') +
 				(currentBranchIsForThisPR ? ':active' : ':nonactive') +
 				(isDraft ? ':draft' : ':ready'),
-			iconPath: this.pullRequestModel.item.createdBy?.imageUrl
-				? this.pullRequestModel.item.createdBy?.imageUrl
-				: new vscode.ThemeIcon('github'),
+			iconPath: this.pullRequestModel.item.createdBy?.imageUrl || new vscode.ThemeIcon('github'),
 		};
 	}
 

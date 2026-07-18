@@ -37,7 +37,8 @@ export const Dropdown = <T extends string>({
 	const onMethodChange = (e: React.MouseEvent<HTMLButtonElement>) => {
 		selectMethod((e.target as HTMLButtonElement).value as T);
 		setOptionsVisible(false);
-		const primaryButton = document.getElementById(`confirm-button${dropdownId}`);
+		const primaryButtonId = `confirm-button${dropdownId}`;
+		const primaryButton = document.querySelector<HTMLElement>(`#${CSS.escape(primaryButtonId)}`);
 		primaryButton?.focus();
 	};
 
@@ -52,13 +53,14 @@ export const Dropdown = <T extends string>({
 		switch (e.keyCode) {
 			case KEYCODES.esc:
 				setOptionsVisible(false);
-				const expandOptionsButton = document.getElementById(EXPAND_OPTIONS_BUTTON);
+				const expandOptionsButton = document.querySelector<HTMLElement>(`#${CSS.escape(EXPAND_OPTIONS_BUTTON)}`);
 				expandOptionsButton?.focus();
 				break;
 
 			case KEYCODES.down:
 				if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
-					const firstOptionButton = document.getElementById(`${dropdownId}option0`);
+					const firstOptionId = `${dropdownId}option0`;
+					const firstOptionButton = document.querySelector<HTMLElement>(`#${CSS.escape(firstOptionId)}`);
 					firstOptionButton?.focus();
 				} else {
 					const regex = new RegExp(`${dropdownId}option([0-9])`);
@@ -66,7 +68,8 @@ export const Dropdown = <T extends string>({
 					if (result?.length) {
 						const index = parseInt(result[1]);
 						if (index < Object.entries(options).length - 1) {
-							const nextOption = document.getElementById(`${dropdownId}option${index + 1}`);
+							const nextOptionId = `${dropdownId}option${index + 1}`;
+							const nextOption = document.querySelector<HTMLElement>(`#${CSS.escape(nextOptionId)}`);
 							nextOption?.focus();
 						}
 					}
@@ -76,7 +79,8 @@ export const Dropdown = <T extends string>({
 			case KEYCODES.up:
 				if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
 					const lastIndex = Object.entries(options).length - 1;
-					const lastOptionButton = document.getElementById(`${dropdownId}option${lastIndex}`);
+					const lastOptionId = `${dropdownId}option${lastIndex}`;
+					const lastOptionButton = document.querySelector<HTMLElement>(`#${CSS.escape(lastOptionId)}`);
 					lastOptionButton?.focus();
 				} else {
 					const regex = new RegExp(`${dropdownId}option([0-9])`);
@@ -84,7 +88,8 @@ export const Dropdown = <T extends string>({
 					if (result?.length) {
 						const index = parseInt(result[1]);
 						if (index > 0) {
-							const nextOption = document.getElementById(`${dropdownId}option${index - 1}`);
+							const nextOptionId = `${dropdownId}option${index - 1}`;
+							const nextOption = document.querySelector<HTMLElement>(`#${CSS.escape(nextOptionId)}`);
 							nextOption?.focus();
 						}
 					}

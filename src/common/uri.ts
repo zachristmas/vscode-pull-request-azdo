@@ -94,7 +94,7 @@ export function toReviewUri(
 	rootUri: Uri,
 ): Uri {
 	const params: ReviewUriParams = {
-		path: filePath ? filePath : uri.path,
+		path: filePath || uri.path,
 		ref,
 		commit: commit,
 		base: options.base,
@@ -105,7 +105,7 @@ export function toReviewUri(
 	let path = uri.path;
 
 	if (options.replaceFileExtension) {
-		path = `${path}.git`;
+		path += '.git';
 	}
 
 	return uri.with({

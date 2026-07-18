@@ -59,7 +59,7 @@ export function parsePullRequestDeepLink(uri: { path: string; query: string }): 
 	const project = query.get('project');
 	const repo = query.get('repo');
 	const prNumber = Number(query.get('pr'));
-	if (!orgUrl || !project || !repo || !Number.isInteger(prNumber) || prNumber <= 0) {
+	if (!orgUrl || !project || !repo || !Number.isSafeInteger(prNumber) || prNumber <= 0) {
 		return undefined;
 	}
 	const filePath = query.get('path') || undefined;
