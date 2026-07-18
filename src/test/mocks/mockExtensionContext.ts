@@ -15,18 +15,18 @@ export class MockExtensionContext implements ExtensionContext {
 	storagePath: string;
 	globalStoragePath: string;
 	logPath: string;
-	extensionUri: Uri;
+	extensionUri!: Uri;
 	environmentVariableCollection: any;
 	extensionMode: any;
 
-	logUri: Uri;
+	logUri!: Uri;
 
-	storageUri: Uri;
+	storageUri!: Uri;
 
-	globalStorageUri: Uri;
+	globalStorageUri!: Uri;
 
 	extensionRuntime: any;
-	secrets: SecretStorage;
+	secrets!: SecretStorage;
 
 	extension: any;
 	languageModelAccessInformation: any;

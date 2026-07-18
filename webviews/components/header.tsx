@@ -41,12 +41,12 @@ export function Header({
 		<>
 			<Title {...{ title, number, url, canEdit, isCurrentlyCheckedOut, isIssue, isDraft, state, isActive }} />
 			<div className="subtitle">
-				<div id="status">{getStatus(state, isDraft)}</div>
-				{!isIssue ? <Avatar url={author.url} avatarUrl={author.avatarUrl} /> : null}
+				<div id="status">{getStatus(state, !!isDraft)}</div>
+				{!isIssue ? <Avatar url={author.url!} avatarUrl={author.avatarUrl!} /> : null}
 				<span className="author">
 					{!isIssue ? (
 						<Spaced>
-							<AuthorLink url={author.url} text={author.name} />
+							<AuthorLink url={author.url!} text={author.name!} />
 							{getActionText(state)}
 							into <code>{base}</code>
 							from <code>{head}</code>
@@ -59,7 +59,7 @@ export function Header({
 					</Spaced>
 				</span>
 			</div>
-			<div className="subtitle">{getClosedCommentDescription(threads)}</div>
+			<div className="subtitle">{getClosedCommentDescription(threads ?? [])}</div>
 		</>
 	);
 }
@@ -156,7 +156,15 @@ function Title({
 	);
 }
 
-const CheckoutButtons = ({ isCurrentlyCheckedOut, isIssue, isActive }) => {
+const CheckoutButtons = ({
+	isCurrentlyCheckedOut,
+	isIssue,
+	isActive,
+}: {
+	isCurrentlyCheckedOut?: boolean;
+	isIssue?: boolean;
+	isActive?: boolean;
+}) => {
 	const { exitReviewMode, checkout } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
 

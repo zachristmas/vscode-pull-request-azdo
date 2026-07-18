@@ -159,7 +159,7 @@ export class GHPRComment implements vscode.Comment {
 	/**
 	 * Whether the comment is in edit mode or not
 	 */
-	public mode: vscode.CommentMode;
+	public mode: vscode.CommentMode = vscode.CommentMode.Preview;
 
 	/**
 	 * The author of the comment

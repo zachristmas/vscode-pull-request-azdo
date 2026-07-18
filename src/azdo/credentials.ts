@@ -160,7 +160,7 @@ export class CredentialStore implements vscode.Disposable {
 			const remotes = this._gitAPI.repositories.map(r => parseRepositoryRemotes(r));
 			const inferredConfigs = remotes
 				.map(r => this.inferOrgConfigFromGitRemote(r))
-				.filter(c => !!c && c.orgUrl && c.projectName);
+				.filter((c): c is AzdoOrgConfig => !!c && !!c.orgUrl && !!c.projectName);
 
 			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
 			if ([...new Set(inferredConfigs.map(a => a.orgUrl))].length !== 1) {
@@ -277,7 +277,9 @@ export class CredentialStore implements vscode.Disposable {
 		}
 	}
 
-	private async getSession(sessionOptions: vscode.AuthenticationGetSessionOptions): Promise<vscode.AuthenticationSession> {
+	private async getSession(
+		sessionOptions: vscode.AuthenticationGetSessionOptions,
+	): Promise<vscode.AuthenticationSession | undefined> {
 		return await vscode.authentication.getSession(
 			// Specifies the Microsoft Auth Provider
 			'microsoft',

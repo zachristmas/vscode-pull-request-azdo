@@ -21,8 +21,8 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 	const canRemove = canDelete && state === PullRequestVote.NO_VOTE;
 	return (
 		<div className="section-item reviewer">
-			<Avatar url={reviewer.url} avatarUrl={reviewer.avatarUrl} />
-			<AuthorLink url={reviewer.url} text={reviewer.name} />
+			<Avatar url={reviewer.url!} avatarUrl={reviewer.avatarUrl!} />
+			<AuthorLink url={reviewer.url!} text={reviewer.name!} />
 			{/* POL-10: required reviewers (min-reviewer/required-reviewer policies) were indistinguishable
 			    from optional ones - data was already flowing to the webview, just never rendered. */}
 			{isRequired ? <span className="required-badge">Required</span> : null}
@@ -36,7 +36,7 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 						className="remove-item"
 						title="Remove reviewer"
 						aria-label={`Remove reviewer ${reviewer.name}`}
-						onClick={() => removeReviewer(reviewState.reviewer.id)}
+						onClick={() => removeReviewer(reviewState.reviewer.id!)}
 					>
 						{deleteIcon}
 					</button>

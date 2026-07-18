@@ -18,7 +18,7 @@ export class PRContext {
 	constructor(
 		public pr: PullRequest = getState(),
 		public onchange: ((ctx: PullRequest) => void) | null = null,
-		private _handler: MessageHandler = null,
+		private _handler: MessageHandler | null = null,
 	) {
 		if (!_handler) {
 			this._handler = getMessageHandler(this.handleMessage);
@@ -65,9 +65,9 @@ export class PRContext {
 
 	public replyThread = async (body: string, thread: GitPullRequestCommentThread) => {
 		const result = await this.postMessage({ command: 'pr.reply-thread', args: { text: body, threadId: thread.id } });
-		thread.comments.push(result.comment);
+		thread.comments?.push(result.comment);
 		this.updatePR({
-			threads: [...this.pr.threads.filter(t => t.id !== thread.id), thread],
+			threads: [...(this.pr.threads ?? []).filter(t => t.id !== thread.id), thread],
 		});
 	};
 
@@ -75,7 +75,7 @@ export class PRContext {
 		const result = await this.postMessage({ command: 'pr.comment', args });
 		const thread = result.thread;
 		this.updatePR({
-			threads: [...this.pr.threads, thread],
+			threads: [...(this.pr.threads ?? []), thread],
 		});
 	};
 
@@ -86,7 +86,7 @@ export class PRContext {
 		});
 		const updatedThread = result.thread;
 		this.updatePR({
-			threads: [...this.pr.threads.filter(t => t.id !== updatedThread?.id), updatedThread],
+			threads: [...(this.pr.threads ?? []).filter(t => t.id !== updatedThread?.id), updatedThread],
 		});
 	};
 
@@ -160,7 +160,10 @@ export class PRContext {
 		mergeStrategy: string;
 		mergeCommitMessage?: string;
 	}) => {
-		const options = { ...args, mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy] };
+		const options = {
+			...args,
+			mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy as keyof typeof GitPullRequestMergeStrategy],
+		};
 		const result = await this.postMessage({ command: 'pr.complete', args: options });
 		this.updatePR(result);
 	};
@@ -171,7 +174,10 @@ export class PRContext {
 		mergeStrategy: string;
 		mergeCommitMessage?: string;
 	}) => {
-		const options = { ...args, mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy] };
+		const options = {
+			...args,
+			mergeStrategy: GitPullRequestMergeStrategy[args.mergeStrategy as keyof typeof GitPullRequestMergeStrategy],
+		};
 		const result = await this.postMessage({ command: 'pr.set-autocomplete', args: { enable: true, options } });
 		this.updatePR(result);
 	};
@@ -238,7 +244,8 @@ export class PRContext {
 	};
 
 	postMessage(message: any) {
-		return this._handler.postMessage(message);
+		// _handler is always assigned in the constructor
+		return this._handler!.postMessage(message);
 	}
 
 	handleMessage = (message: any) => {

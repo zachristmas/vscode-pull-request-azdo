@@ -24,7 +24,7 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 	private _disposables: vscode.Disposable[];
 	private _childrenDisposables: vscode.Disposable[];
 	private _view: vscode.TreeView<TreeNode>;
-	private _reposManager: RepositoriesManager;
+	private _reposManager: RepositoriesManager | undefined;
 	private _initialized: boolean = false;
 
 	get view(): vscode.TreeView<TreeNode> {
@@ -58,7 +58,7 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 
 		this._disposables.push(
 			vscode.commands.registerCommand('azdopr.configurePRViewlet', async () => {
-				const isLoggedIn = this._reposManager.state === ReposManagerState.RepositoriesLoaded;
+				const isLoggedIn = this._reposManager?.state === ReposManagerState.RepositoriesLoaded;
 				const configuration = await vscode.window.showQuickPick([
 					'Configure Project Name...',
 					'Configure Organization URL...',
@@ -130,7 +130,7 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 	}
 
 	private needsRemotes() {
-		if (this._reposManager.state === ReposManagerState.NeedsAuthentication) {
+		if (this._reposManager?.state === ReposManagerState.NeedsAuthentication) {
 			return Promise.resolve([]);
 		}
 

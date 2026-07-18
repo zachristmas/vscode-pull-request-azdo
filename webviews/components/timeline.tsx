@@ -34,7 +34,12 @@ export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestComm
 		    the timeline (overview.tsx) - a new comment appears directly under the box. Do not "fix" the
 		    ordering to oldest-first without also moving the composer to the bottom. */}
 		{threads
-			.sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime())
+			// valueOf() tolerates both real Date instances and the serialized strings the host sends
+			.sort(
+				(a, b) =>
+					new Date(b.publishedDate?.valueOf() ?? NaN).getTime() -
+					new Date(a.publishedDate?.valueOf() ?? NaN).getTime(),
+			)
 			.map(
 				thread =>
 					// TODO: Maybe make TimelineEvent a tagged union type?
@@ -82,17 +87,17 @@ export const SystemThreadView = ({ thread }: { thread: GitPullRequestCommentThre
 				{identities.length > 0 ? (
 					<>
 						<div className="avatar-container">
-							<Avatar url={identities[0].profileUrl} avatarUrl={identities[0]['_links']?.['avatar']?.['href']} />
+							<Avatar url={identities[0].profileUrl!} avatarUrl={identities[0]['_links']?.['avatar']?.['href']} />
 						</div>
-						<AuthorLink url={identities[0].profileUrl} text={identities[0].displayName} />
+						<AuthorLink url={identities[0].profileUrl!} text={identities[0].displayName!} />
 					</>
 				) : null}
 
-				<div className="message">{thread.comments[0].content}</div>
+				<div className="message">{thread.comments?.[0].content}</div>
 			</div>
 			{nbsp}
 			<div className="system-timestamp">
-				<Timestamp date={thread.publishedDate} />
+				<Timestamp date={thread.publishedDate!} />
 			</div>
 		</div>
 	);
@@ -104,9 +109,9 @@ export const CommitEventView = (event: CommitEvent) => (
 			{commitIcon}
 			{nbsp}
 			<div className="avatar-container">
-				<Avatar url={event.author.url} avatarUrl={event.author.avatarUrl} />
+				<Avatar url={event.author.url!} avatarUrl={event.author.avatarUrl!} />
 			</div>
-			<AuthorLink url={event.author.url} text={event.author.name} />
+			<AuthorLink url={event.author.url!} text={event.author.name!} />
 			<a className="message" href={event.htmlUrl}>
 				{event.message}
 			</a>
@@ -133,9 +138,9 @@ const positionKey = (comment: GitPullRequestCommentThread) =>
 	comment.threadContext?.rightFileStart?.line ?? comment.threadContext?.leftFileStart?.line;
 
 const groupCommentsByPath = (comments: GitPullRequestCommentThread[]) =>
-	groupBy(comments, comment => `${comment.threadContext.filePath}:${positionKey(comment)}`);
+	groupBy(comments, comment => `${comment.threadContext?.filePath}:${positionKey(comment)}`);
 
-const DESCRIPTORS = {
+const DESCRIPTORS: { [state: string]: string } = {
 	PENDING: 'will review',
 	COMMENTED: 'reviewed',
 	CHANGES_REQUESTED: 'requested changes',
@@ -152,8 +157,8 @@ export const ReviewEventView = (event: ReviewEvent) => {
 			<div className="review-comment-container">
 				<div className="review-comment-header">
 					<Spaced>
-						<Avatar url={event.user.url} avatarUrl={event.user.avatarUrl} />
-						<AuthorLink url={event.user.url} text={event.user.name} />
+						<Avatar url={event.user.url!} avatarUrl={event.user.avatarUrl!} />
+						<AuthorLink url={event.user.url!} text={event.user.name!} />
 						{association(event)}
 						{reviewIsPending ? (
 							<em>review pending</em>
@@ -187,17 +192,17 @@ export const ReviewEventView = (event: ReviewEvent) => {
 
 function AddReviewSummaryComment() {
 	const { requestChanges, submit } = useContext(PullRequestContext);
-	const comment = useRef<HTMLTextAreaElement>();
+	const comment = useRef<HTMLTextAreaElement>(null);
 	return (
 		<div className="comment-form">
 			<textarea ref={comment} placeholder="Leave a review summary comment"></textarea>
 			<div className="form-actions">
-				<button id="request-changes" onClick={() => requestChanges(comment.current.value)}>
+				<button id="request-changes" onClick={() => requestChanges(comment.current!.value)}>
 					Request Changes
 				</button>
 				{/* <button id='approve'
 				onClick={() => votePullRequest(comment.current.value)}>Approve</button> */}
-				<button id="submit" onClick={() => submit(comment.current.value)}>
+				<button id="submit" onClick={() => submit(comment.current!.value)}>
 					Comment
 				</button>
 			</div>
@@ -266,7 +271,7 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 		setEditMode(false);
 	};
 
-	const onSave = async text => {
+	const onSave = async (text: string) => {
 		try {
 			await replyThread(text, thread);
 		} finally {
@@ -282,7 +287,7 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 	// Same threadContext-derived position as positionKey above; position-less threads (file-level
 	// comments) keep the bare path chip.
 	const threadLine = thread.threadContext?.rightFileStart?.line ?? thread.threadContext?.leftFileStart?.line;
-	const commentCount = thread.comments.length;
+	const commentCount = thread.comments?.length ?? 0;
 
 	return (
 		<div className={`thread-container${isResolved ? ' resolved' : ''}`}>
@@ -291,7 +296,7 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 					{hasFile ? (
 						// item 2: real button so the diff opens via keyboard too (was a click-only <a>).
 						<button type="button" className="thread-file-chip" onClick={() => openDiff(thread)}>
-							{thread.threadContext.filePath}
+							{thread.threadContext!.filePath}
 							{threadLine !== undefined ? `:${threadLine}` : ''}
 						</button>
 					) : null}
@@ -306,13 +311,13 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 			) : null}
 			{!contentHidden ? (
 				<>
-					{thread.comments.map(c => (
+					{thread.comments?.map(c => (
 						<CommentView
 							key={c.id}
 							headerInEditMode
 							{...c}
 							canEdit={c.author?.id === currentUser.id}
-							threadId={thread.id}
+							threadId={thread.id!}
 						/>
 					))}
 					{!inEditMode ? (
@@ -336,9 +341,9 @@ export const MergedEventView = (event: MergedEvent) => (
 			{mergeIcon}
 			{nbsp}
 			<div className="avatar-container">
-				<Avatar url={event.user.url} avatarUrl={event.user.avatarUrl} />
+				<Avatar url={event.user.url!} avatarUrl={event.user.avatarUrl!} />
 			</div>
-			<AuthorLink url={event.user.url} text={event.user.name} />
+			<AuthorLink url={event.user.url!} text={event.user.name!} />
 			<div className="message">
 				merged commit{nbsp}
 				<a className="sha" href={event.commitUrl}>
@@ -357,9 +362,9 @@ export const HeadDeleteEventView = (event: HeadRefDeleteEvent) => (
 	<div className="comment-container commit">
 		<div className="commit-message">
 			<div className="avatar-container">
-				<Avatar url={event.actor.url} avatarUrl={event.actor.avatarUrl} />
+				<Avatar url={event.actor.url!} avatarUrl={event.actor.avatarUrl!} />
 			</div>
-			<AuthorLink url={event.actor.url} text={event.actor.name} />
+			<AuthorLink url={event.actor.url!} text={event.actor.name!} />
 			<div className="message">
 				deleted the {event.headRef} branch{nbsp}
 			</div>

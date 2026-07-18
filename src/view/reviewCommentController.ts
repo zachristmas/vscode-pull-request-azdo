@@ -37,7 +37,7 @@ export class ReviewCommentController
 
 	private _commentHandlerId: string;
 
-	private _commentController?: vscode.CommentController;
+	private _commentController: vscode.CommentController;
 	protected _commonCommentHandler: CommonCommentHandler;
 
 	public get commentController(): vscode.CommentController | undefined {
@@ -122,11 +122,12 @@ export class ReviewCommentController
 	 * @returns A GHPRCommentThread that has been created on an editor.
 	 */
 	private createReviewCommentThread(uri: vscode.Uri, path: string, thread: IReviewThread): GHPRCommentThread {
+		// ReviewUriParams.commit is optional; an undefined mergeBase is dropped by JSON.stringify
 		const reviewUri = toReviewUri(
 			uri,
 			path,
 			undefined,
-			this._reposManager.activePullRequest.mergeBase,
+			this._reposManager.activePullRequest!.mergeBase!,
 			false,
 			{ base: true },
 			this._repository.rootUri,
@@ -269,14 +270,16 @@ export class ReviewCommentController
 						return sameLine;
 					});
 
-					let newThread: GHPRCommentThread;
+					let newThread: GHPRCommentThread | undefined;
 					if (index > -1) {
-						newThread = this._pendingCommentThreadAdds[index];
-						newThread.threadId = thread.id;
-						newThread.comments = thread.thread.comments.map(
-							c => new GHPRComment(c, this._getCommentPermissions(c), newThread),
-						);
+						const pendingThread = this._pendingCommentThreadAdds[index];
+						pendingThread.threadId = thread.id;
+						pendingThread.comments =
+							thread.thread.comments?.map(
+								c => new GHPRComment(c, this._getCommentPermissions(c), pendingThread),
+							) ?? [];
 						this._pendingCommentThreadAdds.splice(index, 1);
+						newThread = pendingThread;
 					} else {
 						const fullPath = nodePath
 							.join(this._repository.rootUri.path, removeLeadingSlash(path))
@@ -291,6 +294,11 @@ export class ReviewCommentController
 								newThread = this.createReviewCommentThread(uri, path, thread);
 							}
 						}
+					}
+
+					// Outdated threads have no creator above; this used to push undefined into the map
+					if (!newThread) {
+						return;
 					}
 
 					const threadMap = thread.isOutdated
@@ -316,9 +324,10 @@ export class ReviewCommentController
 					const index = threadMap[removeLeadingSlash(thread.path)]?.findIndex(t => t.threadId === thread.id);
 					if (index > -1) {
 						const matchingThread = threadMap[removeLeadingSlash(thread.path)][index];
-						matchingThread.comments = thread.thread.comments
-							.filter(c => !c.isDeleted)
-							.map(c => new GHPRComment(c, this._getCommentPermissions(c), matchingThread));
+						matchingThread.comments =
+							thread.thread.comments
+								?.filter(c => !c.isDeleted)
+								.map(c => new GHPRComment(c, this._getCommentPermissions(c), matchingThread)) ?? [];
 					}
 				});
 

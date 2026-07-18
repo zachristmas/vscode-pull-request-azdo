@@ -137,11 +137,11 @@ class LiveShareRepositoryState implements RepositoryState {
 	HEAD: Branch | undefined;
 	refs: Ref[];
 	remotes: Remote[];
-	submodules: Submodule[];
-	rebaseCommit: Commit;
-	mergeChanges: Change[];
-	indexChanges: Change[];
-	workingTreeChanges: Change[];
+	submodules: Submodule[] = [];
+	rebaseCommit: Commit | undefined;
+	mergeChanges: Change[] = [];
+	indexChanges: Change[] = [];
+	workingTreeChanges: Change[] = [];
 	_onDidChange = new vscode.EventEmitter<void>();
 	onDidChange = this._onDidChange.event;
 
@@ -161,8 +161,9 @@ class LiveShareRepositoryState implements RepositoryState {
 }
 
 class LiveShareRepository {
-	rootUri: vscode.Uri;
-	state: LiveShareRepositoryState;
+	// Assigned in initialize(), which is awaited right after construction.
+	rootUri!: vscode.Uri;
+	state!: LiveShareRepositoryState;
 
 	constructor(public workspaceFolder: vscode.WorkspaceFolder, public proxy: SharedServiceProxy) {}
 

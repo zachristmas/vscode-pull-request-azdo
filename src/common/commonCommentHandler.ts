@@ -42,7 +42,7 @@ export class CommonCommentHandler {
 			if (!hasExistingComments) {
 				let isLeft = this.isFileLeft(thread.uri);
 				rawThread = (await this.createNewThread(thread, input, fileChange, isLeft))!;
-				thread.threadId = rawThread?.id;
+				thread.threadId = rawThread.id!;
 				thread.rawThread = rawThread!;
 				addCommentToCache(thread, fileChange.fileName);
 				updateCommentThreadLabel(thread);
@@ -74,7 +74,7 @@ export class CommonCommentHandler {
 		if (uri.scheme === URI_SCHEME_REVIEW) {
 			return fromReviewUri(uri).base;
 		} else if (uri.scheme === URI_SCHEME_PR) {
-			return fromPRUri(uri).isBase;
+			return fromPRUri(uri)?.isBase ?? false;
 		}
 
 		return false;
@@ -301,7 +301,7 @@ export class CommonCommentHandler {
 				return;
 			}
 
-			const range = getCommentingRanges(fileChange.diffHunks, params.isBase);
+			const range = getCommentingRanges(fileChange.diffHunks ?? [], params.isBase);
 			return range;
 		}
 	}

@@ -34,7 +34,7 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 	async provideCommentingRanges(
 		document: vscode.TextDocument,
 		token: vscode.CancellationToken,
-	): Promise<vscode.Range[] | undefined> {
+	): Promise<vscode.Range[] | vscode.CommentingRanges | null | undefined> {
 		const uri = document.uri;
 		const params = fromPRUri(uri);
 
@@ -115,8 +115,8 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 	}
 
 	dispose() {
-		Object.keys(this._prCommentHandlers).forEach(key => {
-			this._prCommentHandlers[key].handler.dispose();
+		Object.values(this._prCommentHandlers).forEach(handlerInfo => {
+			handlerInfo.handler.dispose();
 		});
 
 		this._prCommentingRangeProviders = {};

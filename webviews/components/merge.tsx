@@ -539,7 +539,7 @@ export const ReadyForReview = () => {
 };
 
 export const Merge = (pr: PullRequest) => {
-	const select = useRef<HTMLSelectElement>();
+	const select = useRef<HTMLSelectElement>(null);
 	const [selectedMethod, selectMethod] = useState<MergeMethod | null>(null);
 
 	if (selectedMethod) {
@@ -549,7 +549,7 @@ export const Merge = (pr: PullRequest) => {
 	return (
 		<>
 			<div className="merge-select-container">
-				<button onClick={() => selectMethod(select.current.value as MergeMethod)}>Merge Pull Request</button>
+				<button onClick={() => selectMethod(select.current!.value as MergeMethod)}>Merge Pull Request</button>
 				{nbsp}using method{nbsp}
 				<MergeSelect ref={select} {...pr} />
 			</div>
@@ -593,9 +593,9 @@ export const MergeSimple = (pr: PullRequest) => {
 		updatePR({ state });
 	}
 
-	const availableOptions = Object.keys(MERGE_METHODS)
+	const availableOptions = (Object.keys(MERGE_METHODS) as MergeMethod[])
 		.filter(method => pr.mergeMethodsAvailability[method])
-		.reduce((methods, key) => {
+		.reduce((methods: { [method: string]: string }, key) => {
 			methods[key] = MERGE_METHODS[key];
 			return methods;
 		}, {});
@@ -637,7 +637,7 @@ export const DeleteBranch = (_pr: PullRequest) => {
 };
 
 export const SetAutoComplete = (pr: PullRequest) => {
-	const select = useRef<HTMLSelectElement>();
+	const select = useRef<HTMLSelectElement>(null);
 	const [selectedMethod, selectMethod] = useState<MergeMethod | null>(null);
 
 	if (selectedMethod) {
@@ -646,7 +646,7 @@ export const SetAutoComplete = (pr: PullRequest) => {
 
 	return (
 		<div className="merge-select-container">
-			<button onClick={() => selectMethod(select.current.value as MergeMethod)}>Set auto-complete</button>
+			<button onClick={() => selectMethod(select.current!.value as MergeMethod)}>Set auto-complete</button>
 			{nbsp}using method{nbsp}
 			<MergeSelect ref={select} {...pr} />
 		</div>
@@ -758,7 +758,7 @@ export type MergeSelectProps = Pick<PullRequest, 'mergeMethodsAvailability'> & P
 export const MergeSelect = React.forwardRef<HTMLSelectElement, MergeSelectProps>(
 	({ defaultMergeMethod, mergeMethodsAvailability: avail }: MergeSelectProps, ref) => (
 		<select ref={ref} defaultValue={defaultMergeMethod}>
-			{Object.entries(MERGE_METHODS).map(([method, text]) => (
+			{(Object.entries(MERGE_METHODS) as [MergeMethod, string][]).map(([method, text]) => (
 				<option key={method} value={method} disabled={!avail[method]}>
 					{text}
 					{!avail[method] ? ' (not enabled)' : null}
@@ -768,13 +768,13 @@ export const MergeSelect = React.forwardRef<HTMLSelectElement, MergeSelectProps>
 	),
 );
 
-const StatusCheckDetails = ({ statuses }: Partial<PullRequest['status']>) => (
+const StatusCheckDetails = ({ statuses }: Pick<PullRequestChecks, 'statuses'>) => (
 	<div>
 		{statuses.map(s => (
 			<div key={s.id} className="status-check">
 				<div>
-					<StateIcon state={s.state} />
-					<Avatar url={s.url} avatarUrl={s.avatar_url} />
+					<StateIcon state={s.state ?? GitStatusState.NotSet} />
+					<Avatar url={s.url!} avatarUrl={s.avatar_url!} />
 					<span className="status-check-detail-text">
 						{s.context} {s.description ? `— ${s.description}` : ''}
 					</span>
@@ -792,7 +792,7 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 	const statusPhrases = [];
 	for (const statusType of Object.keys(statusTypes)) {
 		const numOfType = statusTypes[statusType].length;
-		const statusAdjective = GitStatusState[statusType].toString();
+		const statusAdjective = GitStatusState[Number(statusType)].toString();
 
 		const status = numOfType > 1 ? `${numOfType} ${statusAdjective} checks` : `${numOfType} ${statusAdjective} check`;
 

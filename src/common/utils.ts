@@ -8,7 +8,7 @@ import { sep } from 'path';
 import moment from 'moment';
 import { Disposable, Event } from 'vscode';
 
-export function uniqBy<T>(arr: (T[] | readonly T[]), fn: (el: T) => string): T[] {
+export function uniqBy<T>(arr: T[] | readonly T[], fn: (el: T) => string): T[] {
 	const seen = Object.create(null);
 
 	return arr.filter(el => {
@@ -37,7 +37,7 @@ export function combinedDisposable(disposables: Disposable[]): Disposable {
 }
 
 export function anyEvent<T>(...events: Event<T>[]): Event<T> {
-	return (listener, thisArgs = null, disposables?) => {
+	return (listener: (e: T) => unknown, thisArgs: unknown = null, disposables?: Disposable[]) => {
 		const result = combinedDisposable(events.map(event => event(i => listener.call(thisArgs, i))));
 
 		if (disposables) {
@@ -49,11 +49,12 @@ export function anyEvent<T>(...events: Event<T>[]): Event<T> {
 }
 
 export function filterEvent<T>(event: Event<T>, filter: (e: T) => boolean): Event<T> {
-	return (listener, thisArgs = null, disposables?) => event(e => filter(e) && listener.call(thisArgs, e), null, disposables);
+	return (listener: (e: T) => unknown, thisArgs: unknown = null, disposables?: Disposable[]) =>
+		event(e => filter(e) && listener.call(thisArgs, e), null, disposables);
 }
 
 export function onceEvent<T>(event: Event<T>): Event<T> {
-	return (listener, thisArgs = null, disposables?) => {
+	return (listener: (e: T) => unknown, thisArgs: unknown = null, disposables?: Disposable[]) => {
 		const result = event(
 			e => {
 				result.dispose();
@@ -160,7 +161,7 @@ export function formatError(e: HookError | any): string {
 }
 
 export interface PromiseAdapter<T, U> {
-	(value: T, resolve: (value?: U | PromiseLike<U>) => void, reject: (reason: any) => void): any;
+	(value: T, resolve: (value: U | PromiseLike<U>) => void, reject: (reason: any) => void): any;
 }
 
 const passthrough = (value: any, resolve: (value?: any) => void) => resolve(value);
@@ -218,9 +219,9 @@ export interface Predicate<T> {
 }
 
 export class PathIterator implements IKeyIterator {
-	private _value: string;
-	private _from: number;
-	private _to: number;
+	private _value!: string;
+	private _from!: number;
+	private _to!: number;
 
 	reset(key: string): this {
 		this._value = key.replace(/\\$|\/$/, '');
@@ -296,9 +297,9 @@ export interface IKeyIterator {
 }
 
 class TernarySearchTreeNode<E> {
-	segment: string;
+	segment!: string;
 	value: E | undefined;
-	key: string;
+	key!: string;
 	left: TernarySearchTreeNode<E> | undefined;
 	mid: TernarySearchTreeNode<E> | undefined;
 	right: TernarySearchTreeNode<E> | undefined;

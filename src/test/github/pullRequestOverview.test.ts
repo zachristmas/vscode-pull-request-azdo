@@ -1,7 +1,7 @@
 import { strict as assert } from 'assert';
 import * as path from 'path';
 import { GitPullRequest, GitStatusState } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import { createSandbox, match as sinonMatch, SinonSandbox } from 'sinon';
+import { createSandbox, match as sinonMatch, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';
 import * as vscode from 'vscode';
 
@@ -15,6 +15,7 @@ import { convertAzdoPullRequestToRawPullRequest } from '../../azdo/utils';
 import { AzdoWorkItem } from '../../azdo/workItem';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
+import { asReal } from '../mocks/stub';
 import { MockAzdoRepository } from '../mocks/mockAzdoRepository';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage, MockExtensionContext } from '../mocks/mockExtensionContext';
@@ -34,7 +35,7 @@ describe('PullRequestOverview', function () {
 	let telemetry: MockTelemetry;
 	let workItem: AzdoWorkItem;
 	let userManager: AzdoUserManager;
-	let fileReviewedStatusService;
+	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 
 	beforeEach(async function () {
 		sinon = createSandbox();
@@ -53,7 +54,7 @@ describe('PullRequestOverview', function () {
 			telemetry,
 			new GitApiImpl(),
 			credentialStore,
-			fileReviewedStatusService,
+			asReal(fileReviewedStatusService),
 		);
 		workItem = new AzdoWorkItem(credentialStore, telemetry);
 		userManager = new AzdoUserManager(credentialStore, telemetry);

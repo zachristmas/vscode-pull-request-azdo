@@ -69,7 +69,7 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 						continue;
 					}
 					for (const user of batch) {
-						if (!allAssignableUsers.has(user.id)) {
+						if (user.id && !allAssignableUsers.has(user.id)) {
 							allAssignableUsers.set(user.id, user);
 						}
 					}
@@ -100,10 +100,10 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 			if (accounts.findIndex(u => u.id === currentLoginUser) !== -1) {
 				this.notifySuggestedUsers(
 					accounts
-						.filter(u => u.email)
+						.filter(u => u.email && u.id)
 						.map(u => {
 							return {
-								id: u.id,
+								id: u.id!,
 								displayName: u.name ? u.name : u.email,
 								email: u.email,
 							};
@@ -120,7 +120,7 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 		}
 		const origin = await this.pullRequestManager.folderManagers[0]?.getOrigin();
 		if (origin) {
-			const currentUser = origin.azdo.authenticatedUser;
+			const currentUser = origin.azdo?.authenticatedUser;
 			if (currentUser) {
 				return currentUser.id;
 			}

@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 import { GitPullRequest, GitRepository } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import { createSandbox, SinonSandbox } from 'sinon';
+import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';
 import * as vscode from 'vscode';
 
@@ -24,6 +24,7 @@ import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage, MockExtensionContext } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
+import { asReal } from '../mocks/stub';
 import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 
 describe('GitHub Pull Requests view', function () {
@@ -32,7 +33,7 @@ describe('GitHub Pull Requests view', function () {
 	let telemetry: MockTelemetry;
 	let provider: PullRequestsTreeDataProvider;
 	let credentialStore: CredentialStore;
-	let fileReviewedStatusService;
+	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 	let repository: MockRepository;
 	let gitImpl: GitApiImpl;
 
@@ -104,7 +105,7 @@ describe('GitHub Pull Requests view', function () {
 		repository.addRemote('origin', 'https://aaa@dev.azure.com/aaa/bbb/_git/bbb');
 
 		const manager = new RepositoriesManager(
-			[new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, fileReviewedStatusService)],
+			[new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, asReal(fileReviewedStatusService))],
 			credentialStore,
 			telemetry,
 		);
@@ -125,7 +126,7 @@ describe('GitHub Pull Requests view', function () {
 		repository.addRemote('origin', 'https://aaa@dev.azure.com/aaa/bbb/_git/bbb');
 
 		const manager = new RepositoriesManager(
-			[new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, fileReviewedStatusService)],
+			[new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, asReal(fileReviewedStatusService))],
 			credentialStore,
 			telemetry,
 		);
@@ -210,7 +211,7 @@ describe('GitHub Pull Requests view', function () {
 
 			await repository.createBranch('non-pr-branch', false);
 
-			const manager = new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, fileReviewedStatusService);
+			const manager = new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, asReal(fileReviewedStatusService));
 			const reposManager = new RepositoriesManager([manager], credentialStore, telemetry);
 			sinon.stub(manager, 'createAzdoRepository').callsFake((r, cs) => {
 				assert.deepEqual(r, remote);

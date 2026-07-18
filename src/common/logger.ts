@@ -11,7 +11,7 @@ const LOG_LEVEL_SETTING = 'logLevel';
 
 class Log {
 	private _outputChannel: vscode.OutputChannel;
-	private _logLevel: LogLevel;
+	private _logLevel!: LogLevel;
 	private _disposable: vscode.Disposable;
 
 	constructor() {

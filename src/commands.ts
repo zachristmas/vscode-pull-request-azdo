@@ -510,7 +510,7 @@ export function registerCommands(
 			const input = await vscode.window.showInputBox({
 				prompt: vscode.l10n.t('Pull request ID to checkout'),
 				placeHolder: vscode.l10n.t('e.g. 5994'),
-				validateInput: v => (/^\d+$/.test(v.trim()) ? undefined : vscode.l10n.t('Enter a numeric pull request ID')),
+				validateInput: (v: string) => (/^\d+$/.test(v.trim()) ? undefined : vscode.l10n.t('Enter a numeric pull request ID')),
 			});
 			if (!input) {
 				return;

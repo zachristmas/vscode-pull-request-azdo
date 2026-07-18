@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 import { GitPullRequest } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import { createSandbox, SinonSandbox } from 'sinon';
+import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';
 
 import { GitApiImpl } from '../../api/api1';
@@ -16,13 +16,14 @@ import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
+import { asReal } from '../mocks/stub';
 import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 
 describe('PullRequestManager', function () {
 	let sinon: SinonSandbox;
 	let manager: FolderRepositoryManager;
 	let telemetry: MockTelemetry;
-	let fileReviewedStatusService;
+	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 
 	beforeEach(function () {
 		sinon = createSandbox();
@@ -38,7 +39,7 @@ describe('PullRequestManager', function () {
 		gitImpl.registerGitProvider(mockGitProvider);
 		const credentialStore = new CredentialStore(telemetry, secretStorage, gitImpl);
 		fileReviewedStatusService = sinon.createStubInstance(FileReviewedStatusService);
-		manager = new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, fileReviewedStatusService);
+		manager = new FolderRepositoryManager(repository, telemetry, new GitApiImpl(), credentialStore, asReal(fileReviewedStatusService));
 	});
 
 	afterEach(function () {
@@ -55,7 +56,7 @@ describe('PullRequestManager', function () {
 			const url = 'https://dev.azure.com.com/aaa/bbb/_git/bbb';
 			const protocol = new Protocol(url);
 			const remote = new Remote('origin', url, protocol);
-			const repository = new AzdoRepository(remote, manager.credentialStore, fileReviewedStatusService, telemetry);
+			const repository = new AzdoRepository(remote, manager.credentialStore, asReal(fileReviewedStatusService), telemetry);
 			const prItem = await convertAzdoPullRequestToRawPullRequest(createMock<GitPullRequest>(), repository);
 			const pr = new PullRequestModel(telemetry, repository, remote, prItem);
 

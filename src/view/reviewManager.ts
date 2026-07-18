@@ -49,9 +49,10 @@ export class ReviewManager {
 	private _lastCommitSha?: string;
 	private _updateMessageShown: boolean = false;
 	private _validateStatusInProgress?: Promise<void>;
-	private _reviewCommentController: ReviewCommentController;
+	// Assigned in registerCommentController() before review-mode code paths read it.
+	private _reviewCommentController!: ReviewCommentController;
 
-	private _statusBarItem: vscode.StatusBarItem;
+	private _statusBarItem?: vscode.StatusBarItem;
 	private _prNumber?: number;
 	private _previousRepositoryState: {
 		HEAD: Branch | undefined;
@@ -490,7 +491,7 @@ export class ReviewManager {
 			this._obsoleteFileChanges = [];
 			for (const commit in commitsGroup) {
 				const commentsForCommit = commitsGroup[commit];
-				const commentsForFile = groupBy(commentsForCommit, comment => comment.threadContext?.filePath);
+				const commentsForFile = groupBy(commentsForCommit, comment => comment.threadContext?.filePath ?? '');
 
 				for (const fileName in commentsForFile) {
 					let diffHunks: DiffHunk[] = [];
@@ -1005,7 +1006,7 @@ export class ReviewManager {
 							value: title,
 							ignoreFocusOut: true,
 							prompt: `Enter PR title`,
-							validateInput: value => (value ? null : 'Title can not be empty'),
+							validateInput: (value: string) => (value ? null : 'Title can not be empty'),
 						});
 
 						if (!nameResult) {

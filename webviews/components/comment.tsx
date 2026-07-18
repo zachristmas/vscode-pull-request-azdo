@@ -32,7 +32,7 @@ export type Props = Partial<Comment> & {
 
 export function CommentView(comment: Props) {
 	const { threadId, content, canEdit, isPRDescription } = comment;
-	const id = threadId * 1000 + comment.id;
+	const id = threadId * 1000 + comment.id!;
 	const [bodyMd, setBodyMd] = useStateProp(content);
 	const [bodyHTMLState, setBodyHtml] = useStateProp(content);
 	const { editComment, setDescription, pr } = useContext(PullRequestContext);
@@ -43,7 +43,7 @@ export function CommentView(comment: Props) {
 		return React.cloneElement(comment.headerInEditMode ? <CommentBox for={comment} /> : <></>, {}, [
 			<EditComment
 				id={id}
-				body={currentDraft || bodyMd}
+				body={currentDraft || bodyMd || ''}
 				onCancel={() => {
 					if (pr.pendingCommentDrafts) {
 						delete pr.pendingCommentDrafts[id];
@@ -108,8 +108,8 @@ function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children }: Comm
 			<div className="review-comment-container">
 				<div className="review-comment-header">
 					<Spaced>
-						<Avatar url={author.profileUrl} avatarUrl={author['_links']?.['avatar']?.['href']} />
-						<AuthorLink url={author.profileUrl} text={author.displayName} />
+						<Avatar url={author!.profileUrl!} avatarUrl={author!['_links']?.['avatar']?.['href']} />
+						<AuthorLink url={author!.profileUrl!} text={author!.displayName!} />
 						{publishedDate ? (
 							<>
 								commented{nbsp}
@@ -153,7 +153,7 @@ const ComposerHint = () => <div className="composer-hint">Markdown supported · 
 function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 	const { updateDraft } = useContext(PullRequestContext);
 	const draftComment = useRef<{ body: string; dirty: boolean }>({ body, dirty: false });
-	const form = useRef<HTMLFormElement>();
+	const form = useRef<HTMLFormElement>(null);
 
 	useEffect(() => {
 		const interval = setInterval(() => {
@@ -166,7 +166,7 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 	}, [draftComment]);
 
 	const submit = useCallback(async () => {
-		const { markdown, submitButton }: FormInputSet = form.current;
+		const { markdown, submitButton }: FormInputSet = form.current!;
 		submitButton.disabled = true;
 		try {
 			await onSave(markdown.value);
@@ -195,7 +195,7 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 
 	const onInput = useCallback(
 		e => {
-			draftComment.current.body = (e.target as any).value;
+			draftComment.current.body = (e.target as HTMLTextAreaElement).value;
 			draftComment.current.dirty = true;
 		},
 		[draftComment],
@@ -218,15 +218,15 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 }
 
 export interface Embodied {
-	commentContent: string;
-	commentId: number;
+	commentContent: string | undefined;
+	commentId: number | undefined;
 	threadId: number;
 	bodyHTML?: string;
 	body?: string;
 }
 
 const renderers = {
-	code: ({ language, value }) => {
+	code: ({ language, value }: { language?: string; value?: string }) => {
 		// UX-03: match the editor theme instead of hardcoding dracula (purple-on-dark inside a light
 		// VS Code). VS Code stamps document.body with vscode-light / vscode-dark / vscode-high-contrast.
 		const isLight = document.body.classList.contains('vscode-light');
@@ -255,10 +255,10 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 
 	const { applyPatch } = useContext(PullRequestContext);
 	// const renderedBody = <div dangerouslySetInnerHTML={{ __html: bodyHTML }} />;
-	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={body} />;
-	const containsSuggestion = (body || bodyHTML).indexOf('```diff') > -1;
+	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={body ?? ''} />;
+	const containsSuggestion = (body || bodyHTML || '').indexOf('```diff') > -1;
 	const applyPatchButton = containsSuggestion ? (
-		<button onClick={() => applyPatch(commentContent, commentId, threadId)}>Apply Patch</button>
+		<button onClick={() => applyPatch(commentContent!, commentId!, threadId)}>Apply Patch</button>
 	) : (
 		<></>
 	);
@@ -277,10 +277,10 @@ export type ReplyToThreadProps = {
 };
 
 export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
-	const form = useRef<HTMLFormElement>();
+	const form = useRef<HTMLFormElement>(null);
 
 	const submit = useCallback(async () => {
-		const { markdown, submitButton }: FormInputSet = form.current;
+		const { markdown, submitButton }: FormInputSet = form.current!;
 		submitButton.disabled = true;
 		try {
 			await onSave(markdown.value);
@@ -326,20 +326,20 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 export function AddComment({ pendingCommentText, hasWritePermission, isIssue, isActive }: PullRequest & { isActive: boolean }) {
 	const { updatePR, comment, close } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
-	const form = useRef<HTMLFormElement>();
-	const textareaRef = useRef<HTMLTextAreaElement>();
+	const form = useRef<HTMLFormElement>(null);
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
 	emitter.addListener('quoteReply', message => {
 		updatePR({ pendingCommentText: `> ${message} \n\n` });
-		textareaRef.current.scrollIntoView();
-		textareaRef.current.focus();
+		textareaRef.current!.scrollIntoView();
+		textareaRef.current!.focus();
 	});
 
 	const submit = useCallback(
 		async (command: (body: string) => Promise<any> = comment) => {
 			try {
 				setBusy(true);
-				const { body }: FormInputSet = form.current;
+				const { body }: FormInputSet = form.current!;
 				await command(body.value);
 				updatePR({ pendingCommentText: '' });
 			} finally {
@@ -370,7 +370,8 @@ export function AddComment({ pendingCommentText, hasWritePermission, isIssue, is
 		e => {
 			e.preventDefault();
 			const { command } = e.target.dataset;
-			submit({ close }[command]);
+			const commands: { [command: string]: typeof close } = { close };
+			submit(commands[command]);
 		},
 		[submit, close],
 	);
@@ -381,7 +382,7 @@ export function AddComment({ pendingCommentText, hasWritePermission, isIssue, is
 				id="comment-textarea"
 				name="body"
 				ref={textareaRef}
-				onInput={({ target }) => updatePR({ pendingCommentText: (target as any).value })}
+				onInput={({ target }) => updatePR({ pendingCommentText: (target as HTMLTextAreaElement).value })}
 				onKeyDown={onKeyDown}
 				value={pendingCommentText}
 				placeholder="Leave a comment"
@@ -415,10 +416,10 @@ const COMMENT_METHODS = {
 
 export const AddCommentSimple = (pr: PullRequest) => {
 	const { updatePR, votePullRequest, submit } = useContext(PullRequestContext);
-	const textareaRef = useRef<HTMLTextAreaElement>();
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
 	async function submitAction(selected: string): Promise<void> {
-		const { value } = textareaRef.current;
+		const { value } = textareaRef.current!;
 		switch (selected) {
 			case ReviewType.Approve:
 				// Optionally post the typed text as a comment first, then record the ADO vote.
