@@ -12,12 +12,13 @@ async function runAllExtensionTests(testsRoot: string, clb: (error: Error | null
 
 	mocha.setup({
 		ui: 'bdd',
-		reporter: undefined
+		reporter: undefined,
 	});
 
 	try {
 		const importAll = (r: __WebpackModuleApi.RequireContext) => r.keys().forEach(r);
-		importAll(require.context('../', true, /\.test$/));
+		// require.context is a webpack-only extension; @types/node's require wins in this tsconfig.
+		importAll((require as NodeRequire & __WebpackModuleApi.RequireFunction).context('../', true, /\.test$/));
 	} catch (e) {
 		console.log(e);
 	}

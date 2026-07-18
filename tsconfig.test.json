@@ -4,19 +4,16 @@
 		"jsx": "react",
 		"jsxFactory": "vscpp",
 		"jsxFragmentFactory": "vscppf",
-		"lib": [
-			"dom",
-			"dom.iterable",
-			"es2019"
-		],
+		"lib": ["dom", "dom.iterable", "es2019"],
 		"module": "commonjs",
 		"outDir": "out",
+		"plugins": [
+			{
+				"transform": "ts-auto-mock/transformer",
+				"cacheBetweenTests": false
+			}
+		],
 		"tsBuildInfoFile": "tsconfig.test.tsbuildinfo"
 	},
-	"include": [
-		"src/@types",
-		"src/common",
-		"src/github",
-		"src/test"
-	]
+	"include": ["src/@types", "src/common", "src/github", "src/test"]
 }

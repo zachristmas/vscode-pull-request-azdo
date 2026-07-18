@@ -6,6 +6,7 @@ import {
 	Change,
 	Commit,
 	CommitOptions,
+	FetchOptions,
 	InputBox,
 	Ref,
 	Repository,
@@ -55,7 +56,6 @@ export class MockRepository implements Repository {
 
 	private _state: Mutable<RepositoryState> = {
 		HEAD: undefined,
-		refs: [],
 		remotes: [],
 		submodules: [],
 		rebaseCommit: undefined,
@@ -64,6 +64,8 @@ export class MockRepository implements Repository {
 		workingTreeChanges: [],
 		onDidChange: () => ({ dispose() {} }),
 	};
+	// RepositoryState no longer carries refs; keep local bookkeeping for createBranch.
+	private _refs: Ref[] = [];
 	private _config: Map<string, string> = new Map();
 	private _branches: Branch[] = [];
 	private _expectedFetches: { remoteName?: string; ref?: string; depth?: number }[] = [];
@@ -150,7 +152,7 @@ export class MockRepository implements Repository {
 			this._state.HEAD = branch;
 		}
 
-		this._state.refs.push(branch);
+		this._refs.push(branch);
 		this._branches.push(branch);
 	}
 
@@ -240,7 +242,14 @@ export class MockRepository implements Repository {
 		this._state.remotes.splice(index, 1);
 	}
 
-	async fetch(remoteName?: string | undefined, ref?: string | undefined, depth?: number | undefined): Promise<void> {
+	fetch(options?: FetchOptions): Promise<void>;
+	fetch(remote?: string, ref?: string, depth?: number): Promise<void>;
+	async fetch(arg?: FetchOptions | string, ref?: string, depth?: number): Promise<void> {
+		const remoteName = typeof arg === 'object' ? arg.remote : arg;
+		if (typeof arg === 'object') {
+			ref = arg.ref;
+			depth = arg.depth;
+		}
 		const index = this._expectedFetches.findIndex(f => f.remoteName === remoteName && f.ref === ref && f.depth === depth);
 		if (index === -1) {
 			throw new Error(`Unexpected fetch(${remoteName}, ${ref}, ${depth})`);
@@ -281,6 +290,22 @@ export class MockRepository implements Repository {
 
 	blame(treePath: string): Promise<string> {
 		return Promise.reject(new Error(`Unexpected blame(${treePath})`));
+	}
+
+	getBranchBase(name: string): Promise<Branch | undefined> {
+		return Promise.reject(new Error(`Unexpected getBranchBase(${name})`));
+	}
+
+	add(paths: string[]): Promise<void> {
+		return Promise.reject(new Error(`Unexpected add(${paths})`));
+	}
+
+	merge(ref: string): Promise<void> {
+		return Promise.reject(new Error(`Unexpected merge(${ref})`));
+	}
+
+	mergeAbort(): Promise<void> {
+		return Promise.reject(new Error('Unexpected mergeAbort()'));
 	}
 
 	expectFetch(remoteName?: string, ref?: string, depth?: number) {

@@ -53,10 +53,12 @@ async function processFile(inFilename, outFilename) {
 }
 
 const glob = util.promisify(globCb);
-const mkdirp = util.promisify(mkdirpCb);
+// mkdirp v1+ is promise-native; promisify() would pass its callback as the options argument.
+const mkdirp = mkdirpCb;
 
 async function processDirectory(inDirectory, outDirectory) {
-	const files = await glob('**/*.svg', { cwd: inDirectory });
+	// Enumerate relative to the same root the reads below use, not the process cwd.
+	const files = await glob('**/*.svg', { cwd: path.join(__dirname, inDirectory) });
 	return Promise.all(
 		files.map(async subPath => {
 			const inFilename = path.join(__dirname, inDirectory, subPath);
