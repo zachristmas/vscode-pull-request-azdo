@@ -3,6 +3,9 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/* eslint-disable unicorn/prefer-https, sonarjs/no-clear-text-protocols --
+ * the http:// URIs below are protocol-PARSING fixtures (asserting scheme detection),
+ * not endpoints anything connects to. */
 import { strict as assert } from 'assert';
 import { Protocol, ProtocolType } from '../../common/protocol';
 import * as ssh from '../../env/node/ssh';

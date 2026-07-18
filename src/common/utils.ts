@@ -3,7 +3,6 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-'use strict';
 import path from 'path';
 import moment from 'moment';
 import { Disposable, Event } from 'vscode';

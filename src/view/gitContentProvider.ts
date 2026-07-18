@@ -2,8 +2,6 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-'use strict';
-
 import pathLib from 'path';
 import * as vscode from 'vscode';
 import { GitApiImpl } from '../api/api1';

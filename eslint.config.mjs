@@ -203,6 +203,10 @@ export default tseslint.config(
 		plugins: { unicorn },
 		rules: {
 			...downgradeToWarn(unicorn.configs.recommended.rules),
+			// This is a CJS extension host; module strategy changes with the TS 7 /
+			// moduleResolution rework, not here. (The redundant 'use strict' directives the
+			// rule flagged were deleted anyway - tsc alwaysStrict emits its own.)
+			'unicorn/prefer-module': 'off',
 			// The extension:webworker bundle resolves node builtins through resolve.fallback
 			// keys in webpack.config.js that are keyed WITHOUT the node: scheme, and
 			// @types/node@12 has no node:* module declarations. The node: prefix breaks both.
