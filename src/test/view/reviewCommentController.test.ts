@@ -38,7 +38,7 @@ import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
-import { MockGitProvider } from "../../gitProviders/mockGitProvider"
+import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 
 const protocol = new Protocol('https://github.com/github/test.git');
 const remote = new Remote('test', 'github/test', protocol);
@@ -121,6 +121,7 @@ describe('ReviewCommentController', function () {
 			activePullRequest as any,
 			GitChangeType.MODIFY,
 			fileName,
+			undefined,
 			'https://example.com',
 			uri,
 			toReviewUri(uri, fileName, undefined, '1', false, { base: true }, rootUri),
@@ -178,10 +179,12 @@ describe('ReviewCommentController', function () {
 				localFileChanges,
 				[],
 				[],
-				c => { return {
-					canDelete: false,
-					canEdit: false,
-				}},
+				c => {
+					return {
+						canDelete: false,
+						canEdit: false,
+					};
+				},
 				commonCommentHandler,
 			);
 			const thread = createGHPRCommentThread('review-1.1', uri);
@@ -203,19 +206,26 @@ describe('ReviewCommentController', function () {
 			// });
 
 			sinon.stub(activePullRequest.azdoRepository.azdo!.connection, 'getGitApi').resolves({
-				createThread: async (c,r,n,p) => {
+				createThread: async (c, r, n, p) => {
 					return {
 						id: 1,
-						comments: [{ id: 1, commentType: CommentType.Text, content: 'text', author: {
-							displayName: 'Ankit'
-						} }],
-						threadContext: {rightFileStart: 10, filePath: fileName},
+						comments: [
+							{
+								id: 1,
+								commentType: CommentType.Text,
+								content: 'text',
+								author: {
+									displayName: 'Ankit',
+								},
+							},
+						],
+						threadContext: { rightFileStart: 10, filePath: fileName },
 						status: CommentThreadStatus.Active,
 					};
 				},
 				getPullRequestIterations: (r, n, p, i) => {
-					return []
-				}
+					return [];
+				},
 			} as any);
 
 			sinon.stub(activePullRequest.azdoRepository, 'ensure').resolves(activePullRequest.azdoRepository);

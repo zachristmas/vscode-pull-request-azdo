@@ -227,7 +227,9 @@ export class PRNode extends TreeNode {
 		return rawChanges.map(change => {
 			const headCommit = this.pullRequestModel.head!.sha;
 			let fileName = change.fileName;
-			let parentFileName = change.previousFileName!;
+			// Added files have no previousFileName; reuse the head-side name so the base URI stays
+			// resolvable and the content provider can serve its empty base side (#109).
+			let parentFileName = change.previousFileName || change.fileName;
 			let sha = change.fileSHA;
 
 			if (change.status === GitChangeType.DELETE) {

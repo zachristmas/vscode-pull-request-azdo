@@ -11,6 +11,7 @@ import { useContext, useRef, useState } from 'react';
 
 import {
 	CommitEvent,
+	hasVisibleComments,
 	HeadRefDeleteEvent,
 	isSystemThread,
 	isUserCommentThread,
@@ -37,10 +38,14 @@ export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestComm
 			.map(
 				thread =>
 					// TODO: Maybe make TimelineEvent a tagged union type?
-					isUserCommentThread(thread) ? (
-						<CommentEventView key={thread.id} thread={thread} currentUser={currentUser} />
-					) : isSystemThread(thread) ? (
+					isSystemThread(thread) ? (
 						<SystemThreadView key={thread.id} thread={thread} />
+					) : isUserCommentThread(thread) || hasVisibleComments(thread) ? (
+						// hasVisibleComments: threads created via raw REST/integrations can miss the
+						// id-1/commentType shape isUserCommentThread expects; render them as a
+						// (possibly position-less) comment card rather than dropping them - the header
+						// already counts them and the diff editor already shows them.
+						<CommentEventView key={thread.id} thread={thread} currentUser={currentUser} />
 					) : null,
 				// isCommitEvent(event)
 				// 	? <CommitEventView key={event.id} {...event} />
@@ -302,7 +307,7 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 							key={c.id}
 							headerInEditMode
 							{...c}
-							canEdit={c.author.id === currentUser.id}
+							canEdit={c.author?.id === currentUser.id}
 							threadId={thread.id}
 						/>
 					))}

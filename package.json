@@ -12,7 +12,7 @@
 	},
 	"enableProposedApi": false,
 	"preview": true,
-	"version": "1.5.1",
+	"version": "1.5.2",
 	"publisher": "ZacharyChristmas",
 	"engines": {
 		"vscode": "^1.97.0"
@@ -919,7 +919,7 @@
 		"svg-inline-loader": "^0.8.2",
 		"temp": "0.9.4",
 		"terser-webpack-plugin": "5.3.11",
-		"ts-auto-mock": "^3.1.0",
+		"ts-auto-mock": "3.5.0",
 		"ts-loader": "8.0.18",
 		"tty": "1.0.1",
 		"ttypescript": "^1.5.12",

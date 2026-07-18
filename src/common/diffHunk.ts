@@ -303,7 +303,9 @@ export async function parseDiffAzdo(
 	repository: Repository,
 	parentCommit: string,
 ): Promise<(InMemFileChange | SlimFileChange)[]> {
-	const fileChanges: (InMemFileChange | SlimFileChange)[] = await Promise.all(reviews.map(r => parseSingleDiffAzdo(r, repository, parentCommit)));
+	const fileChanges: (InMemFileChange | SlimFileChange)[] = await Promise.all(
+		reviews.map(r => parseSingleDiffAzdo(r, repository, parentCommit)),
+	);
 	return fileChanges;
 }
 
@@ -311,7 +313,7 @@ export async function parseSingleDiffAzdo(
 	review: IAzdoRawFileChange,
 	repository: Repository,
 	parentCommit: string,
-): Promise<(InMemFileChange | SlimFileChange)> {
+): Promise<InMemFileChange | SlimFileChange> {
 	const gitChangeType = getGitChangeTypeFromVersionControlChangeType(review.status);
 
 	if (review.diffHunks === undefined) {
@@ -327,13 +329,24 @@ export async function parseSingleDiffAzdo(
 		);
 	}
 
-	let originalFileExist = false;
+	let localObjectExists = false;
 
 	switch (gitChangeType) {
+		case GitChangeType.ADD:
+			// An added file has no base side; its head content can only come from the head
+			// commit, which is absent locally when the PR isn't checked out. Probe it like the
+			// other cases so such files are served from AzDO instead of a throwing git show (#109).
+			try {
+				await repository.getObjectDetails(review.headCommit, removeLeadingSlash(review.filename));
+				localObjectExists = true;
+			} catch (err) {
+				/* noop */
+			}
+			break;
 		case GitChangeType.MODIFY:
 			try {
 				await repository.getObjectDetails(parentCommit, removeLeadingSlash(review.filename));
-				originalFileExist = true;
+				localObjectExists = true;
 			} catch (err) {
 				/* noop */
 			}
@@ -342,7 +355,7 @@ export async function parseSingleDiffAzdo(
 		case GitChangeType.DELETE:
 			try {
 				await repository.getObjectDetails(parentCommit, removeLeadingSlash(review.previous_filename!));
-				originalFileExist = true;
+				localObjectExists = true;
 			} catch (err) {
 				/* noop */
 			}
@@ -350,7 +363,7 @@ export async function parseSingleDiffAzdo(
 	}
 
 	const diffHunks = review.diffHunks ?? [];
-	const isPartial = !originalFileExist && gitChangeType !== GitChangeType.ADD;
+	const isPartial = !localObjectExists;
 	return new InMemFileChange(
 		parentCommit,
 		review.headCommit,

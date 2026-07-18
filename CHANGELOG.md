@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.2
+
+Field fixes from the 2026-07-17 screenshot/triage session.
+
+- Fix a startup error ("A project name is required in order to reference a Git repository by name") in workspaces with legacy `visualstudio.com` remotes: parse project-omitted remote URL shapes (`https://org.visualstudio.com/_git/repo`, `DefaultCollection/_git/repo`, `https://dev.azure.com/org/_git/repo`), fall back to an org-wide repository search when the project-scoped lookup misses, and never issue Git API calls with an empty repository id (unresolvable remotes such as wiki repos now log and no-op instead of erroring).
+- Fix added-file diffs failing to open on PRs that aren't checked out (upstream #109): added files whose head commit isn't local are now fetched from Azure DevOps like modified files, and the base side renders as an empty pane instead of erroring. Deleted files' mirrored one-sided case verified working.
+- Render description-page timeline threads created outside the extension (raw REST/integrations): threads missing the id-1/commentType shape now show as comment cards (position-less when they have no file context) instead of being dropped, and an author-less comment can no longer blank the timeline.
+- Don't cache an empty policy-type map when the fetch fails; policy display names recover on the next fetch.
+- Repair the test harness (mock drift vs the current VS Code git API, ts-auto-mock transformer wiring, preprocess-svg script); the PullRequestOverview suite runs green again, and `MOCHA_GREP` scopes a run to one suite.
+
 ## 1.5.1
 
 - Docs only: README rewritten around the 1.5 feature set, with screenshots of the policy panel, auto-complete, voting, inline review threads, and the merged-PR view. No code changes.

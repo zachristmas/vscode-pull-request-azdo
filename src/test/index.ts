@@ -43,8 +43,10 @@ async function runAllExtensionTests(testsRoot: string): Promise<number> {
 
 	const mocha = new Mocha({
 		ui: 'bdd',
-		useColors: true,
+		color: true,
 		timeout: 600000,
+		// Scope a run to one suite: MOCHA_GREP="PullRequestOverview" yarn test
+		grep: process.env.MOCHA_GREP ? new RegExp(process.env.MOCHA_GREP) : undefined,
 	});
 	mocha.addFile(path.resolve(testsRoot, 'globalHooks.js'));
 
