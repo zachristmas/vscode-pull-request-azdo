@@ -8,6 +8,7 @@ import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi'
 import * as vscode from 'vscode';
 import { PullRequestModel } from '../azdo/pullRequestModel';
 import Logger from '../common/logger';
+import { errorMessage } from '../common/utils';
 import { ITelemetry } from '../common/telemetry';
 import { Azdo, CredentialStore } from './credentials';
 
@@ -35,7 +36,7 @@ export class AzdoWorkItem implements vscode.Disposable {
 			Logger.appendLine(`Fetching workitem for id: ${id} - finished`, AzdoWorkItem.ID);
 			return res;
 		} catch (error) {
-			Logger.appendLine(`Fetching workitem for id: ${id} - failed. Error: ${error.message}`, AzdoWorkItem.ID);
+			Logger.appendLine(`Fetching workitem for id: ${id} - failed. Error: ${errorMessage(error)}`, AzdoWorkItem.ID);
 		}
 	}
 
@@ -46,7 +47,7 @@ export class AzdoWorkItem implements vscode.Disposable {
 			Logger.appendLine(`Fetching recent workitem - finished`, AzdoWorkItem.ID);
 			return result;
 		} catch (error) {
-			Logger.appendLine(`Fetching recent workitem - failed. Error: ${error.message}`, AzdoWorkItem.ID);
+			Logger.appendLine(`Fetching recent workitem - failed. Error: ${errorMessage(error)}`, AzdoWorkItem.ID);
 			return [];
 		}
 	}
@@ -82,10 +83,10 @@ export class AzdoWorkItem implements vscode.Disposable {
 			return res;
 		} catch (error) {
 			Logger.appendLine(
-				`Associating work item: ${workItemId} with PR ${pr.getPullRequestId()} - failed. Error: ${error.message}`,
+				`Associating work item: ${workItemId} with PR ${pr.getPullRequestId()} - failed. Error: ${errorMessage(error)}`,
 				AzdoWorkItem.ID,
 			);
-			vscode.window.showWarningMessage(`Unable to associate workitem. Error: ${error.message}`);
+			vscode.window.showWarningMessage(`Unable to associate workitem. Error: ${errorMessage(error)}`);
 		}
 	}
 
@@ -126,7 +127,7 @@ export class AzdoWorkItem implements vscode.Disposable {
 			return res;
 		} catch (error) {
 			Logger.appendLine(
-				`Removing work item: ${workItem.id} with PR ${pr.getPullRequestId()} - failed. Error: ${error.message}`,
+				`Removing work item: ${workItem.id} with PR ${pr.getPullRequestId()} - failed. Error: ${errorMessage(error)}`,
 				AzdoWorkItem.ID,
 			);
 			throw error;

@@ -1,3 +1,4 @@
+/// <reference types="webpack-env" />
 // This file is providing the test runner to use when running extension tests.
 import * as vscode from 'vscode';
 require('mocha/mocha');

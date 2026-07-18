@@ -300,7 +300,7 @@ export class AzdoRepository implements vscode.Disposable {
 			return pullRequests;
 		} catch (e) {
 			Logger.appendLine(`Fetching pull requests for search: ${JSON.stringify(search)} failed: ${e}`, AzdoRepository.ID);
-			if (e.code === 404) {
+			if ((e as { code?: number }).code === 404) {
 				// TODO: not found
 				vscode.window.showWarningMessage(
 					`Fetching pull requests for remote '${this.remote.remoteName}' failed, please check if the url ${this.remote.url} is valid.`,

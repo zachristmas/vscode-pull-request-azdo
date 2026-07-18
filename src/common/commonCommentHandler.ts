@@ -18,6 +18,7 @@ import {
 } from '../view/treeNodes/fileChangeNode';
 import { getCommentingRanges } from './commentingRanges';
 import Logger from './logger';
+import { formatError } from './utils';
 import { fromPRUri, fromReviewUri } from './uri';
 
 export class CommonCommentHandler {
@@ -157,7 +158,7 @@ export class CommonCommentHandler {
 			updateCommentThreadLabel(thread);
 		} catch (e) {
 			vscode.window.showErrorMessage(`Updating status failed: ${e}`);
-			Logger.appendLine(e);
+			Logger.appendLine(formatError(e));
 		}
 	}
 

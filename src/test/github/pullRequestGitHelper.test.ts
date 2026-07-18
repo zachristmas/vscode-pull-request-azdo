@@ -83,9 +83,9 @@ describe('PullRequestGitHelper', function () {
 
 			const pullRequest = new PullRequestModel(telemetry, azdoRepository, remote, prItem);
 
-			if (pullRequest.isResolved() === false) {
-				assert(pullRequest.isResolved(), 'pull request head not resolved successfully');
-				return;
+			const resolved = pullRequest.isResolved();
+			if (!resolved) {
+				assert.fail('pull request head not resolved successfully');
 			}
 
 			await PullRequestGitHelper.checkoutFromFork(repository, pullRequest, undefined);

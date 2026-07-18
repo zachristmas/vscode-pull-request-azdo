@@ -14,6 +14,7 @@ import { mapThreadsToBase } from '../../common/commentingRanges';
 import { getZeroBased } from '../../common/diffPositionMapping';
 import { GitChangeType, SlimFileChange } from '../../common/file';
 import Logger from '../../common/logger';
+import { formatError } from '../../common/utils';
 import { fromPRUri, toPRUriAzdo } from '../../common/uri';
 import { SETTINGS_NAMESPACE } from '../../constants';
 import { getInMemPRContentProvider, provideDocumentContentForChangeModel } from '../inMemPRContentProvider';
@@ -178,7 +179,7 @@ export class PRNode extends TreeNode {
 			this.childrenDisposables = result;
 			return result;
 		} catch (e) {
-			Logger.appendLine(e);
+			Logger.appendLine(formatError(e));
 			return [];
 		}
 	}

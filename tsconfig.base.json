@@ -6,6 +6,9 @@
 		"isolatedModules": false,
 		"lib": ["es2019"],
 		"module": "esnext",
+		// node10 resolution is deprecated and gone in TS 7; moving to "bundler" (extension/webviews)
+		// + "node16" (tests) is its own migration, deferred until the TS 7 jump.
+		"ignoreDeprecations": "6.0",
 		"moduleResolution": "node",
 		"noFallthroughCasesInSwitch": true,
 		"noImplicitReturns": false,

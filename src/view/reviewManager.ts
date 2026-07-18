@@ -20,7 +20,7 @@ import Logger from '../common/logger';
 import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { fromReviewUri, toReviewUri } from '../common/uri';
-import { formatError, groupBy } from '../common/utils';
+import { formatError, gitErrorCode, groupBy } from '../common/utils';
 import { SETTINGS_NAMESPACE } from '../constants';
 import { PullRequestChangesTreeDataProvider } from './prChangesTreeDataProvider';
 
@@ -568,12 +568,10 @@ export class ReviewManager {
 			Logger.appendLine(`Review> checkout failed #${JSON.stringify(e)}`);
 			this.switchingToReviewMode = false;
 
-			if (e.gitErrorCode) {
+			const errCode = gitErrorCode(e);
+			if (errCode) {
 				// for known git errors, we should provide actions for users to continue.
-				if (
-					e.gitErrorCode === GitErrorCodes.LocalChangesOverwritten ||
-					e.gitErrorCode === GitErrorCodes.DirtyWorkTree
-				) {
+				if (errCode === GitErrorCodes.LocalChangesOverwritten || errCode === GitErrorCodes.DirtyWorkTree) {
 					vscode.window.showErrorMessage(
 						'Your local changes would be overwritten by checkout, please commit your changes or stash them before you switch branches',
 					);
@@ -673,7 +671,7 @@ export class ReviewManager {
 					// git push -u origin local_branch:remote_branch
 					await this._repository.push(remote.remoteName, `${branch.name}:${inputBox.value}`, true);
 				} catch (err) {
-					if (err.gitErrorCode === GitErrorCodes.PushRejected) {
+					if (gitErrorCode(err) === GitErrorCodes.PushRejected) {
 						vscode.window.showWarningMessage(
 							`Can't push refs to remote, try running 'git pull' first to integrate with your change`,
 							{
@@ -684,7 +682,7 @@ export class ReviewManager {
 						resolve(undefined);
 					}
 
-					if (err.gitErrorCode === GitErrorCodes.RemoteConnectionError) {
+					if (gitErrorCode(err) === GitErrorCodes.RemoteConnectionError) {
 						vscode.window.showWarningMessage(
 							`Could not read from remote repository '${remote.remoteName}'. Please make sure you have the correct access rights and the repository exists.`,
 							{

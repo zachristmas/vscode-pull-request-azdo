@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import Logger from '../common/logger';
+import { errorMessage } from '../common/utils';
 import { ITelemetry } from '../common/telemetry';
 import { Azdo, CredentialStore } from './credentials';
 import { getEntitlementApi, IUserEntitlementApi, User } from './entitlementApi';
@@ -49,7 +50,7 @@ export class AzdoUserManager implements vscode.Disposable {
 			return members;
 		} catch (error) {
 			Logger.appendLine(
-				`Searching for Identities filter: ${filter} - failed. Error: ${error.message}`,
+				`Searching for Identities filter: ${filter} - failed. Error: ${errorMessage(error)}`,
 				AzdoUserManager.ID,
 			);
 			return [];

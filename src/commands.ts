@@ -26,7 +26,7 @@ import { GitChangeType } from './common/file';
 import Logger from './common/logger';
 import { ITelemetry } from './common/telemetry';
 import { asImageDataURI, fromPRUri, fromReviewUri, ReviewUriParams } from './common/uri';
-import { formatError } from './common/utils';
+import { formatError, gitErrorCode } from './common/utils';
 import { SETTINGS_NAMESPACE, URI_SCHEME_PR, URI_SCHEME_REVIEW } from './constants';
 import { PullRequestsTreeDataProvider } from './view/prsTreeDataProvider';
 import { ReviewManager } from './view/reviewManager';
@@ -464,7 +464,7 @@ export function registerCommands(
 			try {
 				await folderManager.deleteLocalPullRequest(pullRequestModel);
 			} catch (e) {
-				if (e.gitErrorCode === GitErrorCodes.BranchNotFullyMerged) {
+				if (gitErrorCode(e) === GitErrorCodes.BranchNotFullyMerged) {
 					const action = await vscode.window.showErrorMessage(
 						`The branch '${pullRequestModel.localBranchName}' is not fully merged, are you sure you want to delete it? `,
 						DELETE_BRANCH_FORCE,
@@ -491,7 +491,7 @@ export function registerCommands(
 				}
 			*/
 				telemetry.sendTelemetryErrorEvent('azdopr.deleteLocalPullRequest.failure', {
-					message: error,
+					message: formatError(error),
 				});
 				await vscode.window.showErrorMessage(`Deleting local pull request branch failed: ${error}`);
 			} else {

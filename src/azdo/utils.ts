@@ -427,11 +427,11 @@ export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 }
 
 export function isUserThread(thread: GitPullRequestCommentThread): boolean {
-	return thread.comments?.find(c => c.id === 1)?.commentType === CommentType.Text ?? true;
+	return thread.comments?.find(c => c.id === 1)?.commentType === CommentType.Text;
 }
 
 export function isSystemThread(thread: GitPullRequestCommentThread): boolean {
-	return thread.comments?.find(c => c.id === 1)?.commentType !== CommentType.Text ?? false;
+	return thread.comments?.find(c => c.id === 1)?.commentType !== CommentType.Text;
 }
 
 export function getRelatedUsersFromPullrequest(

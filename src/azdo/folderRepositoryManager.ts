@@ -19,7 +19,7 @@ import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { EventType, TimelineEvent } from '../common/timelineEvent';
 import { fromPRUri } from '../common/uri';
-import { formatError, Predicate } from '../common/utils';
+import { formatError, gitErrorCode, Predicate } from '../common/utils';
 import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from '../constants';
 import { AzdoRepository } from './azdoRepository';
 import { CredentialStore } from './credentials';
@@ -308,7 +308,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 										}
 									}
 								} catch (err) {
-									Logger.debug(err, FolderRepositoryManager.ID);
+									Logger.debug(String(err), FolderRepositoryManager.ID);
 								}
 							}
 
@@ -1537,9 +1537,10 @@ export class FolderRepositoryManager implements vscode.Disposable {
 				await vscode.commands.executeCommand('git.checkout');
 			}
 		} catch (e) {
-			if (e.gitErrorCode) {
+			const errCode = gitErrorCode(e);
+			if (errCode) {
 				// for known git errors, we should provide actions for users to continue.
-				if (e.gitErrorCode === GitErrorCodes.DirtyWorkTree) {
+				if (errCode === GitErrorCodes.DirtyWorkTree) {
 					vscode.window.showErrorMessage(
 						'Your local changes would be overwritten by checkout, please commit your changes or stash them before you switch branches',
 					);

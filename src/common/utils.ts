@@ -121,6 +121,17 @@ function hasFieldErrors(e: any): e is Error & { errors: { value: string; field: 
 	return areFieldErrors;
 }
 
+// Narrowers for catch-variable unknowns (strict useUnknownInCatchVariables, TS 4.4+).
+export function errorMessage(e: unknown): string {
+	return e instanceof Error ? e.message : String(e);
+}
+
+export function gitErrorCode(e: unknown): string | undefined {
+	return typeof e === 'object' && e !== null && 'gitErrorCode' in e
+		? (e as { gitErrorCode?: string }).gitErrorCode
+		: undefined;
+}
+
 export function formatError(e: HookError | any): string {
 	if (!(e instanceof Error)) {
 		if (typeof e === 'string') {
