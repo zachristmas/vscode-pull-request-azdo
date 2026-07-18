@@ -1299,71 +1299,13 @@ export class PullRequestModel implements IPullRequestModel {
 		pullRequestModel: PullRequestModel,
 		comment: GitPullRequestCommentThread,
 	): Promise<void> {
-		const fileChanges = await pullRequestModel.getFileChangesInfo();
-		// TODO merge base is here also
-		const mergeBase = pullRequestModel.getDiffTarget();
-		const contentChanges = await parseDiffAzdo(fileChanges, folderManager.repository, mergeBase);
-		const change = contentChanges.find(
-			fileChange =>
-				fileChange.fileName === comment.threadContext?.filePath ||
-				fileChange.previousFileName === comment.threadContext?.filePath,
-		);
-		if (!change) {
+		const filePath = comment.threadContext?.filePath;
+		if (!filePath) {
 			throw new Error(`Can't find matching file`);
 		}
-
-		let headUri, baseUri: vscode.Uri;
-		if (!pullRequestModel.equals(folderManager.activePullRequest)) {
-			const headCommit = pullRequestModel.head!.sha;
-			const fileName = change.status === GitChangeType.DELETE ? change.previousFileName! : change.fileName;
-			// Falls back to the head-side name for added files so the base URI stays resolvable (#109).
-			const parentFileName = change.previousFileName || fileName;
-			headUri = toPRUriAzdo(
-				vscode.Uri.file(path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName))),
-				pullRequestModel,
-				change.baseCommit,
-				headCommit,
-				fileName,
-				false,
-				change.status,
-			);
-			baseUri = toPRUriAzdo(
-				vscode.Uri.file(path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName))),
-				pullRequestModel,
-				change.baseCommit,
-				headCommit,
-				parentFileName,
-				true,
-				change.status,
-			);
-		} else {
-			const uri = vscode.Uri.file(
-				path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(change.fileName)),
-			);
-
-			headUri =
-				change.status === GitChangeType.DELETE
-					? toReviewUri(uri, undefined, undefined, '', false, { base: false }, folderManager.repository.rootUri)
-					: uri;
-
-			baseUri = toReviewUri(
-				uri,
-				change.status === GitChangeType.RENAME ? change.previousFileName : change.fileName,
-				undefined,
-				change.status === GitChangeType.ADD ? '' : mergeBase,
-				false,
-				{ base: true },
-				folderManager.repository.rootUri,
-			);
-		}
-
-		const pathSegments = comment.threadContext?.filePath?.split('/');
-		vscode.commands.executeCommand(
-			'vscode.diff',
-			baseUri,
-			headUri,
-			`${pathSegments[pathSegments.length - 1]} (Pull Request)`,
-			{},
-		);
+		// vscode.diff used to receive an empty options object here, so long files opened at Ln 1 and
+		// the user had to hunt for the thread. getPositionFromThread returns the thread's tracked
+		// 1-based line; openDiffForFile turns it into the editor selection.
+		return this.openDiffForFile(folderManager, pullRequestModel, filePath, getPositionFromThread(comment));
 	}
 }
