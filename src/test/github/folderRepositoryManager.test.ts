@@ -12,12 +12,12 @@ import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { convertAzdoPullRequestToRawPullRequest } from '../../azdo/utils';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
+import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
 import { asReal } from '../mocks/stub';
-import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 
 describe('PullRequestManager', function () {
 	let sinon: SinonSandbox;

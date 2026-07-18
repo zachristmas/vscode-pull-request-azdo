@@ -4,10 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import { API, IGit, PostCommitCommandsProvider, Repository, ReviewerCommentsProvider, TitleAndDescriptionProvider } from './api';
 import { APIState, PublishEvent } from '../@types/git';
 import Logger from '../common/logger';
 import { TernarySearchTree } from '../common/utils';
-import { API, IGit, PostCommitCommandsProvider, Repository, ReviewerCommentsProvider, TitleAndDescriptionProvider } from './api';
 
 export const enum RefType {
 	Head,

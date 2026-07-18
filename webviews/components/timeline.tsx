@@ -6,9 +6,15 @@
 import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as React from 'react';
-// eslint-disable-next-line no-duplicate-imports
+ 
 import { useContext, useRef, useState } from 'react';
 
+import { CommentView, ReplyToThread } from './comment';
+import { chevronIcon, commitIcon, mergeIcon } from './icon';
+import { nbsp, Spaced } from './space';
+// eslint-disable-next-line import-x/no-named-as-default
+import Timestamp from './timestamp';
+import { AuthorLink, Avatar } from './user';
 import {
 	CommitEvent,
 	hasVisibleComments,
@@ -20,12 +26,6 @@ import {
 } from '../../src/common/timelineEvent';
 import { groupBy } from '../../src/common/utils';
 import PullRequestContext from '../common/context';
-import { CommentView, ReplyToThread } from './comment';
-import { chevronIcon, commitIcon, mergeIcon } from './icon';
-import { nbsp, Spaced } from './space';
-// eslint-disable-next-line import/no-named-as-default
-import Timestamp from './timestamp';
-import { AuthorLink, Avatar } from './user';
 // import { isUserThread } from '../../src/azdo/utils';
 
 export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestCommentThread[]; currentUser: Identity }) => (

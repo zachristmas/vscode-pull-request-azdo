@@ -5,10 +5,10 @@
 
 import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
-import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
-import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { CommitNode } from './commitNode';
 import { TreeNode, TreeNodeParent } from './treeNode';
+import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
+import { PullRequestModel } from '../../azdo/pullRequestModel';
 
 export class CommitsNode extends TreeNode implements vscode.TreeItem {
 	public label: string = 'Commits';

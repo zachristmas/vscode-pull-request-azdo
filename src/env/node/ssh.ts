@@ -50,6 +50,6 @@ function resolverFromConfigFile(configPath = join(homedir(), '.ssh', 'config')):
 		const config = readFileSync(configPath).toString();
 		return resolverFromConfig(config);
 	} catch (error) {
-		Logger.appendLine(`${configPath}: ${error.message}`);
+		Logger.appendLine(`${configPath}: ${error instanceof Error ? error.message : String(error)}`);
 	}
 }

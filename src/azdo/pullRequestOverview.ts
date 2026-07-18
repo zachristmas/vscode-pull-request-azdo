@@ -63,7 +63,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		pr: PullRequestModel,
 		workItem: AzdoWorkItem,
 		azdoUserManager: AzdoUserManager,
-		toTheSide: Boolean = false,
+		toTheSide: boolean = false,
 	) {
 		const activeColumn = toTheSide
 			? vscode.ViewColumn.Beside

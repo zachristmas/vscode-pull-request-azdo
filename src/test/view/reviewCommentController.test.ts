@@ -30,16 +30,16 @@ import { GitChangeType } from '../../common/file';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
 import { toReviewUri } from '../../common/uri';
+import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { PullRequestsTreeDataProvider } from '../../view/prsTreeDataProvider';
 import { ReviewCommentController } from '../../view/reviewCommentController';
 import { GitFileChangeNode, RemoteFileChangeNode } from '../../view/treeNodes/fileChangeNode';
-import { asReal } from '../mocks/stub';
 import { MockAzdoRepository } from '../mocks/mockAzdoRepository';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
-import { MockGitProvider } from '../../gitProviders/mockGitProvider';
+import { asReal } from '../mocks/stub';
 
 const protocol = new Protocol('https://github.com/github/test.git');
 const remote = new Remote('test', 'github/test', protocol);

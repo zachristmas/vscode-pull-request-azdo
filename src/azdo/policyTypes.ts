@@ -81,7 +81,7 @@ export type AnyPolicySettings =
 	| MinimumReviewersPolicySettings
 	| CommentRequirementsPolicySettings
 	| BuildValidationPolicySettings
-	| WorkItemLinkingPolicySettings
+	 
 	| RequiredReviewersPolicySettings
 	| MergeStrategyPolicySettings;
 

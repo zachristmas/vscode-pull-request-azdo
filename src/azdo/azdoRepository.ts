@@ -6,10 +6,6 @@ import {
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as vscode from 'vscode';
-import Logger from '../common/logger';
-import { parseRemote, Remote } from '../common/remote';
-import { ITelemetry } from '../common/telemetry';
-import { PRCommentControllerRegistry } from '../view/pullRequestCommentControllerRegistry';
 import { Azdo, CredentialStore } from './credentials';
 import { FileReviewedStatusService, FileViewedStatus } from './fileReviewedStatusService';
 import { IAccount, IGitHubRef } from './interface';
@@ -20,6 +16,10 @@ import {
 	convertAzdoPullRequestToRawPullRequest,
 	convertBranchRefToBranchName,
 } from './utils';
+import Logger from '../common/logger';
+import { parseRemote, Remote } from '../common/remote';
+import { ITelemetry } from '../common/telemetry';
+import { PRCommentControllerRegistry } from '../view/pullRequestCommentControllerRegistry';
 
 export const PULL_REQUEST_PAGE_SIZE = 20;
 
@@ -300,7 +300,7 @@ export class AzdoRepository implements vscode.Disposable {
 			return pullRequests;
 		} catch (e) {
 			Logger.appendLine(`Fetching pull requests for search: ${JSON.stringify(search)} failed: ${e}`, AzdoRepository.ID);
-			if (e.code === 404) {
+			if ((e as { code?: number }).code === 404) {
 				// TODO: not found
 				vscode.window.showWarningMessage(
 					`Fetching pull requests for remote '${this.remote.remoteName}' failed, please check if the url ${this.remote.url} is valid.`,

@@ -17,6 +17,7 @@ import { convertAzdoPullRequestToRawPullRequest } from '../../azdo/utils';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
 import { Resource } from '../../common/resources';
+import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { PullRequestsTreeDataProvider } from '../../view/prsTreeDataProvider';
 
 import { MockAzdoRepository } from '../mocks/mockAzdoRepository';
@@ -25,7 +26,6 @@ import { createFakeSecretStorage, MockExtensionContext } from '../mocks/mockExte
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
 import { asReal } from '../mocks/stub';
-import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 
 describe('GitHub Pull Requests view', function () {
 	let sinon: SinonSandbox;
@@ -236,14 +236,14 @@ describe('GitHub Pull Requests view', function () {
 			assert.strictEqual(localItem0.description, '#1111 by me');
 			assert.strictEqual(localItem0.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
 			assert.strictEqual(localItem0.contextValue, 'pullrequest:local:nonactive');
-			assert.deepEqual(localItem0.iconPath!.toString(), 'https://avatars.com/me.jpg');
+			assert.deepEqual((localItem0.iconPath as vscode.Uri).toString(), 'https://avatars.com/me.jpg');
 
 			assert.strictEqual(localItem1.label, '✓ #2222: one');
 			assert.strictEqual(localItem1.tooltip, 'Current Branch * one by you');
 			assert.strictEqual(localItem1.description, '#2222 by you');
 			assert.strictEqual(localItem1.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
 			assert.strictEqual(localItem1.contextValue, 'pullrequest:local:active');
-			assert.deepEqual(localItem1.iconPath!.toString(), 'https://avatars.com/you.jpg');
+			assert.deepEqual((localItem1.iconPath as vscode.Uri).toString(), 'https://avatars.com/you.jpg');
 		});
 	});
 });

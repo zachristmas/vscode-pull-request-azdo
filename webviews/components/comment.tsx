@@ -10,17 +10,17 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { prism, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import gfm from 'remark-gfm';
 
+import { Dropdown } from './dropdown';
+import { commentIcon, editIcon } from './icon';
+import { nbsp, Spaced } from './space';
+import Timestamp from './timestamp';
+import { AuthorLink, Avatar } from './user';
 import { PullRequestVote } from '../../src/azdo/interface';
 import { PullRequest, ReviewType } from '../common/cache';
 import PullRequestContext from '../common/context';
 import emitter from '../common/events';
 import { useStateProp } from '../common/hooks';
-import { Dropdown } from './dropdown';
-import { commentIcon, editIcon } from './icon';
-import { nbsp, Spaced } from './space';
-// eslint-disable-next-line import/no-named-as-default
-import Timestamp from './timestamp';
-import { AuthorLink, Avatar } from './user';
+// eslint-disable-next-line import-x/no-named-as-default
 
 const { useCallback, useContext, useEffect, useRef, useState } = React;
 export type Props = Partial<Comment> & {

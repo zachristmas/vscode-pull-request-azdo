@@ -4,14 +4,14 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import { PRNode } from './pullRequestNode';
+import { TreeNode, TreeNodeParent } from './treeNode';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { PRType } from '../../azdo/interface';
 import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { AuthenticationError } from '../../common/authentication';
 import { ITelemetry } from '../../common/telemetry';
 import { formatError } from '../../common/utils';
-import { PRNode } from './pullRequestNode';
-import { TreeNode, TreeNodeParent } from './treeNode';
 
 export enum PRCategoryActionType {
 	Empty,

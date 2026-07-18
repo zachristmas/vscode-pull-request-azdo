@@ -20,12 +20,6 @@ import {
 	PolicyEvaluationStatus,
 } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as vscode from 'vscode';
-import { Repository } from '../api/api';
-import { GitApiImpl } from '../api/api1';
-import { DiffSide, Reaction } from '../common/comment';
-import { DiffChangeType, DiffHunk, DiffLine, getGitChangeTypeFromVersionControlChangeType } from '../common/diffHunk';
-import { Resource } from '../common/resources';
-import { ThreadData } from '../view/treeNodes/pullRequestNode';
 import { AzdoRepository } from './azdoRepository';
 import {
 	IAccount,
@@ -51,6 +45,12 @@ import {
 	WellKnownPolicyTypeIds,
 } from './policyTypes';
 import { GHPRComment, GHPRCommentThread } from './prComment';
+import { Repository } from '../api/api';
+import { GitApiImpl } from '../api/api1';
+import { DiffSide, Reaction } from '../common/comment';
+import { DiffChangeType, DiffHunk, DiffLine, getGitChangeTypeFromVersionControlChangeType } from '../common/diffHunk';
+import { Resource } from '../common/resources';
+import { ThreadData } from '../view/treeNodes/pullRequestNode';
 
 export interface CommentReactionHandler {
 	toggleReaction(comment: vscode.Comment, reaction: vscode.CommentReaction): Promise<void>;
@@ -316,7 +316,7 @@ export async function readableToString(readable?: NodeJS.ReadableStream): Promis
 	}
 	let result = '';
 	for await (const chunk of readable) {
-		result += chunk;
+		result += String(chunk);
 	}
 	return result;
 }
@@ -427,11 +427,11 @@ export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 }
 
 export function isUserThread(thread: GitPullRequestCommentThread): boolean {
-	return thread.comments?.find(c => c.id === 1)?.commentType === CommentType.Text ?? true;
+	return thread.comments?.find(c => c.id === 1)?.commentType === CommentType.Text;
 }
 
 export function isSystemThread(thread: GitPullRequestCommentThread): boolean {
-	return thread.comments?.find(c => c.id === 1)?.commentType !== CommentType.Text ?? false;
+	return thread.comments?.find(c => c.id === 1)?.commentType !== CommentType.Text;
 }
 
 export function getRelatedUsersFromPullrequest(

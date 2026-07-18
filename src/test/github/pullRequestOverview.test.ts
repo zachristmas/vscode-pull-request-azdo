@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 
 import { GitApiImpl } from '../../api/api1';
 import { CredentialStore } from '../../azdo/credentials';
+import { FileReviewedStatusService } from '../../azdo/fileReviewedStatusService';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { PullRequestOverviewPanel } from '../../azdo/pullRequestOverview';
@@ -15,14 +16,13 @@ import { convertAzdoPullRequestToRawPullRequest } from '../../azdo/utils';
 import { AzdoWorkItem } from '../../azdo/workItem';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
-import { asReal } from '../mocks/stub';
+import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { MockAzdoRepository } from '../mocks/mockAzdoRepository';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage, MockExtensionContext } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
-import { FileReviewedStatusService } from '../../azdo/fileReviewedStatusService';
-import { MockGitProvider } from '../../gitProviders/mockGitProvider';
+import { asReal } from '../mocks/stub';
 
 const EXTENSION_PATH = path.resolve(__dirname, '../../..');
 

@@ -3,14 +3,14 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import * as React from 'react';
-// eslint-disable-next-line no-duplicate-imports
+ 
 import { useContext } from 'react';
-import { PullRequestVote, ReviewState } from '../../src/azdo/interface';
-import PullRequestContext from '../common/context';
 import { approveIcon, approveSuggestionIcon, deleteIcon, noVoteIcon, rejectedIcon, waitingForAuthorIcon } from './icon';
 import { VoteText } from './sidebar';
 import { nbsp } from './space';
 import { AuthorLink, Avatar } from './user';
+import { PullRequestVote, ReviewState } from '../../src/azdo/interface';
+import PullRequestContext from '../common/context';
 
 export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 	const { reviewer, state, isRequired, canDelete } = reviewState;

@@ -6,15 +6,15 @@
 import { PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as React from 'react';
-// eslint-disable-next-line no-duplicate-imports
+ 
 import { useContext, useEffect, useRef, useState } from 'react';
-import { ReviewState } from '../../src/azdo/interface';
-import { PullRequest } from '../common/cache';
-import PullRequestContext from '../common/context';
 import { getClosedCommentDescription } from './header';
 import { checkIcon, deleteIcon, plusIcon } from './icon';
 import { REVIEW_STATE_ICON, Reviewer, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
+import { ReviewState } from '../../src/azdo/interface';
+import { PullRequest } from '../common/cache';
+import PullRequestContext from '../common/context';
 
 export default function Sidebar({ reviewers, workItems, hasWritePermission, isActive }: PullRequest & { isActive: boolean }) {
 	const { addRequiredReviewers, addOptionalReviewers, associateWorkItem, pr } = useContext(PullRequestContext);

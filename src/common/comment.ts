@@ -5,8 +5,8 @@
 
 import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
-import { IAccount } from '../azdo/interface';
 import { DiffHunk } from './diffHunk';
+import { IAccount } from '../azdo/interface';
 
 export interface Reaction {
 	label: string;

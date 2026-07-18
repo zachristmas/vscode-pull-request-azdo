@@ -7,6 +7,7 @@ import { IGit } from '../api/api';
 import Logger from '../common/logger';
 import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
+import { errorMessage } from '../common/utils';
 import { EXTENSION_ID, SETTINGS_NAMESPACE } from '../constants';
 import { initAvatarCache } from './avatarCache';
 import { parseAzdoRemoteUrl } from './remoteUrlParser';
@@ -165,7 +166,7 @@ export class CredentialStore implements vscode.Disposable {
 			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
 			if ([...new Set(inferredConfigs.map(a => a.orgUrl))].length !== 1) {
 				Logger.appendLine(
-					`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${inferredConfigs}`,
+					`Unable to infer org config from git. Repository Length: ${this._gitAPI.repositories.length}. Inferred Configs: ${JSON.stringify(inferredConfigs)}`,
 					CredentialStore.ID,
 				);
 				return undefined;
@@ -258,12 +259,12 @@ export class CredentialStore implements vscode.Disposable {
 
 				return azdo;
 			} catch (e) {
-				Logger.appendLine(`Auth> Failed: ${e.message}`, CredentialStore.ID);
+				Logger.appendLine(`Auth> Failed: ${errorMessage(e)}`, CredentialStore.ID);
 				this._telemetry.sendTelemetryEvent('auth.failed');
 				if (e instanceof Error && e.stack) {
 					Logger.appendLine(e.stack);
 				}
-				if (e.message === 'User canceled authentication') {
+				if (errorMessage(e) === 'User canceled authentication') {
 					return undefined;
 				}
 			}

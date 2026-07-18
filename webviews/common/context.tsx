@@ -9,10 +9,10 @@ import {
 	GitPullRequestMergeStrategy,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { createContext } from 'react';
-import { MergeMethod } from '../../src/azdo/interface';
-import { ReviewEvent } from '../../src/common/timelineEvent';
 import { getState, PullRequest, setState, updateState } from './cache';
 import { getMessageHandler, MessageHandler } from './message';
+import { MergeMethod } from '../../src/azdo/interface';
+import { ReviewEvent } from '../../src/common/timelineEvent';
 
 export class PRContext {
 	constructor(

@@ -21,7 +21,7 @@ type Mutable<T> = {
 
 export class MockRepository implements Repository {
 	commit(message: string, opts?: CommitOptions): Promise<void> {
-		return Promise.reject(new Error(`Unexpected commit(${message}, ${opts})`));
+		return Promise.reject(new Error(`Unexpected commit(${message}, ${JSON.stringify(opts)})`));
 	}
 	renameRemote(name: string, newName: string): Promise<void> {
 		return Promise.reject(new Error(`Unexpected renameRemote (${name}, ${newName})`));
@@ -109,11 +109,11 @@ export class MockRepository implements Repository {
 		return Promise.reject(new Error(`Unexpected getCommit(${ref})`));
 	}
 
-	apply(patch: string, reverse?: boolean | undefined): Promise<void> {
+	apply(patch: string, reverse?: boolean  ): Promise<void> {
 		return Promise.reject(new Error(`Unexpected apply(..., ${reverse})`));
 	}
 
-	diff(cached?: boolean | undefined): Promise<string> {
+	diff(cached?: boolean  ): Promise<string> {
 		return Promise.reject(new Error(`Unexpected diff(${cached})`));
 	}
 
@@ -137,7 +137,7 @@ export class MockRepository implements Repository {
 		return Promise.reject(new Error('Unexpected hashObject(...)'));
 	}
 
-	async createBranch(name: string, checkout: boolean, ref?: string | undefined): Promise<void> {
+	async createBranch(name: string, checkout: boolean, ref?: string  ): Promise<void> {
 		if (this._branches.some(b => b.name === name)) {
 			throw new Error(`A branch named ${name} already exists`);
 		}
@@ -156,7 +156,7 @@ export class MockRepository implements Repository {
 		this._branches.push(branch);
 	}
 
-	async deleteBranch(name: string, force?: boolean | undefined): Promise<void> {
+	async deleteBranch(name: string, force?: boolean  ): Promise<void> {
 		const index = this._branches.findIndex(b => b.name === name);
 		if (index === -1) {
 			throw new Error(`Attempt to delete nonexistent branch ${name}`);
@@ -266,7 +266,7 @@ export class MockRepository implements Repository {
 		this._expectedFetches.splice(index, 1);
 	}
 
-	async pull(unshallow?: boolean | undefined): Promise<void> {
+	async pull(unshallow?: boolean  ): Promise<void> {
 		const index = this._expectedPulls.findIndex(f => f.unshallow === unshallow);
 		if (index === -1) {
 			throw new Error(`Unexpected pull(${unshallow})`);
@@ -275,9 +275,9 @@ export class MockRepository implements Repository {
 	}
 
 	async push(
-		remoteName?: string | undefined,
-		branchName?: string | undefined,
-		setUpstream?: boolean | undefined,
+		remoteName?: string  ,
+		branchName?: string  ,
+		setUpstream?: boolean  ,
 	): Promise<void> {
 		const index = this._expectedPushes.findIndex(
 			f => f.remoteName === remoteName && f.branchName === branchName && f.setUpstream === setUpstream,

@@ -9,8 +9,9 @@ import { mockWebviewEnvironment } from './mocks/mockWebviewEnvironment';
 // Since we are not running in a tty environment, we just implement the method statically.
 // This is copied verbatim from the upstream, default Mocha test runner:
 // https://github.com/microsoft/vscode-extension-vscode/blob/master/lib/testrunner.ts
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const tty = require('tty') as any;
+
 if (!tty.getWindowSize) {
 	tty.getWindowSize = function () {
 		return [80, 75];
@@ -69,7 +70,7 @@ async function runAllExtensionTests(testsRoot: string): Promise<number> {
 }
 
 export function run(testsRoot: string, clb: (error: Error | null, failures?: number) => void): void {
-	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	 
 	require('source-map-support').install();
 
 	runAllExtensionTests(testsRoot).then(

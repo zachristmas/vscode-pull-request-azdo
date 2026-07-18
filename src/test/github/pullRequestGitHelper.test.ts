@@ -11,12 +11,12 @@ import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { convertAzdoPullRequestToRawPullRequest } from '../../azdo/utils';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
+import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { MockAzdoRepository } from '../mocks/mockAzdoRepository';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
-import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 
 describe('PullRequestGitHelper', function () {
 	let sinon: SinonSandbox;
@@ -83,9 +83,9 @@ describe('PullRequestGitHelper', function () {
 
 			const pullRequest = new PullRequestModel(telemetry, azdoRepository, remote, prItem);
 
-			if (pullRequest.isResolved() === false) {
-				assert(pullRequest.isResolved(), 'pull request head not resolved successfully');
-				return;
+			const resolved = pullRequest.isResolved();
+			if (!resolved) {
+				assert.fail('pull request head not resolved successfully');
 			}
 
 			await PullRequestGitHelper.checkoutFromFork(repository, pullRequest, undefined);

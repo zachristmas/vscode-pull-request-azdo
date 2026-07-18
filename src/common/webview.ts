@@ -4,8 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { resolveAvatarsDeep } from '../azdo/avatarCache';
 import { formatError } from './utils';
+import { resolveAvatarsDeep } from '../azdo/avatarCache';
 
 export interface IRequestMessage<T> {
 	req: string;

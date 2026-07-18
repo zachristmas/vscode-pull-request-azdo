@@ -1,8 +1,11 @@
+/// <reference types="webpack-env" />
 // This file is providing the test runner to use when running extension tests.
 import * as vscode from 'vscode';
+
 require('mocha/mocha');
-import { mockWebviewEnvironment } from '../mocks/mockWebviewEnvironment';
+
 import { EXTENSION_ID } from '../../constants';
+import { mockWebviewEnvironment } from '../mocks/mockWebviewEnvironment';
 
 async function runAllExtensionTests(testsRoot: string, clb: (error: Error | null, failures?: number) => void): Promise<any> {
 	// Ensure the dev-mode extension is activated

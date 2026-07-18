@@ -1189,7 +1189,7 @@ export class PullRequestModel implements IPullRequestModel {
 	}
 
 	public async createPatch(repository: Repository, fileChange: InMemFileChange | SlimFileChange): Promise<string> {
-		let patch = '';
+		let patch: string;
 		try {
 			patch = await repository.diffBetween(
 				fileChange.baseCommit,
