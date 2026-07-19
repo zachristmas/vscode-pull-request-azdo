@@ -6,19 +6,9 @@ import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
 import tseslint from 'typescript-eslint';
 
-// Shadow mode (see repo convention): new rule sets enter as warnings only; individual rules get
-// promoted to 'error' on evidence, not on a date.
-function downgradeToWarn(rules) {
-	return Object.fromEntries(
-		Object.entries(rules).map(([id, conf]) => {
-			if (Array.isArray(conf)) {
-				return [id, conf[0] === 'off' ? conf : ['warn', ...conf.slice(1)]];
-			}
-			return [id, conf === 'off' ? 'off' : 'warn'];
-		}),
-	);
-}
-
+// Shadow mode is over: the 2026-07 lint burndown drove every sonarjs/unicorn recommended rule
+// to zero, so both sets now run at their natural (error) severity. New rule sets still enter
+// warn-first (see react-hooks below); individual rules get promoted on evidence, not on a date.
 // Flat-config port of the old .eslintrc.base.json (ESLint 7 / typescript-eslint 4 era).
 // Rule intent preserved 1:1, including the deliberate offs; import/* rules moved to
 // eslint-plugin-import-x (eslint-plugin-import has no ESLint 10 support).
@@ -187,68 +177,20 @@ export default tseslint.config(
 		},
 	},
 	{
-		name: 'sonarjs-shadow',
+		name: 'sonarjs',
 		plugins: { sonarjs },
 		rules: {
-			...downgradeToWarn(sonarjs.configs.recommended.rules),
+			...sonarjs.configs.recommended.rules,
 			'sonarjs/cognitive-complexity': ['error', 15],
 			// A legacy codebase self-reports its TODOs; the tag rule adds no signal here.
 			'sonarjs/todo-tag': 'off',
-			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
-			'sonarjs/assertions-in-tests': 'error',
-			'sonarjs/constructor-for-side-effects': 'error',
-			'sonarjs/deprecation': 'error',
-			'sonarjs/different-types-comparison': 'error',
-			'sonarjs/no-async-constructor': 'error',
-			'sonarjs/prefer-regexp-exec': 'error',
-			'sonarjs/super-linear-regex': 'error',
-			'sonarjs/max-switch-cases': 'error',
-			'sonarjs/no-empty-test-file': 'error',
-			'sonarjs/no-empty-test-title': 'error',
-			'sonarjs/no-identical-functions': 'error',
-			'sonarjs/no-invariant-returns': 'error',
-			'sonarjs/no-nested-assignment': 'error',
-			'sonarjs/no-nested-template-literals': 'error',
-			'sonarjs/no-selector-parameter': 'error',
-			'sonarjs/no-small-switch': 'error',
-			'sonarjs/no-try-promise': 'error',
-			'sonarjs/no-undefined-argument': 'error',
-			'sonarjs/no-unused-collection': 'error',
-			'sonarjs/prefer-read-only-props': 'error',
-			'sonarjs/pseudo-random': 'error',
-			'sonarjs/use-type-alias': 'error',
-			'sonarjs/no-ignored-exceptions': 'error',
-			'sonarjs/no-misleading-array-reverse': 'error',
-			'sonarjs/no-nested-conditional': 'error',
-			'sonarjs/no-redundant-jump': 'error',
-			'sonarjs/no-redundant-optional': 'error',
-			'sonarjs/public-static-readonly': 'error',
-			'sonarjs/prefer-single-boolean-return': 'error',
-			'sonarjs/unused-import': 'error',
 		},
 	},
 	{
-		name: 'unicorn-shadow',
+		name: 'unicorn',
 		plugins: { unicorn },
 		rules: {
-			...downgradeToWarn(unicorn.configs.recommended.rules),
-			// Name-based match hits vscode.EventEmitter (the required platform event API) and
-			// the webviews npm events shim; converting either to EventTarget is wrong here.
-			'unicorn/prefer-event-target': 'off',
-			// Demands ES2025 Iterator#toArray(): no types in the es2022 lib and no runtime
-			// support on the Node 20 extension host. The flagged [...map.values()] spreads
-			// are the correct idiom for this target.
-			'unicorn/prefer-iterator-to-array': 'off',
-			// This is a CJS extension host; module strategy changes with the TS 7 /
-			// moduleResolution rework, not here. (The redundant 'use strict' directives the
-			// rule flagged were deleted anyway - tsc alwaysStrict emits its own.)
-			'unicorn/prefer-module': 'off',
-			// The extension:webworker bundle resolves node builtins through resolve.fallback
-			// keys in webpack.config.js that are keyed WITHOUT the node: scheme, and
-			// @types/node@12 has no node:* module declarations. The node: prefix breaks both.
-			// The sole webviews hit (common/events.ts) imports the npm `events` shim, not the
-			// builtin, so the rule is off globally. Revisit with the TS 7 / moduleResolution rework.
-			'unicorn/prefer-node-protocol': 'off',
+			...unicorn.configs.recommended.rules,
 			// Churn-heavy stylistic rules that would bury the useful signal in this codebase
 			// (top offenders measured at 2283 warnings on first run; these are style-only):
 			'unicorn/prevent-abbreviations': 'off',
@@ -265,92 +207,23 @@ export default tseslint.config(
 			'unicorn/explicit-length-check': 'off',
 			'unicorn/no-negated-condition': 'off',
 			'unicorn/no-useless-else': 'off',
-			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).
-			'unicorn/better-dom-traversing': 'error',
-			'unicorn/class-reference-in-static-methods': 'error',
-			'unicorn/consistent-assert': 'error',
-			'unicorn/consistent-compound-words': 'error',
-			'unicorn/consistent-function-scoping': 'error',
-			'unicorn/error-message': 'error',
-			'unicorn/max-nested-calls': 'error',
-			'unicorn/no-array-callback-reference': 'error',
-			'unicorn/no-array-reduce': 'error',
-			'unicorn/no-array-sort': 'error',
-			'unicorn/no-break-in-nested-loop': 'error',
-			'unicorn/no-computed-property-existence-check': 'error',
-			'unicorn/no-declarations-before-early-exit': 'error',
-			'unicorn/no-multiple-promise-resolver-calls': 'error',
-			'unicorn/no-this-outside-of-class': 'error',
-			'unicorn/no-top-level-side-effects': 'error',
-			'unicorn/prefer-add-event-listener': 'error',
-			'unicorn/prefer-iterator-helpers': 'error',
-			'unicorn/prefer-ternary': 'error',
-			'unicorn/prefer-then-catch': 'error',
-			'unicorn/no-empty-file': 'error',
-			'unicorn/no-immediate-mutation': 'error',
-			'unicorn/no-non-function-verb-prefix': 'error',
-			'unicorn/no-object-as-default-parameter': 'error',
-			'unicorn/no-return-array-push': 'error',
-			'unicorn/no-top-level-assignment-in-function': 'error',
-			'unicorn/no-unnecessary-polyfills': 'error',
-			'unicorn/no-unnecessary-splice': 'error',
-			'unicorn/no-useless-switch-case': 'error',
-			'unicorn/prefer-hoisting-branch-code': 'error',
-			'unicorn/prefer-keyboard-event-key': 'error',
-			'unicorn/prefer-object-iterable-methods': 'error',
-			'unicorn/prefer-simple-sort-comparator': 'error',
-			'unicorn/prefer-smaller-scope': 'error',
-			'unicorn/prefer-top-level-await': 'error',
-			'unicorn/import-style': 'error',
-			'unicorn/logical-assignment-operators': 'error',
-			'unicorn/no-await-expression-member': 'error',
-			'unicorn/no-confusing-array-splice': 'error',
-			'unicorn/no-unreadable-for-of-expression': 'error',
-			'unicorn/operator-assignment': 'error',
-			'unicorn/prefer-array-find': 'error',
-			'unicorn/prefer-array-from-map': 'error',
-			'unicorn/prefer-array-some': 'error',
-			'unicorn/prefer-at': 'error',
-			'unicorn/prefer-code-point': 'error',
-			'unicorn/prefer-else-if': 'error',
-			'unicorn/prefer-includes-over-repeated-comparisons': 'error',
-			'unicorn/prefer-logical-operator-over-ternary': 'error',
-			'unicorn/prefer-minimal-ternary': 'error',
-			'unicorn/prefer-number-is-safe-integer': 'error',
-			'unicorn/prefer-query-selector': 'error',
-			'unicorn/prefer-simple-condition-first': 'error',
-			'unicorn/prefer-spread': 'error',
-			'unicorn/prefer-string-slice': 'error',
-			'unicorn/no-static-only-class': 'error',
-			'unicorn/no-useless-template-literals': 'error',
-			'unicorn/consistent-existence-index-check': 'error',
-			'unicorn/no-for-loop': 'error',
-			'unicorn/no-lonely-if': 'error',
-			'unicorn/no-negated-array-predicate': 'error',
-			'unicorn/no-unnecessary-boolean-comparison': 'error',
-			'unicorn/no-unnecessary-slice-end': 'error',
-			'unicorn/no-useless-coercion': 'error',
-			'unicorn/no-useless-logical-operand': 'error',
-			'unicorn/no-useless-promise-resolve-reject': 'error',
-			'unicorn/no-useless-spread': 'error',
-			'unicorn/no-useless-undefined': 'error',
-			'unicorn/numeric-separators-style': 'error',
-			'unicorn/prefer-boolean-return': 'error',
-			'unicorn/prefer-class-fields': 'error',
-			'unicorn/prefer-continue': 'error',
-			'unicorn/prefer-date-now': 'error',
-			'unicorn/prefer-early-return': 'error',
-			'unicorn/prefer-global-this': 'error',
-			'unicorn/prefer-includes': 'error',
-			'unicorn/prefer-optional-catch-binding': 'error',
-			'unicorn/prefer-private-class-fields': 'error',
-			'unicorn/prefer-set-has': 'error',
-			'unicorn/prefer-set-size': 'error',
-			'unicorn/prefer-string-raw': 'error',
-			'unicorn/prefer-string-replace-all': 'error',
-			'unicorn/prefer-switch': 'error',
-			'unicorn/prefer-type-error': 'error',
-			'unicorn/prefer-type-literal-last': 'error',
+			// Name-based match hits vscode.EventEmitter (the required platform event API) and
+			// the webviews npm events shim; converting either to EventTarget is wrong here.
+			'unicorn/prefer-event-target': 'off',
+			// Demands ES2025 Iterator#toArray(): no types in the es2023 lib and no runtime
+			// support on the Node 20 extension host. The flagged [...map.values()] spreads
+			// are the correct idiom for this target.
+			'unicorn/prefer-iterator-to-array': 'off',
+			// This is a CJS extension host; module strategy changes with the TS 7 /
+			// moduleResolution rework, not here. (The redundant 'use strict' directives the
+			// rule flagged were deleted anyway - tsc alwaysStrict emits its own.)
+			'unicorn/prefer-module': 'off',
+			// The extension:webworker bundle resolves node builtins through resolve.fallback
+			// keys in webpack.config.js that are keyed WITHOUT the node: scheme, and
+			// @types/node@12 has no node:* module declarations. The node: prefix breaks both.
+			// The sole webviews hit (common/events.ts) imports the npm events shim, not the
+			// builtin, so the rule is off globally. Revisit with the TS 7 / moduleResolution rework.
+			'unicorn/prefer-node-protocol': 'off',
 		},
 	},
 	{
