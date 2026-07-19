@@ -53,7 +53,7 @@ import {
 	PullRequestVote,
 } from './interface';
 import { BuildPolicyEvaluationContext } from './policyTypes';
-import { setCurrentUserId } from './prComment';
+import { setCurrentUserId, setMentionNames } from './prComment';
 import {
 	convertAzdoPullRequestToRawPullRequest,
 	convertBranchRefToBranchName,
@@ -513,6 +513,20 @@ export class PullRequestModel implements IPullRequestModel {
 		const allThreads = await git?.getThreads(repoId, this.getPullRequestId(), undefined, iteration, baseIteration);
 		const threads = allThreads?.filter(t => !t.isDeleted);
 		await resolveAvatarsDeep(threads);
+
+		// Assemble the id -> display-name map used to resolve @<guid> mention tokens in native comment
+		// bodies, from everyone we know on this PR: author, reviewers, and every comment author.
+		const mentionNames = new Map<string, string>();
+		const addName = (id?: string, name?: string) => {
+			if (id && name) {
+				mentionNames.set(id.toLowerCase(), name);
+			}
+		};
+		addName(this.item.createdBy?.id, this.item.createdBy?.displayName);
+		this.item.reviewers?.forEach(r => addName(r.id, r.displayName));
+		threads?.forEach(t => t.comments?.forEach(c => addName(c.author?.id, c.author?.displayName)));
+		setMentionNames(mentionNames);
+
 		return threads;
 	}
 

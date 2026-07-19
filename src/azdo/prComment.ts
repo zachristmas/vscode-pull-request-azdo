@@ -7,6 +7,7 @@ import { Comment, GitPullRequestCommentThread } from 'azure-devops-node-api/inte
 import * as vscode from 'vscode';
 import { getAvatarIconUri } from './avatarCache';
 import { CommentPermissions, IAccount } from './interface';
+import { resolveMentions } from '../common/mentions';
 import { Resource } from '../common/resources';
 
 // The current user's identity id, used to compute whether the viewer has liked a comment. Set once
@@ -17,6 +18,14 @@ import { Resource } from '../common/resources';
 const likeState: { currentUserId: string | undefined } = { currentUserId: undefined };
 export function setCurrentUserId(id: string | undefined): void {
 	likeState.currentUserId = id;
+}
+
+// id (lower-cased) -> display name, used to resolve @<guid> mention tokens in the native comment body.
+// Populated from PR participants when threads load (see PullRequestModel). Held on a const object so it
+// can be updated without reassigning a top-level binding.
+const mentionState: { names: Map<string, string> } = { names: new Map() };
+export function setMentionNames(names: Map<string, string>): void {
+	mentionState.names = names;
 }
 
 // Azure DevOps exposes a single Like per comment (Comment.usersLiked: IdentityRef[]), NOT GitHub-style
@@ -221,7 +230,9 @@ export class GHPRComment implements vscode.Comment {
 	constructor(comment: Comment, commentPermission: CommentPermissions, parent: GHPRCommentThread) {
 		this._rawComment = comment;
 		this.commentId = comment.id!.toString();
-		this.body = new vscode.MarkdownString(comment.content);
+		// Resolve ADO @<guid> mention tokens to @Display Name so the raw id never shows in the native
+		// comment UI (the same resolution the webview does).
+		this.body = new vscode.MarkdownString(resolveMentions(comment.content, mentionState.names));
 		this.body.isTrusted = true;
 		this.author = {
 			name: comment.author!.displayName!,

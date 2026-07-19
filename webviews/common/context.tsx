@@ -10,6 +10,7 @@ import {
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { createContext } from 'react';
 import { getState, PullRequest, setState, updateState } from './cache';
+import { applyMentionTokens } from './mentions';
 import { getMessageHandler, MessageHandler } from './message';
 import { MergeMethod } from '../../src/azdo/interface';
 import { ReviewEvent } from '../../src/common/timelineEvent';
@@ -28,7 +29,11 @@ export class PRContext {
 	public setTitle = (title: string) => this.postMessage({ command: 'pr.edit-title', args: { text: title } });
 
 	public setDescription = (description: string) =>
-		this.postMessage({ command: 'pr.edit-description', args: { text: description } });
+		this.postMessage({ command: 'pr.edit-description', args: { text: applyMentionTokens(description) } });
+
+	// Resolve @mention picker queries to ADO identities (host-backed). Shape matches MentionIdentity.
+	public searchIdentities = (query: string): Promise<{ id: string; displayName: string; uniqueName?: string }[]> =>
+		this.postMessage({ command: 'pr.search-identities', args: { query } });
 
 	public checkout = () => this.postMessage({ command: 'pr.checkout' });
 
@@ -66,7 +71,10 @@ export class PRContext {
 	public convertToDraft = () => this.postMessage({ command: 'azdopr.convertToDraft' });
 
 	public replyThread = async (body: string, thread: GitPullRequestCommentThread) => {
-		const result = await this.postMessage({ command: 'pr.reply-thread', args: { text: body, threadId: thread.id } });
+		const result = await this.postMessage({
+			command: 'pr.reply-thread',
+			args: { text: applyMentionTokens(body), threadId: thread.id },
+		});
 		thread.comments?.push(result.comment);
 		this.updatePR({
 			threads: [...(this.pr.threads ?? []).filter(t => t.id !== thread.id), thread],
@@ -74,7 +82,7 @@ export class PRContext {
 	};
 
 	public comment = async (args: string) => {
-		const result = await this.postMessage({ command: 'pr.comment', args });
+		const result = await this.postMessage({ command: 'pr.comment', args: applyMentionTokens(args) });
 		const thread = result.thread;
 		this.updatePR({
 			threads: [...(this.pr.threads ?? []), thread],
@@ -128,7 +136,7 @@ export class PRContext {
 	};
 
 	public editComment = (args: { comment: Comment; threadId: number; text: string }) =>
-		this.postMessage({ command: 'pr.edit-comment', args });
+		this.postMessage({ command: 'pr.edit-comment', args: { ...args, text: applyMentionTokens(args.text) } });
 
 	public updateDraft = (id: number, body: string) => {
 		const pullRequest = getState();
@@ -146,7 +154,8 @@ export class PRContext {
 	public votePullRequest = async (body: number) =>
 		this.appendReview(await this.postMessage({ command: 'pr.vote', args: body }));
 
-	public submit = async (body: string) => this.appendReview(await this.postMessage({ command: 'pr.submit', args: body }));
+	public submit = async (body: string) =>
+		this.appendReview(await this.postMessage({ command: 'pr.submit', args: applyMentionTokens(body) }));
 
 	public close = async (body?: string) => {
 		try {

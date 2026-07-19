@@ -266,3 +266,49 @@ body img.avatar {
 ::-webkit-scrollbar-corner {
 	display: none;
 }
+
+/** @mention people-picker (MentionTextarea) */
+
+.mention-textarea-wrap {
+	position: relative;
+	display: block;
+}
+
+.mention-suggestions {
+	position: absolute;
+	z-index: 100;
+	left: 0;
+	right: 0;
+	margin: 2px 0 0;
+	padding: 4px 0;
+	list-style: none;
+	max-height: 200px;
+	overflow-y: auto;
+	background: var(--vscode-editorSuggestWidget-background, var(--vscode-editor-background));
+	border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-panel-border));
+	border-radius: 3px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+}
+
+.mention-suggestion {
+	display: flex;
+	gap: 8px;
+	align-items: baseline;
+	padding: 3px 10px;
+	cursor: pointer;
+	color: var(--vscode-editorSuggestWidget-foreground, var(--vscode-foreground));
+}
+
+.mention-suggestion.selected {
+	background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+	color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-list-activeSelectionForeground));
+}
+
+.mention-suggestion-name {
+	font-weight: 600;
+}
+
+.mention-suggestion-detail {
+	color: var(--vscode-descriptionForeground);
+	font-size: 0.9em;
+}
