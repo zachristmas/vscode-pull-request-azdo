@@ -45,10 +45,15 @@ jobs:
           name: vsix
           path: '*.vsix'
 
-      # Shadow mode: the suite was repaired in v1.5.2 but has never run in CI on this fork.
-      # Non-blocking until it proves stable; flip to required on evidence, not on a date.
+      # Shadow mode: the suite was repaired in v1.5.2 but had never actually run in CI - it crash-exited
+      # on load (utils.ts/diffHunk.ts circular-import init, fixed alongside this) so the step passed in
+      # seconds without running a single test. With the crash gone the suite now runs, but the
+      # auth-dependent suites hang headless in beforeEach when no working ADO auth is available (real
+      # login()/connect()), so bound the non-blocking step to keep runs from approaching the 6h job cap.
+      # Flip to required on evidence (auth-layer mocked so the suite is green), not on a date.
       - name: Run tests (non-blocking)
         continue-on-error: true
+        timeout-minutes: 12
         run: xvfb-run -a pnpm run test
         env:
           TEST_JUNIT_XML_PATH: ${{ github.workspace }}/test-results.xml

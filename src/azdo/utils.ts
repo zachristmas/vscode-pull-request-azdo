@@ -571,10 +571,20 @@ export function getDiffSide(thread: GitPullRequestCommentThread): DiffSide | und
 	return undefined;
 }
 
-const DIFF_CHANGE_SIGN: { [type: number]: string } = {
-	[DiffChangeType.Add]: '+',
-	[DiffChangeType.Delete]: '-',
-};
+// Kept as a function rather than a module-level object keyed by DiffChangeType so it never reads the
+// enum during module initialization. utils.ts and diffHunk.ts import each other; a top-level enum read
+// crashes when diffHunk loads first, because its `import '../azdo/utils'` runs before its own enum is
+// defined. Evaluating the enum only at call time sidesteps that load-order trap.
+function diffChangeSign(type: DiffChangeType): string {
+	switch (type) {
+		case DiffChangeType.Add:
+			return '+';
+		case DiffChangeType.Delete:
+			return '-';
+		default:
+			return ' ';
+	}
+}
 
 // Line numbers (on the given side) that the file's diff blocks mark as `changedType`. Used to
 // classify each excerpt line as changed vs unchanged context.
@@ -650,7 +660,7 @@ export async function getThreadDiffHunkExcerpt(
 	const excerpt = new DiffHunk(start, anchorLine - start + 1, start, anchorLine - start + 1, 0);
 	for (let ln = start; ln <= anchorLine; ln++) {
 		const type = changedLines.has(ln) ? changedType : DiffChangeType.Context;
-		const sign = DIFF_CHANGE_SIGN[type] ?? ' ';
+		const sign = diffChangeSign(type);
 		// Only the shown side's line-number column is populated; the other stays blank (-1), the
 		// same convention the Hunk renderer already uses for add/delete rows.
 		const oldLine = isRight ? -1 : ln;

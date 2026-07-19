@@ -116,7 +116,7 @@ Opening a deep link (`vscode://.../open-pr?...&path=/src/file.ts&line=42`) finds
 
 ## Known issues
 
-1. When Microsoft's GitHub Pull Requests extension is enabled at the same time, both extensions register comment controllers on VS Code's single shared commenting surface. This extension scopes its commenting ranges to its own document schemes plus the checked-out PR's changed files, so the two rarely overlap; but on a workspace file both are actively reviewing, the inline comment gutter can still appear or behave twice. If that happens, disable the other extension and reload the window.
+None currently.
 
 ## Credits
 

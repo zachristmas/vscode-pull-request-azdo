@@ -38,7 +38,6 @@
 	],
 	"activationEvents": [
 		"onStartupFinished",
-		"onFileSystem:newIssue",
 		"onUri"
 	],
 	"browser": "./dist/browser/extension",
