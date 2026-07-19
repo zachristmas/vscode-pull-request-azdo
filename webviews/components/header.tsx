@@ -9,7 +9,7 @@ import {
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as React from 'react';
- 
+
 import { useContext, useState } from 'react';
 
 import { checkIcon, copyIcon, editIcon } from './icon';
@@ -77,7 +77,7 @@ function Title({
 }: Partial<PullRequest> & { isActive?: boolean }) {
 	const [inEditMode, setEditMode] = useState(false);
 	const [currentTitle, setCurrentTitle] = useStateProp(title);
-	const { setTitle, refresh, copyPrLink, convertToDraft, updatePR } = useContext(PullRequestContext);
+	const { setTitle, refresh, copyPrLink, copyVscodeDeepLink, convertToDraft, updatePR } = useContext(PullRequestContext);
 	const canConvertToDraft = !isIssue && !isDraft && state === PullRequestStatus.Active;
 	const editableTitle = inEditMode ? (
 		<form
@@ -129,6 +129,14 @@ function Title({
 					{
 						<button title="Copy Link" onClick={copyPrLink}>
 							{copyIcon}
+						</button>
+					}
+					{
+						<button
+							title="Copy a vscode:// link that opens this pull request in VS Code"
+							onClick={copyVscodeDeepLink}
+						>
+							Copy VS Code Link
 						</button>
 					}
 					{canConvertToDraft ? (

@@ -18,6 +18,7 @@ import {
 	PullRequestPolicyEvaluation,
 	ReviewState,
 } from '../../src/azdo/interface';
+import type { DiffHunk } from '../../src/common/diffHunk';
 import { TimelineEvent } from '../../src/common/timelineEvent';
 
 export enum ReviewType {
@@ -66,6 +67,12 @@ export interface PullRequest {
 
 	isAuthor?: boolean;
 	threads?: GitPullRequestCommentThread[];
+	/**
+	 * Per-thread diff-hunk excerpt (a few lines ending at the thread's anchor line), keyed by
+	 * thread id. Absent for file-level threads and when the file-diff fetch failed - thread
+	 * cards degrade to no inline diff context.
+	 */
+	threadHunks?: { [threadId: number]: DiffHunk };
 	commits: GitCommitRef[];
 	currentUser: Identity;
 	workItems: WorkItem[];

@@ -13,13 +13,15 @@ import {
 import { AccountRecentActivityWorkItemModel2, WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as vscode from 'vscode';
 import { onDidUpdatePR } from '../commands';
+import { buildPullRequestDeepLink, deepLinkParamsFromPullRequest } from '../common/deepLink';
+import { DiffHunk } from '../common/diffHunk';
 import Logger from '../common/logger';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
 import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
 import { User } from './entitlementApi';
 import { FolderRepositoryManager } from './folderRepositoryManager';
-import { MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
+import { IRawFileChange, MergeMethod, MergeMethodsAvailability, PullRequestCompletion, ReviewState } from './interface';
 import { PullRequestModel } from './pullRequestModel';
 import { AzdoUserManager } from './userManager';
 import {
@@ -27,6 +29,7 @@ import {
 	convertBranchRefToBranchName,
 	convertIdentityRefWithVoteToReviewer,
 	convertRESTUserToAccount,
+	getThreadDiffHunkExcerpt,
 } from './utils';
 import { AzdoWorkItem } from './workItem';
 
@@ -235,6 +238,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				// POL-01: policy data is progressive enhancement - a fetch failure must not sink the
 				// whole panel the way the other members here fail loudly.
 				pullRequestModel.getPolicyEvaluations().catch(() => {}),
+				// Thread hunk excerpts are progressive enhancement too: without file diffs the
+				// timeline still renders, just without inline diff context on thread cards.
+				this.getFileChangesOrUndefined(pullRequestModel),
 			]);
 			const [
 				pullRequest,
@@ -246,6 +252,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				currentUser,
 				workItems,
 				policies,
+				fileChanges,
 			] = result;
 			const canEditPr = pullRequest?.canEdit();
 			if (!pullRequest) {
@@ -272,6 +279,32 @@ export class PullRequestOverviewPanel extends WebviewBase {
 
 			this._existingReviewers = requestedReviewers?.map(reviewer => convertIdentityRefWithVoteToReviewer(reviewer)) ?? [];
 
+			const threadHunks: { [threadId: number]: DiffHunk } = {};
+			if (fileChanges) {
+				// Fetch each referenced blob at most once; a failed fetch resolves to undefined so the
+				// affected thread simply gets no excerpt.
+				const contentCache = new Map<string, Promise<string | undefined>>();
+				const getContentBySha = (sha: string): Promise<string | undefined> => {
+					let pending = contentCache.get(sha);
+					if (pending === undefined) {
+						pending = this.getFileContentOrUndefined(sha);
+						contentCache.set(sha, pending);
+					}
+					return pending;
+				};
+				await Promise.all(
+					(threads ?? []).map(async thread => {
+						if (thread.id === undefined) {
+							return;
+						}
+						const excerpt = await getThreadDiffHunkExcerpt(fileChanges, thread, getContentBySha);
+						if (excerpt) {
+							threadHunks[thread.id] = excerpt;
+						}
+					}),
+				);
+			}
+
 			Logger.debug('pr.initialize', PullRequestOverviewPanel.ID);
 			this._postMessage({
 				command: 'pr.initialize',
@@ -292,6 +325,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					},
 					state: pullRequest.item.status,
 					threads: threads,
+					threadHunks: threadHunks,
 					commits: commits,
 					isCurrentlyCheckedOut: isCurrentlyCheckedOut,
 					// AC-08: getBranchRef() returns undefined once a branch no longer exists (e.g. the
@@ -336,6 +370,26 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		}
 	}
 
+	// Thread hunk excerpts are progressive enhancement; a file-diff fetch failure must not sink the
+	// panel, so swallow it and return undefined (callers render the timeline without excerpts).
+	private async getFileChangesOrUndefined(pullRequestModel: PullRequestModel): Promise<IRawFileChange[] | undefined> {
+		try {
+			return await pullRequestModel.getFileChangesInfo();
+		} catch {
+			return;
+		}
+	}
+
+	// Blob fetch for a single excerpt; a failure yields undefined so only that thread loses its
+	// excerpt rather than the whole timeline.
+	private async getFileContentOrUndefined(sha: string): Promise<string | undefined> {
+		try {
+			return await this._item.getFile(sha);
+		} catch {
+			return;
+		}
+	}
+
 	public async update(folderRepositoryManager: FolderRepositoryManager, pullRequestModel: PullRequestModel): Promise<void> {
 		if (this._folderRepositoryManager !== folderRepositoryManager) {
 			this._folderRepositoryManager = folderRepositoryManager;
@@ -365,6 +419,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		if (message.command === 'alert') {
 			vscode.window.showErrorMessage(message.args);
 			return;
+		}
+		if (message.command === 'pr.copy-vscode-deeplink') {
+			return this.copyVscodeDeepLink(message);
 		}
 		switch (message.command) {
 			case 'pr.checkout':
@@ -1011,6 +1068,18 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	private async copyPrLink(_message: IRequestMessage<string>): Promise<void> {
 		await vscode.env.clipboard.writeText(this._item.url ?? '');
 		vscode.window.showInformationMessage(`Copied link to PR ${this._item.item.title}!`);
+	}
+
+	private async copyVscodeDeepLink(_message: IRequestMessage<undefined>): Promise<void> {
+		const params = deepLinkParamsFromPullRequest(this._item);
+		if (!params) {
+			vscode.window.showErrorMessage(
+				'Unable to build a deep link: the organization or project of this pull request could not be determined.',
+			);
+			return;
+		}
+		await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
+		vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
 	}
 
 	protected editCommentPromise(comment: Comment, threadId: number, text: string): Promise<Comment> {
