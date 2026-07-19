@@ -380,8 +380,21 @@ export class ReviewCommentController
 			return false;
 		}
 
-		return (
-			thread.uri.scheme === currentWorkspace.uri.scheme && thread.uri.fsPath.startsWith(this._repository.rootUri.fsPath)
+		if (
+			thread.uri.scheme !== currentWorkspace.uri.scheme ||
+			!thread.uri.fsPath.startsWith(this._repository.rootUri.fsPath)
+		) {
+			return false;
+		}
+
+		// Claim a workspace (file:) thread only when the file is part of the checked-out PR's changes,
+		// matching provideCommentingRanges. Claiming any file under the repo root would route unrelated
+		// threads to this controller and widen the extension's footprint on VS Code's single shared
+		// commenting surface, overlapping a coexisting review extension (e.g. GitHub Pull Requests) on
+		// files this PR does not touch.
+		const fileName = this.gitRelativeRootPath(thread.uri.path);
+		return gitFileChangeNodeFilter(this._localFileChanges).some(
+			fileChange => removeLeadingSlash(fileChange.fileName) === fileName,
 		);
 	}
 
