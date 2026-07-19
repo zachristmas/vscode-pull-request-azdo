@@ -230,6 +230,49 @@ export class ReviewManager {
 		return this._validateStatusInProgress;
 	}
 
+	// Looks up PR metadata for the branch locally first, then on the server (associating the
+	// branch with the PR when the server lookup hits). Null when neither side knows the branch.
+	private async resolveMatchingPullRequestMetadata(branch: Branch) {
+		const matchingPullRequestMetadata = await this._folderRepoManager.getMatchingPullRequestMetadataForBranch();
+		if (matchingPullRequestMetadata) {
+			return matchingPullRequestMetadata;
+		}
+
+		Logger.appendLine(`Review> no matching pull request metadata found for current branch ${branch.name}`);
+		const metadataFromGithub = await this._folderRepoManager.getMatchingPullRequestMetadataFromGitHub();
+		if (metadataFromGithub) {
+			PullRequestGitHelper.associateBranchWithPullRequest(this._repository, metadataFromGithub.model, branch.name!);
+			return metadataFromGithub;
+		}
+
+		return null;
+	}
+
+	// Creates and registers the PR webview provider on first use, updates it afterwards.
+	private ensureWebviewViewProvider(pr: PullRequestModel): void {
+		if (!this._webviewViewProvider) {
+			this._webviewViewProvider = new PullRequestViewProvider(this._context.extensionUri, this._folderRepoManager, pr);
+			this._context.subscriptions.push(
+				vscode.window.registerWebviewViewProvider(PullRequestViewProvider.viewType, this._webviewViewProvider),
+			);
+		} else {
+			this._webviewViewProvider.updatePullRequest(pr);
+		}
+	}
+
+	// Opens the diff of the first modified file (or the first file) of the review.
+	private async openFirstModifiedFileDiff(): Promise<void> {
+		let fileChangeToShow: GitFileChangeNode | undefined;
+		for (const fileChange of this.localFileChanges) {
+			if (fileChange.status === GitChangeType.MODIFY) {
+				fileChangeToShow = fileChange;
+				break;
+			}
+		}
+		fileChangeToShow ??= this.localFileChanges[0];
+		await fileChangeToShow.openDiff(this._folderRepoManager);
+	}
+
 	private async validateState(silent: boolean) {
 		try {
 			Logger.appendLine('Review> Validating state...');
@@ -241,20 +284,7 @@ export class ReviewManager {
 			}
 
 			const branch = this._repository.state.HEAD;
-			let matchingPullRequestMetadata = await this._folderRepoManager.getMatchingPullRequestMetadataForBranch();
-
-			if (!matchingPullRequestMetadata) {
-				Logger.appendLine(`Review> no matching pull request metadata found for current branch ${branch.name}`);
-				const metadataFromGithub = await this._folderRepoManager.getMatchingPullRequestMetadataFromGitHub();
-				if (metadataFromGithub) {
-					PullRequestGitHelper.associateBranchWithPullRequest(
-						this._repository,
-						metadataFromGithub.model,
-						branch.name!,
-					);
-					matchingPullRequestMetadata = metadataFromGithub;
-				}
-			}
+			const matchingPullRequestMetadata = await this.resolveMatchingPullRequestMetadata(branch);
 
 			if (!matchingPullRequestMetadata) {
 				Logger.appendLine(
@@ -313,18 +343,7 @@ export class ReviewManager {
 			Logger.appendLine(`Review> register comments provider`);
 			await this.registerCommentController(pr);
 
-			if (!this._webviewViewProvider) {
-				this._webviewViewProvider = new PullRequestViewProvider(
-					this._context.extensionUri,
-					this._folderRepoManager,
-					pr,
-				);
-				this._context.subscriptions.push(
-					vscode.window.registerWebviewViewProvider(PullRequestViewProvider.viewType, this._webviewViewProvider),
-				);
-			} else {
-				this._webviewViewProvider.updatePullRequest(pr);
-			}
+			this.ensureWebviewViewProvider(pr);
 
 			this.statusBarItem.text = `$(git-branch) Pull Request #${this._prNumber}`;
 			this.statusBarItem.command = {
@@ -336,15 +355,7 @@ export class ReviewManager {
 			this.statusBarItem.show();
 			vscode.commands.executeCommand('azdopr.refreshList');
 			if (!silent && this._context.workspaceState.get(FOCUS_REVIEW_MODE) && this.localFileChanges.length > 0) {
-				let fileChangeToShow: GitFileChangeNode | undefined;
-				for (const fileChange of this.localFileChanges) {
-					if (fileChange.status === GitChangeType.MODIFY) {
-						fileChangeToShow = fileChange;
-						break;
-					}
-				}
-				fileChangeToShow ??= this.localFileChanges[0];
-				await fileChangeToShow.openDiff(this._folderRepoManager);
+				await this.openFirstModifiedFileDiff();
 			}
 		} finally {
 			this._validateStatusInProgress = undefined;
@@ -928,17 +939,9 @@ export class ReviewManager {
 			},
 			async progress => {
 				progress.report({ increment: 10 });
-				let HEAD: Branch | undefined = this._repository.state.HEAD!;
-
-				if (!HEAD.upstream) {
-					progress.report({ increment: 10, message: `Start publishing branch ${HEAD.name}` });
-					HEAD = await this.publishBranch(HEAD);
-					if (!HEAD) {
-						return;
-					}
-					progress.report({ increment: 20, message: `Branch ${HEAD.name} published` });
-				} else {
-					progress.report({ increment: 30, message: `Start creating pull request.` });
+				const HEAD = await this.ensureBranchPublished(this._repository.state.HEAD!, progress);
+				if (!HEAD) {
+					return;
 				}
 
 				const branchName = HEAD.upstream!.name;
@@ -1027,18 +1030,46 @@ export class ReviewManager {
 
 				const pullRequestModel = await this._folderRepoManager.createPullRequest(headRemote.remoteName, creationParams);
 
-				if (pullRequestModel) {
-					progress.report({ increment: 30, message: `Pull Request #${pullRequestModel.getPullRequestId()} Created` });
-					await this.updateState();
-					await vscode.commands.executeCommand('azdopr.refreshList');
-					await vscode.commands.executeCommand('azdopr.openDescription', pullRequestModel);
-					progress.report({ increment: 30 });
-				} else {
-					// folderRepoManager.createPullRequest already surfaced the error to the user.
-					progress.report({ increment: 90, message: `Failed to create pull request for ${branchName}` });
-				}
+				await this.finishPullRequestCreation(pullRequestModel, branchName, progress);
 			},
 		);
+	}
+
+	// Publishes the branch when it has no upstream yet. Undefined when publishing fails or is cancelled.
+	private async ensureBranchPublished(
+		branch: Branch,
+		progress: vscode.Progress<{ message?: string; increment?: number }>,
+	): Promise<Branch | undefined> {
+		if (!branch.upstream) {
+			progress.report({ increment: 10, message: `Start publishing branch ${branch.name}` });
+			const publishedBranch = await this.publishBranch(branch);
+			if (!publishedBranch) {
+				return undefined;
+			}
+			progress.report({ increment: 20, message: `Branch ${publishedBranch.name} published` });
+			return publishedBranch;
+		}
+
+		progress.report({ increment: 30, message: `Start creating pull request.` });
+		return branch;
+	}
+
+	// Post-creation UX: refresh state and open the new PR, or report the failure via progress.
+	private async finishPullRequestCreation(
+		pullRequestModel: PullRequestModel | undefined,
+		branchName: string | undefined,
+		progress: vscode.Progress<{ message?: string; increment?: number }>,
+	): Promise<void> {
+		if (pullRequestModel) {
+			progress.report({ increment: 30, message: `Pull Request #${pullRequestModel.getPullRequestId()} Created` });
+			await this.updateState();
+			await vscode.commands.executeCommand('azdopr.refreshList');
+			await vscode.commands.executeCommand('azdopr.openDescription', pullRequestModel);
+			progress.report({ increment: 30 });
+		} else {
+			// folderRepoManager.createPullRequest already surfaced the error to the user.
+			progress.report({ increment: 90, message: `Failed to create pull request for ${branchName}` });
+		}
 	}
 
 	private updateFocusedViewMode(): void {

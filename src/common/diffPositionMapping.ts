@@ -98,6 +98,25 @@ export function mapNewPositionToOld(patch: string, line: number): number {
 	return line + delta;
 }
 
+// Finds the diff-hunk position of the line whose old (isBase) or new line number matches, or -1.
+function findDiffHunkPositionForLine(diffHunks: DiffHunk[], lineInPRDiff: number, isBase: boolean): number {
+	const positionInDiffHunk = -1;
+
+	for (const diffHunk of diffHunks) {
+		for (let j = 0; j < diffHunk.diffLines.length; j++) {
+			if (isBase) {
+				if (diffHunk.diffLines[j].oldLineNumber === lineInPRDiff) {
+					return diffHunk.diffLines[j].positionInHunk;
+				}
+			} else if (diffHunk.diffLines[j].newLineNumber === lineInPRDiff) {
+				return diffHunk.diffLines[j].positionInHunk;
+			}
+		}
+	}
+
+	return positionInDiffHunk;
+}
+
 export function mapLineInHeadToDiffHunkPosition(
 	diffHunks: DiffHunk[],
 	localDiff: string,
@@ -119,23 +138,7 @@ export function mapLineInHeadToDiffHunkPosition(
 		localDiffIter = localDiffReader.next();
 	}
 
-	const positionInDiffHunk = -1;
-
-	for (const diffHunk of diffHunks) {
-		for (let j = 0; j < diffHunk.diffLines.length; j++) {
-			if (isBase) {
-				if (diffHunk.diffLines[j].oldLineNumber === lineInPRDiff) {
-					return diffHunk.diffLines[j].positionInHunk;
-				}
-			} else {
-				if (diffHunk.diffLines[j].newLineNumber === lineInPRDiff) {
-					return diffHunk.diffLines[j].positionInHunk;
-				}
-			}
-		}
-	}
-
-	return positionInDiffHunk;
+	return findDiffHunkPositionForLine(diffHunks, lineInPRDiff, isBase);
 }
 
 export function mapOldPositionToNew(patch: string, line: number): number {

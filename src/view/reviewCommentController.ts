@@ -416,28 +416,40 @@ export class ReviewCommentController
 			const matchedFile = gitFileChangeNodeFilter(this._localFileChanges).find(
 				fileChange => removeLeadingSlash(fileChange.fileName) === fileName,
 			);
-			const ranges = [];
 
 			if (matchedFile) {
-				// TODO Why was this here?
-				// if (matchedFile.status === GitChangeType.RENAME) {
-				// 	return [];
-				// }
-
-				const contentDiff = await this.getContentDiff(document.uri, removeLeadingSlash(matchedFile.fileName));
-				const diffHunks = matchedFile.diffHunks;
-
-				for (const diffHunk of diffHunks) {
-					const start = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber);
-					const end = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber + diffHunk.newLength - 1);
-					if (start > 0 && end > 0) {
-						ranges.push(new vscode.Range(start - 1, 0, end - 1, 0));
-					}
-				}
+				return await this.getWorkspaceFileCommentingRanges(document.uri, matchedFile);
 			}
 
-			return ranges;
+			return [];
 		}
+	}
+
+	// Maps each diff hunk of the matched file onto the current (possibly dirty) document via the
+	// working-tree diff, keeping only hunks that still exist.
+	private async getWorkspaceFileCommentingRanges(
+		documentUri: vscode.Uri,
+		matchedFile: GitFileChangeNode,
+	): Promise<vscode.Range[]> {
+		const ranges: vscode.Range[] = [];
+
+		// TODO Why was this here?
+		// if (matchedFile.status === GitChangeType.RENAME) {
+		// 	return [];
+		// }
+
+		const contentDiff = await this.getContentDiff(documentUri, removeLeadingSlash(matchedFile.fileName));
+		const diffHunks = matchedFile.diffHunks;
+
+		for (const diffHunk of diffHunks) {
+			const start = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber);
+			const end = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber + diffHunk.newLength - 1);
+			if (start > 0 && end > 0) {
+				ranges.push(new vscode.Range(start - 1, 0, end - 1, 0));
+			}
+		}
+
+		return ranges;
 	}
 
 	// #endregion

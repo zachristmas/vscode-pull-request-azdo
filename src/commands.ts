@@ -101,6 +101,59 @@ interface PullRequestFileTarget {
 	fileName: string;
 }
 
+/** Resolve the target for a pr_azdo diff editor: match the PR encoded in the URI query. */
+async function resolveFileTargetFromPRUri(
+	reposManager: RepositoriesManager,
+	editorUri: vscode.Uri,
+): Promise<PullRequestFileTarget | undefined> {
+	const params = fromPRUri(editorUri);
+	if (!params) {
+		return undefined;
+	}
+	for (const folderManager of reposManager.folderManagers) {
+		const azdoRepo = folderManager.azdoRepositories.find(repo => repo.remote.remoteName === params.remoteName);
+		if (!azdoRepo) {
+			continue;
+		}
+		const active = folderManager.activePullRequest;
+		const pullRequest =
+			active?.getPullRequestId() === params.prNumber
+				? active
+				: await folderManager.resolvePullRequest(
+						azdoRepo.remote.owner,
+						azdoRepo.remote.repositoryName,
+						params.prNumber,
+				  );
+		if (pullRequest) {
+			return { pullRequest, fileName: params.fileName };
+		}
+	}
+	return undefined;
+}
+
+/** Resolve the target for a review_azdo editor: the checked-out PR of the owning folder. */
+function resolveFileTargetFromReviewUri(
+	reposManager: RepositoriesManager,
+	editorUri: vscode.Uri,
+): PullRequestFileTarget | undefined {
+	const pullRequest = reposManager.getManagerForFile(editorUri)?.activePullRequest;
+	return pullRequest ? { pullRequest, fileName: fromReviewUri(editorUri).path } : undefined;
+}
+
+/** Resolve the target for a plain workspace file: the checked-out PR plus the repo-relative path. */
+function resolveFileTargetFromWorkspaceFile(
+	reposManager: RepositoriesManager,
+	editorUri: vscode.Uri,
+): PullRequestFileTarget | undefined {
+	const folderManager = reposManager.getManagerForFile(editorUri);
+	const pullRequest = folderManager?.activePullRequest;
+	if (!pullRequest) {
+		return undefined;
+	}
+	const relative = pathLib.relative(folderManager!.repository.rootUri.fsPath, editorUri.fsPath);
+	return { pullRequest, fileName: `/${relative.split(pathLib.sep).join('/')}` };
+}
+
 /**
  * Resolve the {pull request, file} pair a file-scoped command targets: a PR tree file node when
  * invoked from a context menu, otherwise the active editor (a pr_azdo diff editor, a review_azdo
@@ -120,44 +173,15 @@ async function resolvePullRequestFileTarget(
 	}
 
 	if (editorUri.scheme === URI_SCHEME_PR) {
-		const params = fromPRUri(editorUri);
-		if (!params) {
-			return undefined;
-		}
-		for (const folderManager of reposManager.folderManagers) {
-			const azdoRepo = folderManager.azdoRepositories.find(repo => repo.remote.remoteName === params.remoteName);
-			if (!azdoRepo) {
-				continue;
-			}
-			const active = folderManager.activePullRequest;
-			const pullRequest =
-				active?.getPullRequestId() === params.prNumber
-					? active
-					: await folderManager.resolvePullRequest(
-							azdoRepo.remote.owner,
-							azdoRepo.remote.repositoryName,
-							params.prNumber,
-					  );
-			if (pullRequest) {
-				return { pullRequest, fileName: params.fileName };
-			}
-		}
-		return undefined;
+		return await resolveFileTargetFromPRUri(reposManager, editorUri);
 	}
 
 	if (editorUri.scheme === URI_SCHEME_REVIEW) {
-		const pullRequest = reposManager.getManagerForFile(editorUri)?.activePullRequest;
-		return pullRequest ? { pullRequest, fileName: fromReviewUri(editorUri).path } : undefined;
+		return resolveFileTargetFromReviewUri(reposManager, editorUri);
 	}
 
 	if (editorUri.scheme === 'file') {
-		const folderManager = reposManager.getManagerForFile(editorUri);
-		const pullRequest = folderManager?.activePullRequest;
-		if (!pullRequest) {
-			return undefined;
-		}
-		const relative = pathLib.relative(folderManager!.repository.rootUri.fsPath, editorUri.fsPath);
-		return { pullRequest, fileName: `/${relative.split(pathLib.sep).join('/')}` };
+		return resolveFileTargetFromWorkspaceFile(reposManager, editorUri);
 	}
 
 	return undefined;

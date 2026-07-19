@@ -329,40 +329,53 @@ export class TernarySearchTree<E> {
 		this._root = undefined;
 	}
 
+	// Get-or-create descend helpers for set(): each steps into the child on its side,
+	// creating an empty node carrying the iterator's current segment when missing.
+	private descendLeft(node: TernarySearchTreeNode<E>, iter: IKeyIterator): TernarySearchTreeNode<E> {
+		if (!node.left) {
+			node.left = new TernarySearchTreeNode<E>();
+			node.left.segment = iter.value();
+		}
+		return node.left;
+	}
+
+	private descendRight(node: TernarySearchTreeNode<E>, iter: IKeyIterator): TernarySearchTreeNode<E> {
+		if (!node.right) {
+			node.right = new TernarySearchTreeNode<E>();
+			node.right.segment = iter.value();
+		}
+		return node.right;
+	}
+
+	private descendMid(node: TernarySearchTreeNode<E>, iter: IKeyIterator): TernarySearchTreeNode<E> {
+		iter.next();
+		if (!node.mid) {
+			node.mid = new TernarySearchTreeNode<E>();
+			node.mid.segment = iter.value();
+		}
+		return node.mid;
+	}
+
 	set(key: string, element: E): E | undefined {
 		const iter = this._iter.reset(key);
-		let node: TernarySearchTreeNode<E>;
 
 		if (!this._root) {
 			this._root = new TernarySearchTreeNode<E>();
 			this._root.segment = iter.value();
 		}
 
-		node = this._root;
+		let node: TernarySearchTreeNode<E> = this._root;
 		while (true) {
 			const val = iter.cmp(node.segment);
 			if (val > 0) {
 				// left
-				if (!node.left) {
-					node.left = new TernarySearchTreeNode<E>();
-					node.left.segment = iter.value();
-				}
-				node = node.left;
+				node = this.descendLeft(node, iter);
 			} else if (val < 0) {
 				// right
-				if (!node.right) {
-					node.right = new TernarySearchTreeNode<E>();
-					node.right.segment = iter.value();
-				}
-				node = node.right;
+				node = this.descendRight(node, iter);
 			} else if (iter.hasNext()) {
 				// mid
-				iter.next();
-				if (!node.mid) {
-					node.mid = new TernarySearchTreeNode<E>();
-					node.mid.segment = iter.value();
-				}
-				node = node.mid;
+				node = this.descendMid(node, iter);
 			} else {
 				break;
 			}

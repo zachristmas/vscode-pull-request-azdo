@@ -208,6 +208,112 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			.filter((repo: Remote | undefined): repo is Remote => !!repo);
 	}
 
+	// Collects author names from a cached (or freshly run) git blame of the file into
+	// fileRelatedUsersNames. Failures are logged and ignored.
+	private async collectFileRelatedUserNames(
+		editorFsPath: string,
+		fileRelatedUsersNames: { [key: string]: boolean },
+	): Promise<void> {
+		try {
+			Logger.debug('git blame and parse users', FolderRepositoryManager.ID);
+			const fsPath = path.resolve(editorFsPath);
+			const cachedBlames = this._gitBlameCache[fsPath];
+			let blames: string | undefined;
+			if (cachedBlames) {
+				blames = cachedBlames;
+			} else {
+				blames = await this.repository.blame(fsPath);
+				this._gitBlameCache[fsPath] = blames;
+			}
+
+			const blameLines = blames.split('\n');
+
+			for (const line of blameLines) {
+				// eslint-disable-next-line sonarjs/super-linear-regex -- capture must span to the LAST date token; no equivalent linear rewrite exists, and input is local `git blame` output, not attacker-controlled
+				const matches = /^\w{11} \S*\s*\((.*)\s*\d{4}\-/.exec(line);
+
+				if (matches && matches.length === 2) {
+					const name = matches[1].trim();
+					fileRelatedUsersNames[name] = true;
+				}
+			}
+		} catch (err) {
+			Logger.debug(String(err), FolderRepositoryManager.ID);
+		}
+	}
+
+	// Merges PR-related, file-related, and mentionable users into the completion list,
+	// deduplicating and prioritizing users already involved in the file or PR.
+	private buildUserCompletions(
+		prRelatedusers: { login: string; name?: string; email?: string }[],
+		fileRelatedUsersNames: { [key: string]: boolean },
+		mentionableUsers: { [key: string]: { id?: string; name?: string; email?: string }[] },
+	): UserCompletion[] {
+		const cachedUsers: UserCompletion[] = [];
+		const prRelatedUsersMap: { [key: string]: { login: string; name?: string; email?: string } } = {};
+		Logger.debug('prepare user suggestions', FolderRepositoryManager.ID);
+
+		prRelatedusers.forEach(user => {
+			if (!Object.hasOwn(prRelatedUsersMap, user.login)) {
+				prRelatedUsersMap[user.login] = user;
+			}
+		});
+
+		const secondMap: { [key: string]: boolean } = {};
+
+		for (const mentionableUserGroup in mentionableUsers) {
+			mentionableUsers[mentionableUserGroup].forEach(user => {
+				if (Object.hasOwn(prRelatedUsersMap, user.id!) || secondMap[user.id!]) {
+					return;
+				}
+
+				secondMap[user.id!] = true;
+
+				let priority = fileRelatedUsersNames[user.id!] || (user.name && fileRelatedUsersNames[user.name]) ? 1 : 2;
+
+				if (Object.hasOwn(prRelatedUsersMap, user.id!)) {
+					priority = 0;
+				}
+
+				cachedUsers.push({
+					label: user.id!,
+					email: user.email,
+					insertText: user.id!,
+					filterText:
+						user.id! + (user.name && user.name !== user.id! ? `_${user.name.toLowerCase().replace(' ', '_')}` : ''),
+					sortText: `${priority}_${user.id!}`,
+					detail: user.name,
+					kind: vscode.CompletionItemKind.User,
+					login: user.id!,
+					uri: this.repository.rootUri,
+				});
+			});
+		}
+
+		for (const user in prRelatedUsersMap) {
+			if (!secondMap[user]) {
+				// if the mentionable api call fails partially, we should still populate related users from timeline events into the completion list
+				cachedUsers.push({
+					label: prRelatedUsersMap[user].login,
+					insertText: prRelatedUsersMap[user].login,
+					filterText:
+						prRelatedUsersMap[user].login +
+						(prRelatedUsersMap[user].name && prRelatedUsersMap[user].name !== prRelatedUsersMap[user].login
+							? `_${prRelatedUsersMap[user].name!.toLowerCase().replace(' ', '_')}`
+							: ''),
+					sortText: `0_${prRelatedUsersMap[user].login}`,
+					detail: prRelatedUsersMap[user].name,
+					kind: vscode.CompletionItemKind.User,
+					login: prRelatedUsersMap[user].login,
+					uri: this.repository.rootUri,
+					email: prRelatedUsersMap[user].email,
+				});
+			}
+		}
+
+		return cachedUsers;
+	}
+
 	public setUpCompletionItemProvider() {
 		let lastPullRequest: PullRequestModel | undefined;
 		const lastPullRequestTimelineEvents: TimelineEvent[] = [];
@@ -287,32 +393,10 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 						const fileRelatedUsersNamesPromise = new Promise<void>(async resolve => {
 							if (activeTextEditors.length) {
-								try {
-									Logger.debug('git blame and parse users', FolderRepositoryManager.ID);
-									const fsPath = path.resolve(activeTextEditors[0].document.uri.fsPath);
-									const cachedBlames = this._gitBlameCache[fsPath];
-									let blames: string | undefined;
-									if (cachedBlames) {
-										blames = cachedBlames;
-									} else {
-										blames = await this.repository.blame(fsPath);
-										this._gitBlameCache[fsPath] = blames;
-									}
-
-									const blameLines = blames.split('\n');
-
-									for (const line of blameLines) {
-										// eslint-disable-next-line sonarjs/super-linear-regex -- capture must span to the LAST date token; no equivalent linear rewrite exists, and input is local `git blame` output, not attacker-controlled
-										const matches = /^\w{11} \S*\s*\((.*)\s*\d{4}\-/.exec(line);
-
-										if (matches && matches.length === 2) {
-											const name = matches[1].trim();
-											fileRelatedUsersNames[name] = true;
-										}
-									}
-								} catch (err) {
-									Logger.debug(String(err), FolderRepositoryManager.ID);
-								}
+								await this.collectFileRelatedUserNames(
+									activeTextEditors[0].document.uri.fsPath,
+									fileRelatedUsersNames,
+								);
 							}
 
 							resolve();
@@ -326,73 +410,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 						await Promise.all([prRelatedUsersPromise, fileRelatedUsersNamesPromise, mentionableUsersPromise]);
 
-						cachedUsers = [];
-						const prRelatedUsersMap: { [key: string]: { login: string; name?: string; email?: string } } = {};
-						Logger.debug('prepare user suggestions', FolderRepositoryManager.ID);
-
-						prRelatedusers.forEach(user => {
-							if (!Object.hasOwn(prRelatedUsersMap, user.login)) {
-								prRelatedUsersMap[user.login] = user;
-							}
-						});
-
-						const secondMap: { [key: string]: boolean } = {};
-
-						for (const mentionableUserGroup in mentionableUsers) {
-							// eslint-disable-next-line no-loop-func
-							mentionableUsers[mentionableUserGroup].forEach(user => {
-								if (Object.hasOwn(prRelatedUsersMap, user.id!) || secondMap[user.id!]) {
-									return;
-								}
-
-								secondMap[user.id!] = true;
-
-								let priority =
-									fileRelatedUsersNames[user.id!] || (user.name && fileRelatedUsersNames[user.name]) ? 1 : 2;
-
-								if (Object.hasOwn(prRelatedUsersMap, user.id!)) {
-									priority = 0;
-								}
-
-								cachedUsers.push({
-									label: user.id!,
-									email: user.email,
-									insertText: user.id!,
-									filterText:
-										user.id! +
-										(user.name && user.name !== user.id!
-											? `_${user.name.toLowerCase().replace(' ', '_')}`
-											: ''),
-									sortText: `${priority}_${user.id!}`,
-									detail: user.name,
-									kind: vscode.CompletionItemKind.User,
-									login: user.id!,
-									uri: this.repository.rootUri,
-								});
-							});
-						}
-
-						for (const user in prRelatedUsersMap) {
-							if (!secondMap[user]) {
-								// if the mentionable api call fails partially, we should still populate related users from timeline events into the completion list
-								cachedUsers.push({
-									label: prRelatedUsersMap[user].login,
-									insertText: prRelatedUsersMap[user].login,
-									filterText:
-										prRelatedUsersMap[user].login +
-										(prRelatedUsersMap[user].name &&
-										prRelatedUsersMap[user].name !== prRelatedUsersMap[user].login
-											? `_${prRelatedUsersMap[user].name!.toLowerCase().replace(' ', '_')}`
-											: ''),
-									sortText: `0_${prRelatedUsersMap[user].login}`,
-									detail: prRelatedUsersMap[user].name,
-									kind: vscode.CompletionItemKind.User,
-									login: prRelatedUsersMap[user].login,
-									uri: this.repository.rootUri,
-									email: prRelatedUsersMap[user].email,
-								});
-							}
-						}
+						cachedUsers = this.buildUserCompletions(prRelatedusers, fileRelatedUsersNames, mentionableUsers);
 
 						Logger.debug('done', FolderRepositoryManager.ID);
 						return cachedUsers;
@@ -728,6 +746,30 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	// Keep track of how many pages we've fetched for each query, so when we reload we pull the same ones.
 	private totalFetchedPages = new Map<string, number>();
 
+	// Seeds paging bookkeeping for every repository that has not been queried with this queryId yet.
+	private ensureRepositoryPageInformation(queryId: string): void {
+		for (const repository of this._azdoRepositories) {
+			const remoteId = repository.remote.url + queryId;
+			if (!this._repositoryPageInformation.get(remoteId)) {
+				this._repositoryPageInformation.set(remoteId, {
+					pullRequestPage: 0,
+					hasMorePages: null,
+				});
+			}
+		}
+	}
+
+	// True when a repository produced data and we can stop: fetching just the next page (case 2),
+	// or restoring (cases 1&3) once we've fetched at least as many pages as before.
+	private hasFetchedEnoughPages(
+		itemCount: number,
+		fetchNextPage: boolean,
+		pagesFetched: number,
+		totalFetchedPages: number,
+	): boolean {
+		return itemCount > 0 && (fetchNextPage || (!fetchNextPage && pagesFetched >= totalFetchedPages));
+	}
+
 	/**
 	 * This method works in three different ways:
 	 * 1) Initialize: fetch the first page of the first remote that has pages
@@ -758,15 +800,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		const getTotalFetchedPages = () => this.totalFetchedPages.get(queryId) || 0;
 		const setTotalFetchedPages = (numPages: number) => this.totalFetchedPages.set(queryId, numPages);
 
-		for (const repository of this._azdoRepositories) {
-			const remoteId = repository.remote.url + queryId;
-			if (!this._repositoryPageInformation.get(remoteId)) {
-				this._repositoryPageInformation.set(remoteId, {
-					pullRequestPage: 0,
-					hasMorePages: null,
-				});
-			}
-		}
+		this.ensureRepositoryPageInformation(queryId);
 
 		let pagesFetched = 0;
 		const itemData = { hasMorePages: false, items: [] };
@@ -863,8 +897,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			// 2) either we're fetching just the next page (case 2)
 			//    OR we're fetching all (cases 1&3), and we've fetched as far as we had previously (or further, in case 1).
 			if (
-				itemData.items.length &&
-				(options.fetchNextPage || (!options.fetchNextPage && pagesFetched >= getTotalFetchedPages()))
+				this.hasFetchedEnoughPages(itemData.items.length, options.fetchNextPage, pagesFetched, getTotalFetchedPages())
 			) {
 				if (getTotalFetchedPages() === 0) {
 					// We're in case 1, manually set number of pages we looked through until we found first results.

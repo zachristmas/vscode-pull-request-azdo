@@ -14,42 +14,52 @@ import { getZeroBased } from './diffPositionMapping';
  * @param diffHunks The diff hunks of the file
  * @param isBase Whether the commenting ranges are calculated for the base or modified file
  */
+// Contiguous runs of deleted lines in a hunk - the only commentable areas on the base file.
+function getDeletedLineRanges(diffHunk: DiffHunk): vscode.Range[] {
+	const ranges: vscode.Range[] = [];
+	let startingLine: number | undefined;
+	let endingLine: number | undefined;
+	for (let j = 0; j < diffHunk.diffLines.length; j++) {
+		const diffLine = diffHunk.diffLines[j];
+		if (diffLine.type === DiffChangeType.Delete) {
+			if (startingLine !== undefined) {
+				endingLine = getZeroBased(diffLine.oldLineNumber);
+			} else {
+				startingLine = getZeroBased(diffLine.oldLineNumber);
+				endingLine = getZeroBased(diffLine.oldLineNumber);
+			}
+		} else if (startingLine !== undefined && endingLine !== undefined) {
+			ranges.push(new vscode.Range(startingLine, 0, endingLine, 0));
+			startingLine = undefined;
+			endingLine = undefined;
+		}
+	}
+
+	if (startingLine !== undefined && endingLine !== undefined) {
+		ranges.push(new vscode.Range(startingLine, 0, endingLine, 0));
+	}
+
+	return ranges;
+}
+
+// The whole hunk (with its overflow buffer) is commentable on the modified file.
+function getModifiedHunkRanges(diffHunk: DiffHunk): vscode.Range[] {
+	if (!diffHunk.newLineNumber) {
+		return [];
+	}
+	const startingLine = getZeroBased(diffHunk.newLineNumber);
+	const length = getZeroBased(diffHunk.newLength);
+	return [new vscode.Range(startingLine, 0, startingLine + length, 0)];
+}
+
 export function getCommentingRanges(diffHunks: DiffHunk[], isBase: boolean): vscode.Range[] {
 	const ranges: vscode.Range[] = [];
 
 	for (const diffHunk of diffHunks) {
-		let startingLine: number | undefined;
 		if (isBase) {
-			let endingLine: number | undefined;
-			for (let j = 0; j < diffHunk.diffLines.length; j++) {
-				const diffLine = diffHunk.diffLines[j];
-				if (diffLine.type === DiffChangeType.Delete) {
-					if (startingLine !== undefined) {
-						endingLine = getZeroBased(diffLine.oldLineNumber);
-					} else {
-						startingLine = getZeroBased(diffLine.oldLineNumber);
-						endingLine = getZeroBased(diffLine.oldLineNumber);
-					}
-				} else {
-					if (startingLine !== undefined && endingLine !== undefined) {
-						ranges.push(new vscode.Range(startingLine, 0, endingLine, 0));
-						startingLine = undefined;
-						endingLine = undefined;
-					}
-				}
-			}
-
-			if (startingLine !== undefined && endingLine !== undefined) {
-				ranges.push(new vscode.Range(startingLine, 0, endingLine, 0));
-				startingLine = undefined;
-				endingLine = undefined;
-			}
+			ranges.push(...getDeletedLineRanges(diffHunk));
 		} else {
-			if (diffHunk.newLineNumber) {
-				startingLine = getZeroBased(diffHunk.newLineNumber);
-				const length = getZeroBased(diffHunk.newLength);
-				ranges.push(new vscode.Range(startingLine, 0, startingLine + length, 0));
-			}
+			ranges.push(...getModifiedHunkRanges(diffHunk));
 		}
 	}
 

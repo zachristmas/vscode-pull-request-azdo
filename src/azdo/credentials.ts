@@ -200,6 +200,49 @@ export class CredentialStore implements vscode.Disposable {
 		return new AzdoOrgConfig(orgUrl, projectName);
 	}
 
+	// Missing-org-config error notification with a shortcut into the extension settings.
+	private showMissingOrgConfigError(): void {
+		vscode.window
+			.showErrorMessage(
+				vscode.l10n.t(
+					'Azure DevOps sign-in failed: could not determine organization and project. Set "azdoPullRequests.orgUrl" and "azdoPullRequests.projectName" in settings, or make sure a git remote points at an Azure DevOps URL.',
+				),
+				vscode.l10n.t('Open Settings'),
+			)
+			.then(choice => {
+				if (choice) {
+					vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${EXTENSION_ID}`);
+				}
+			});
+	}
+
+	// Resolves the auth token for login: the configured PAT when set, otherwise a Microsoft
+	// auth session token. Returns undefined (after logging + telemetry) when neither works.
+	private async acquireToken(): Promise<{ token: string; isPatTokenAuth: boolean } | undefined> {
+		const patToken = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PATTOKEN_SETTINGS);
+		if (patToken) {
+			return { token: patToken, isPatTokenAuth: true };
+		}
+
+		const session = await this.getSession(this._sessionOptions);
+		if (!session) {
+			Logger.appendLine('Auth> Unable to get session', CredentialStore.ID);
+			this._telemetry.sendTelemetryEvent('auth.failed');
+			return undefined;
+		}
+
+		this._sessionId = session.id;
+		const token = await this.getToken(session);
+
+		if (!token) {
+			Logger.appendLine('Auth> Unable to get token', CredentialStore.ID);
+			this._telemetry.sendTelemetryEvent('auth.failed');
+			return undefined;
+		}
+
+		return { token, isPatTokenAuth: false };
+	}
+
 	public async login(): Promise<Azdo | undefined> {
 		/* __GDPR__
 			"auth.start" : {}
@@ -210,18 +253,7 @@ export class CredentialStore implements vscode.Disposable {
 		if (!orgConfig) {
 			Logger.appendLine('Unable to get org config', CredentialStore.ID);
 			this._telemetry.sendTelemetryEvent('auth.failed');
-			vscode.window
-				.showErrorMessage(
-					vscode.l10n.t(
-						'Azure DevOps sign-in failed: could not determine organization and project. Set "azdoPullRequests.orgUrl" and "azdoPullRequests.projectName" in settings, or make sure a git remote points at an Azure DevOps URL.',
-					),
-					vscode.l10n.t('Open Settings'),
-				)
-				.then(choice => {
-					if (choice) {
-						vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${EXTENSION_ID}`);
-					}
-				});
+			this.showMissingOrgConfigError();
 			return undefined;
 		}
 
@@ -229,30 +261,12 @@ export class CredentialStore implements vscode.Disposable {
 
 		while (retry) {
 			try {
-				let isPatTokenAuth = true;
-				let token = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PATTOKEN_SETTINGS);
-
-				if (!token) {
-					const session = await this.getSession(this._sessionOptions);
-					if (!session) {
-						Logger.appendLine('Auth> Unable to get session', CredentialStore.ID);
-						this._telemetry.sendTelemetryEvent('auth.failed');
-						return undefined;
-					}
-
-					this._sessionId = session.id;
-					token = await this.getToken(session);
-
-					if (!token) {
-						Logger.appendLine('Auth> Unable to get token', CredentialStore.ID);
-						this._telemetry.sendTelemetryEvent('auth.failed');
-						return undefined;
-					}
-
-					isPatTokenAuth = false;
+				const auth = await this.acquireToken();
+				if (!auth) {
+					return undefined;
 				}
 
-				const azdo = new Azdo(orgConfig.orgUrl, orgConfig.projectName, token, isPatTokenAuth);
+				const azdo = new Azdo(orgConfig.orgUrl, orgConfig.projectName, auth.token, auth.isPatTokenAuth);
 				const connectionData = await azdo.connection.connect();
 				azdo.authenticatedUser = connectionData.authenticatedUser;
 				initAvatarCache(azdo.connection);

@@ -190,7 +190,7 @@ export default tseslint.config(
 		plugins: { sonarjs },
 		rules: {
 			...downgradeToWarn(sonarjs.configs.recommended.rules),
-			'sonarjs/cognitive-complexity': ['warn', 15],
+			'sonarjs/cognitive-complexity': ['error', 15],
 			// A legacy codebase self-reports its TODOs; the tag rule adds no signal here.
 			'sonarjs/todo-tag': 'off',
 			// Promoted to error: cleared to zero during the lint burndown (evidence-based flip).

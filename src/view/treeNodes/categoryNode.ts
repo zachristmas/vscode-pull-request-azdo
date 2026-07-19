@@ -145,6 +145,93 @@ export class CategoryTreeNode extends TreeNode implements vscode.TreeItem {
 		}
 	}
 
+	// Loads local (checked-out) pull request branches into this.prs. Returns needLogin.
+	private async fetchLocalPullRequests(): Promise<boolean> {
+		try {
+			this.prs = await this._folderRepoManager.getLocalPullRequests();
+			/* __GDPR__
+				"pr.expand.local" : {}
+			*/
+			this._telemetry.sendTelemetryEvent('pr.expand.local');
+			return false;
+		} catch (e) {
+			vscode.window.showErrorMessage(`Fetching local pull requests failed: ${formatError(e)}`);
+			return e instanceof AuthenticationError;
+		}
+	}
+
+	private sendExpandTelemetry(): void {
+		switch (this._type) {
+			case PRType.AllActive:
+				/* __GDPR__
+					"pr.expand.all" : {}
+				*/
+				this._telemetry.sendTelemetryEvent('pr.expand.all');
+				break;
+			case PRType.CreatedByMe:
+				/* __GDPR__
+					"pr.expand.query" : {}
+				*/
+				this._telemetry.sendTelemetryEvent('pr.expand.createdByMe');
+				break;
+			case PRType.AssignedToMe:
+				/* __GDPR__
+					"pr.expand.query" : {}
+				*/
+				this._telemetry.sendTelemetryEvent('pr.expand.query');
+				break;
+		}
+	}
+
+	// Replaces this.prs with the first page(s) for this category. Returns paging flags + needLogin.
+	private async fetchInitialPullRequestPage(): Promise<{
+		hasMorePages: boolean;
+		hasUnsearchedRepositories: boolean;
+		needLogin: boolean;
+	}> {
+		try {
+			const response = await this._folderRepoManager.getPullRequests(
+				this._type,
+				{ fetchNextPage: false },
+				this._categoryQuery,
+			);
+			this.prs = response.items;
+			this.sendExpandTelemetry();
+			return {
+				hasMorePages: response.hasMorePages,
+				hasUnsearchedRepositories: response.hasUnsearchedRepositories,
+				needLogin: false,
+			};
+		} catch (e) {
+			vscode.window.showErrorMessage(`Fetching pull requests failed: ${formatError(e)}`);
+			return { hasMorePages: false, hasUnsearchedRepositories: false, needLogin: e instanceof AuthenticationError };
+		}
+	}
+
+	// Appends the next page for this category to this.prs. Returns paging flags + needLogin.
+	private async fetchAdditionalPullRequestPage(): Promise<{
+		hasMorePages: boolean;
+		hasUnsearchedRepositories: boolean;
+		needLogin: boolean;
+	}> {
+		try {
+			const response = await this._folderRepoManager.getPullRequests(
+				this._type,
+				{ fetchNextPage: true },
+				this._categoryQuery,
+			);
+			this.prs = [...this.prs, ...response.items];
+			return {
+				hasMorePages: response.hasMorePages,
+				hasUnsearchedRepositories: response.hasUnsearchedRepositories,
+				needLogin: false,
+			};
+		} catch (e) {
+			vscode.window.showErrorMessage(`Fetching pull requests failed: ${formatError(e)}`);
+			return { hasMorePages: false, hasUnsearchedRepositories: false, needLogin: e instanceof AuthenticationError };
+		}
+	}
+
 	async getChildren(): Promise<TreeNode[]> {
 		if (this.childrenDisposables && this.childrenDisposables.length) {
 			this.childrenDisposables.forEach(dp => dp.dispose());
@@ -152,71 +239,14 @@ export class CategoryTreeNode extends TreeNode implements vscode.TreeItem {
 
 		let hasMorePages = false;
 		let hasUnsearchedRepositories = false;
-		let needLogin = false;
+		let needLogin: boolean;
 		if (this._type === PRType.LocalPullRequest) {
-			try {
-				this.prs = await this._folderRepoManager.getLocalPullRequests();
-				/* __GDPR__
-					"pr.expand.local" : {}
-				*/
-				this._telemetry.sendTelemetryEvent('pr.expand.local');
-			} catch (e) {
-				vscode.window.showErrorMessage(`Fetching local pull requests failed: ${formatError(e)}`);
-				needLogin = e instanceof AuthenticationError;
-			}
+			needLogin = await this.fetchLocalPullRequests();
+		} else if (!this.fetchNextPage) {
+			({ hasMorePages, hasUnsearchedRepositories, needLogin } = await this.fetchInitialPullRequestPage());
 		} else {
-			if (!this.fetchNextPage) {
-				try {
-					const response = await this._folderRepoManager.getPullRequests(
-						this._type,
-						{ fetchNextPage: false },
-						this._categoryQuery,
-					);
-					this.prs = response.items;
-					hasMorePages = response.hasMorePages;
-					hasUnsearchedRepositories = response.hasUnsearchedRepositories;
-
-					switch (this._type) {
-						case PRType.AllActive:
-							/* __GDPR__
-								"pr.expand.all" : {}
-							*/
-							this._telemetry.sendTelemetryEvent('pr.expand.all');
-							break;
-						case PRType.CreatedByMe:
-							/* __GDPR__
-								"pr.expand.query" : {}
-							*/
-							this._telemetry.sendTelemetryEvent('pr.expand.createdByMe');
-							break;
-						case PRType.AssignedToMe:
-							/* __GDPR__
-								"pr.expand.query" : {}
-							*/
-							this._telemetry.sendTelemetryEvent('pr.expand.query');
-							break;
-					}
-				} catch (e) {
-					vscode.window.showErrorMessage(`Fetching pull requests failed: ${formatError(e)}`);
-					needLogin = e instanceof AuthenticationError;
-				}
-			} else {
-				try {
-					const response = await this._folderRepoManager.getPullRequests(
-						this._type,
-						{ fetchNextPage: true },
-						this._categoryQuery,
-					);
-					this.prs = [...this.prs, ...response.items];
-					hasMorePages = response.hasMorePages;
-					hasUnsearchedRepositories = response.hasUnsearchedRepositories;
-				} catch (e) {
-					vscode.window.showErrorMessage(`Fetching pull requests failed: ${formatError(e)}`);
-					needLogin = e instanceof AuthenticationError;
-				}
-
-				this.fetchNextPage = false;
-			}
+			({ hasMorePages, hasUnsearchedRepositories, needLogin } = await this.fetchAdditionalPullRequestPage());
+			this.fetchNextPage = false;
 		}
 
 		if (this.prs && this.prs.length) {
