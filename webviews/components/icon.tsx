@@ -1,4 +1,3 @@
- 
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -18,6 +17,7 @@ export const chevronIcon = <Icon src={require('../../resources/icons/chevron.svg
 export const commentIcon = <Icon src={require('../../resources/icons/comment.svg')} />;
 export const commitIcon = <Icon src={require('../../resources/icons/commit_icon.svg')} />;
 export const copyIcon = <Icon src={require('../../resources/icons/copy.svg')} />;
+export const linkIcon = <Icon src={require('../../resources/icons/link.svg')} />;
 export const crossIcon = <Icon src={require('../../resources/icons/delete.svg')} />;
 export const mergeIcon = <Icon src={require('../../resources/icons/merge_icon.svg')} />;
 export const editIcon = <Icon src={require('../../resources/icons/edit.svg')} />;
