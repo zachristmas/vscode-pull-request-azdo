@@ -473,20 +473,37 @@ body button .icon {
 
 .overview-title {
 	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	column-gap: var(--azdo-space-3);
+	row-gap: var(--azdo-space-2);
 	position: relative;
 }
 
 .overview-title h2 {
 	font-size: 24px;
+	/* Take the row's free width and, when it runs out, keep the title on line one at full width
+	   while the action cluster wraps below - the title is never squeezed by the actions. */
+	flex: 1 1 auto;
+	margin: 0;
 }
 
 .overview-title textarea {
 	min-height: 50px;
 }
 
+/* The action cluster (icon toolbar + checkout/refresh buttons) rides to the right of the title and
+   wraps below it as a unit when the panel is narrow, instead of squeezing the title. */
+.overview-title .title-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-3);
+	margin-left: auto;
+	flex: 0 0 auto;
+}
+
 .overview-title .button-group {
 	padding-top: 5px;
-	margin-left: auto;
 	display: flex;
 	align-self: start;
 }
@@ -1149,15 +1166,53 @@ code {
 	display: inline-flex;
 }
 
-/* item 2: the title action bar (Edit / Copy Link / Convert to draft) is always rendered now; reveal
-   it on hover OR keyboard focus-within so it is reachable without a mouse. */
+/* Always-visible title action toolbar. Sits inside .title-actions (which right-aligns the whole
+   cluster); padding-top lines the icon buttons up with the checkout/refresh group. */
 .overview-title .title-action-bar {
-	display: none;
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-1);
+	padding-top: 5px;
 }
 
-.overview-title:hover .title-action-bar,
-.overview-title:focus-within .title-action-bar {
-	display: flex;
+/* Uniform icon button: a subtle square that reads as a toolbar action, with a hover/focus wash
+   instead of filled-button chrome (VS Code editor-toolbar idiom). */
+.title-action-bar .title-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	height: 28px;
+	min-width: 28px;
+	padding: 0 var(--azdo-space-1);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: var(--azdo-radius-md);
+	color: var(--azdo-muted);
+	cursor: pointer;
+}
+
+.title-action-bar .title-action .icon {
+	margin: 0;
+}
+
+.title-action-bar .title-action:hover:enabled,
+.title-action-bar .title-action:focus-visible:enabled {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+/* The one text action in the toolbar (Convert to draft): reads as a subtle ghost button next to the
+   icons, not a primary filled button. */
+.title-action-bar .title-action-text {
+	padding: 0 var(--azdo-space-2);
+	font-size: 12px;
+	color: var(--azdo-muted);
+}
+
+.title-action-bar .title-action-text:hover:enabled,
+.title-action-bar .title-action-text:focus-visible:enabled {
+	color: var(--vscode-foreground);
+	border-color: var(--azdo-border-subtle);
 }
 
 .title-editing-form {

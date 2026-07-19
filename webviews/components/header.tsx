@@ -12,7 +12,7 @@ import * as React from 'react';
 
 import { useContext, useState } from 'react';
 
-import { checkIcon, copyIcon, editIcon } from './icon';
+import { checkIcon, copyIcon, editIcon, linkIcon } from './icon';
 import { Spaced } from './space';
 // eslint-disable-next-line import-x/no-named-as-default
 import Timestamp from './timestamp';
@@ -116,49 +116,63 @@ function Title({
 			  Add an empty selectable div here to block triple click on title from selecting the following buttons. Issue #628.
 			*/}
 			</div>
-			{/* item 2: the title actions (Edit / Copy Link / Convert to draft) are always in the DOM now
-			    and revealed on hover OR focus-within (see index.css .title-action-bar), so keyboard users
-			    can reach them - they were previously gated on an onMouseEnter-only showActionBar state. */}
-			{canEdit && !inEditMode ? (
-				<div className="flex-action-bar comment-actions title-action-bar">
-					{isActive ? (
-						<button title="Edit" onClick={() => setEditMode(true)}>
-							{editIcon}
-						</button>
-					) : null}
-					{
-						<button title="Copy Link" onClick={copyPrLink}>
-							{copyIcon}
-						</button>
-					}
-					{
-						<button
-							title="Copy a vscode:// link that opens this pull request in VS Code"
-							onClick={copyVscodeDeepLink}
-						>
-							Copy VS Code Link
-						</button>
-					}
-					{canConvertToDraft ? (
-						<button
-							title="Convert to draft"
-							onClick={async () => {
-								const result = await convertToDraft();
-								if (result && result.isDraft) {
-									updatePR({ isDraft: true });
-								}
-							}}
-						>
-							Convert to draft
-						</button>
+			{/* The title (above) keeps flex priority; this whole action cluster wraps to its own line
+			    when the panel is too narrow, so the title never gets squeezed. */}
+			<div className="title-actions">
+				{/* Always-visible action toolbar (no longer hover-revealed): a row of uniform icon
+				    buttons for the quick metadata actions, plus Convert to draft as a subtle labeled
+				    action. Every control carries a title + aria-label so it stays discoverable and
+				    keyboard-reachable. */}
+				<div className="title-action-bar">
+					{canEdit && !inEditMode ? (
+						<>
+							{isActive ? (
+								<button
+									className="title-action"
+									title="Edit title"
+									aria-label="Edit title"
+									onClick={() => setEditMode(true)}
+								>
+									{editIcon}
+								</button>
+							) : null}
+							<button
+								className="title-action"
+								title="Copy a link to this pull request"
+								aria-label="Copy pull request link"
+								onClick={copyPrLink}
+							>
+								{copyIcon}
+							</button>
+							<button
+								className="title-action"
+								title="Copy a vscode:// link that opens this pull request in VS Code"
+								aria-label="Copy VS Code link"
+								onClick={copyVscodeDeepLink}
+							>
+								{linkIcon}
+							</button>
+							{canConvertToDraft ? (
+								<button
+									className="title-action title-action-text"
+									title="Convert this pull request back to a draft"
+									onClick={async () => {
+										const result = await convertToDraft();
+										if (result && result.isDraft) {
+											updatePR({ isDraft: true });
+										}
+									}}
+								>
+									Convert to draft
+								</button>
+							) : null}
+						</>
 					) : null}
 				</div>
-			) : (
-				<div className="flex-action-bar comment-actions title-action-bar"></div>
-			)}
-			<div className="button-group">
-				<CheckoutButtons {...{ isCurrentlyCheckedOut, isIssue, isActive }} />
-				<button onClick={refresh}>Refresh</button>
+				<div className="button-group">
+					<CheckoutButtons {...{ isCurrentlyCheckedOut, isIssue, isActive }} />
+					<button onClick={refresh}>Refresh</button>
+				</div>
 			</div>
 		</div>
 	);
