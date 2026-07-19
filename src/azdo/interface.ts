@@ -277,5 +277,10 @@ export interface PullRequestPolicyEvaluation {
 		result?: number; // BuildResult, BuildInterfaces.d.ts:260
 		webUrl?: string; // Build._links.web.href, BuildInterfaces.d.ts:135
 		isExpired?: boolean; // evaluation context
+		// POL-06: a build IS queued (context.buildId set) but the getBuild enrichment could not read it,
+		// almost always because the caller lacks Build (read) permission on the pipeline. The row still
+		// renders from the Policy API; this flag lets the webview say so quietly instead of showing a
+		// bare "(Build <id>)" with no number/result and a dead Details link.
+		detailsUnavailable?: boolean;
 	};
 }

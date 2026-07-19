@@ -388,6 +388,18 @@ const PolicyRow = ({
 		buildLabel = 'Queue';
 	}
 
+	// POL-06: the status row itself comes from the Policy API and needs no build permission. Only the
+	// number/result/Details enrichment does; when it is missing say so quietly rather than leaving a
+	// bare row with a dead Details link.
+	let buildDetail: React.ReactNode = null;
+	if (policy.build?.detailsUnavailable) {
+		buildDetail = (
+			<span className="text-muted build-details-note">build details unavailable (needs Build read permission)</span>
+		);
+	} else if (policy.build?.webUrl) {
+		buildDetail = <a href={policy.build.webUrl}>Details</a>;
+	}
+
 	return (
 		<div className="status-check">
 			<div>
@@ -401,7 +413,7 @@ const PolicyRow = ({
 			</div>
 			{policy.kind === 'build' ? (
 				<div className="policy-build-actions">
-					{policy.build?.webUrl ? <a href={policy.build.webUrl}>Details</a> : null}
+					{buildDetail}
 					{nbsp}
 					<button disabled={isBusy} onClick={requeue}>
 						{isBusy ? 'Queuing...' : buildLabel}
@@ -413,6 +425,11 @@ const PolicyRow = ({
 };
 
 function buildDetailSuffix(policy: PullRequestPolicyEvaluation): string {
+	if (policy.build?.detailsUnavailable) {
+		// POL-06: don't render "(Build <id>)" with no number/result - the inline note in PolicyRow
+		// explains the enrichment is missing.
+		return '';
+	}
 	if (!policy.build?.buildId) {
 		return ' (build not queued)';
 	}

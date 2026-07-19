@@ -924,6 +924,9 @@ export class PullRequestModel implements IPullRequestModel {
 				result: build?.result,
 				webUrl: (build?._links as any)?.web?.href,
 				isExpired: context?.isExpired,
+				// POL-06: a build was queued (context.buildId) but getBuild returned nothing - the .catch
+				// swallowed a failure, almost always a missing Build (read) permission on the pipeline.
+				detailsUnavailable: !!context?.buildId && !build,
 			};
 		});
 	}
