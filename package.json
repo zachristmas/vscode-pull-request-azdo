@@ -2,7 +2,7 @@
 	"name": "azdo-pull-requests-multiproject",
 	"displayName": "AzDO Pull Requests (Multi-Project)",
 	"description": "Pull Request Provider for Azure DevOps with multi-project workspace support. Fork of ankitbko/vscode-pull-request-azdo.",
-	"icon": "",
+	"icon": "resources/icons/azdo_logo.png",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/zachristmas/vscode-pull-request-azdo"
@@ -26,7 +26,15 @@
 		"vscode": "^1.97.0"
 	},
 	"categories": [
-		"Other"
+		"SCM Providers"
+	],
+	"keywords": [
+		"azure devops",
+		"azure repos",
+		"azdo",
+		"pull request",
+		"code review",
+		"multi-project"
 	],
 	"activationEvents": [
 		"onStartupFinished",

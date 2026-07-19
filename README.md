@@ -15,8 +15,10 @@ Works with git repositories on Azure DevOps Services (dev.azure.com). TFVC is no
 - See exactly **which branch policies block completion**: minimum reviewers, comment resolution, required reviewers, work item linking, and build validation, with build click-through and re-queue
 - **Set or cancel auto-complete** with merge strategy, merge commit message, delete-source-branch, and work item transition options; strategy choices respect the branch's "Limit merge types" policy
 - Comment on code with **thread statuses** (Active, Resolved, Won't fix, Closed, Pending) that stay anchored to the right lines across new pushes
+- **Create pull requests** and drafts from the current branch, with the target branch prefilled from the repository default
 - Manage the whole lifecycle: publish drafts, convert back to draft, complete, and clean up branches afterward
 - Link, view, and remove **work items** on a PR
+- **Share a PR**: copy its web URL, a link to a file's diff, or a `vscode://` deep link that opens the PR (and a specific file and line) in a teammate's VS Code
 
 ## See why a PR can't complete
 
@@ -40,9 +42,9 @@ Review comments live where the code does: threads render inline in the diff edit
 
 ![Inline threads in the diff editor](documentation/images/v15/editor-threads.png)
 
-On the description page the same threads appear as cards with a status pill (Active, Resolved, Won't fix, ...), collapse when resolved, and jump to the diff from the file chip. Thread positions are tracked server-side, so a force-push or follow-up commit moves your comments with the code instead of leaving them stranded.
+On the description page the same threads appear as cards headed by the file path and the anchoring line number, with a status pill (Active, Resolved, Won't fix, ...) that collapses the card once the thread is resolved. Each card shows a short excerpt of the commented code, so a thread is triageable without opening the file, and the file chip jumps straight to that line in the diff. Thread positions are tracked server-side, so a force-push or follow-up commit moves your comments with the code instead of leaving them stranded.
 
-![Comment threads](documentation/images/v15/thread-cards.png)
+![Comment threads with inline diff context](documentation/images/v15/thread-cards.png)
 
 ## A clear end state
 
@@ -55,6 +57,14 @@ Merged and abandoned PRs show a read-only outcome summary: final state, comment 
 Local branches with PRs, Created By Me, Assigned To Me, All Active, and All Pull Requests (for finding completed ones), across every repository in the workspace.
 
 ![Pull request tree](documentation/images/v15/pr-tree.png)
+
+## Share a PR, or open one in VS Code
+
+Copy a PR's web URL, a link straight to a file's diff, or a `vscode://` **deep link** that opens the PR in a teammate's VS Code. Every one of these is reachable from the PR list row, the description header, and the command palette.
+
+![Copy a shareable link from the description header](documentation/images/v15/share-deeplink.png)
+
+Opening a deep link (`vscode://.../open-pr?...&path=/src/file.ts&line=42`) finds the workspace folder that clones the repo, opens the PR description page, and, when the link carries a file and line, jumps to that exact spot in the diff. "Take a look at this" now lands the reviewer on the right line instead of a repo URL.
 
 ## Getting started
 
@@ -100,6 +110,7 @@ Local branches with PRs, Created By Me, Assigned To Me, All Active, and All Pull
 
 ## Version highlights
 
+- **1.6.0**: deep links in both directions (copy a PR URL, a link to a file's diff, or a `vscode://` link; and open a PR from a `vscode://` link, jumping to a file and line); the create-pull-request flow rebuilt for Azure DevOps (Create Pull Request and Create Draft Pull Request); description-page thread chips carry the thread's line number and open the diff at that line. See the [CHANGELOG](CHANGELOG.md).
 - **1.5.0**: branch policy evaluations with build click-through and re-queue; auto-complete with full completion options; policy-aware merge strategy choices; full reviewer vote spectrum with palette commands; comment threads tracked across pushes; draft publish and convert-to-draft; one description panel per PR; outcome summaries on finished PRs; theme-aware UI refresh; repaired completion, work item transition, and branch cleanup flows. See the [CHANGELOG](CHANGELOG.md).
 - **1.1.0 to 1.3.0**: multi-project workspaces, authenticated avatars, SSH and visualstudio.com remote detection, paginated large-PR diffs, checkout by PR ID, viewed-state fixes, comment anchoring fixes.
 
