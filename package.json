@@ -587,7 +587,7 @@
 				},
 				{
 					"command": "azdopr.copyVscodeDeepLink",
-					"when": "gitOpenRepositoryCount != 0 && azdo:inReviewMode"
+					"when": "gitOpenRepositoryCount != 0 && azdo:initialized"
 				},
 				{
 					"command": "azdopr.copyFileLinkInPullRequest",
@@ -769,6 +769,11 @@
 					"command": "azdopr.copyVscodeDeepLink",
 					"when": "view == azdopr:azdo && viewItem =~ /pullrequest|description/",
 					"group": "pullrequest@5"
+				},
+				{
+					"command": "azdopr.copyVscodeDeepLink",
+					"when": "view == azdopr:azdo && viewItem =~ /pullrequest/",
+					"group": "inline"
 				},
 				{
 					"command": "azdopr.deleteLocalBranch",

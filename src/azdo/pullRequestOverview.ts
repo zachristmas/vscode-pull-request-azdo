@@ -13,6 +13,7 @@ import {
 import { AccountRecentActivityWorkItemModel2, WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as vscode from 'vscode';
 import { onDidUpdatePR } from '../commands';
+import { buildPullRequestDeepLink, deepLinkParamsFromPullRequest } from '../common/deepLink';
 import { DiffHunk } from '../common/diffHunk';
 import Logger from '../common/logger';
 import { formatError } from '../common/utils';
@@ -418,6 +419,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		if (message.command === 'alert') {
 			vscode.window.showErrorMessage(message.args);
 			return;
+		}
+		if (message.command === 'pr.copy-vscode-deeplink') {
+			return this.copyVscodeDeepLink(message);
 		}
 		switch (message.command) {
 			case 'pr.checkout':
@@ -1064,6 +1068,18 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	private async copyPrLink(_message: IRequestMessage<string>): Promise<void> {
 		await vscode.env.clipboard.writeText(this._item.url ?? '');
 		vscode.window.showInformationMessage(`Copied link to PR ${this._item.item.title}!`);
+	}
+
+	private async copyVscodeDeepLink(_message: IRequestMessage<undefined>): Promise<void> {
+		const params = deepLinkParamsFromPullRequest(this._item);
+		if (!params) {
+			vscode.window.showErrorMessage(
+				'Unable to build a deep link: the organization or project of this pull request could not be determined.',
+			);
+			return;
+		}
+		await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
+		vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
 	}
 
 	protected editCommentPromise(comment: Comment, threadId: number, text: string): Promise<Comment> {
