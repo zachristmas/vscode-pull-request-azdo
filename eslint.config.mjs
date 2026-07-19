@@ -1,6 +1,7 @@
 import eslint from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import importX from 'eslint-plugin-import-x';
+import reactHooks from 'eslint-plugin-react-hooks';
 import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
 import tseslint from 'typescript-eslint';
@@ -350,6 +351,16 @@ export default tseslint.config(
 			'unicorn/prefer-switch': 'error',
 			'unicorn/prefer-type-error': 'error',
 			'unicorn/prefer-type-literal-last': 'error',
+		},
+	},
+	{
+		name: 'react-hooks-shadow',
+		files: ['webviews/**/*.{ts,tsx}'],
+		plugins: { 'react-hooks': reactHooks },
+		// House rule: new rules ship warn-first; promote on evidence.
+		rules: {
+			'react-hooks/rules-of-hooks': 'warn',
+			'react-hooks/exhaustive-deps': 'warn',
 		},
 	},
 	prettier,

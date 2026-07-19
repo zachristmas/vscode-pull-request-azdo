@@ -23,7 +23,7 @@ export function Root({ children }: { children: (pr: PullRequest) => JSX.Element 
 		// eslint-disable-next-line unicorn/prefer-add-event-listener
 		ctx.onchange = setPR;
 		setPR(ctx.pr);
-	}, []);
+	}, [ctx]);
 	ctx.postMessage({ command: 'ready' });
 	ctx.postMessage({ command: 'pr.debug', args: 'initialized ' + (pr ? 'with PR' : 'without PR') });
 	return pr ? children(pr) : <div className="loading-indicator">Loading...</div>;

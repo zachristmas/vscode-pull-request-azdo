@@ -31,31 +31,26 @@ const successIcon = <span className="text-success">{checkIcon}</span>;
 const dangerIcon = <span className="text-danger">{crossIcon}</span>;
 const mutedIcon = <span className="text-muted">{pendingIcon}</span>;
 
-export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
-	if (pr.isIssue) {
-		return null;
-	}
+// Wrapper keeps the isIssue bail-out outside the component that owns hooks, so hooks run
+// unconditionally (rules-of-hooks).
+export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) =>
+	pr.isIssue ? null : <PullRequestStatusChecks pr={pr} isSimple={isSimple} />;
+
+const PullRequestStatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
 	const { state } = pr;
 	const { checkStatus } = useContext(PullRequestContext);
 	// POL-09: statuses were fetched once per overview load; refresh them on the same 3s cycle the
 	// mergeability poll already uses so build results update without reopening the panel.
 	const [status, setStatus] = useState(pr.status);
-	const [showDetails, toggleDetails] = useReducer(
-		show => !show,
-		status.statuses.some(s => s.state === GitStatusState.Failed),
-	) as [boolean, () => void];
+	const [showDetails, setShowDetails] = useState(() => status.statuses.some(s => s.state === GitStatusState.Failed));
+	const toggleDetails = () => setShowDetails(shown => !shown);
 
 	useEffect(() => {
-		if (status.statuses.some(s => s.state === GitStatusState.Failed || s.state === GitStatusState.Error)) {
-			if (!showDetails) {
-				toggleDetails();
-			}
-		} else {
-			if (showDetails) {
-				toggleDetails();
-			}
-		}
-	}, status.statuses);
+		// Force details open while any check is failing, closed once all recover (manual toggles
+		// still apply between status refreshes) - same net effect as the old toggle-based version,
+		// whose dependency list was `status.statuses` itself rather than an array literal.
+		setShowDetails(status.statuses.some(s => s.state === GitStatusState.Failed || s.state === GitStatusState.Error));
+	}, [status.statuses]);
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
@@ -602,9 +597,7 @@ export const MergeSimple = (pr: PullRequest) => {
 		updatePR({ state });
 	}
 
-	const enabledMethods = (Object.keys(MERGE_METHODS) as MergeMethod[]).filter(
-		method => pr.mergeMethodsAvailability[method],
-	);
+	const enabledMethods = (Object.keys(MERGE_METHODS) as MergeMethod[]).filter(method => pr.mergeMethodsAvailability[method]);
 	const availableOptions: { [method: string]: string } = Object.fromEntries(
 		enabledMethods.map(key => [key, MERGE_METHODS[key]]),
 	);

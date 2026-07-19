@@ -18,6 +18,9 @@ export function useStateProp<S>(prop: S): [S, Dispatch<SetStateAction<S>>] {
 		if (state !== prop) {
 			setState(prop);
 		}
+		// state is intentionally NOT a dependency: local edits may diverge until the prop changes;
+		// adding it would revert them on every keystroke.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [prop]);
 	return [state, setState];
 }

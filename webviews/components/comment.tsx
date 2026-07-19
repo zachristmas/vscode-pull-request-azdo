@@ -164,7 +164,7 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 			draftComment.current.dirty = false;
 		}, 500);
 		return () => clearInterval(interval);
-	}, [draftComment]);
+	}, [draftComment, id, updateDraft]);
 
 	const submit = useCallback(async () => {
 		const { markdown, submitButton }: FormInputSet = form.current!;
@@ -246,6 +246,8 @@ const renderers = {
 };
 
 export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, body }: Embodied) => {
+	// Hook must run unconditionally (rules-of-hooks); it was previously below the early return.
+	const { applyPatch } = useContext(PullRequestContext);
 	if (!body && !bodyHTML) {
 		// UX-03: dashed-border muted placeholder rather than a bare line - it reads as a fillable slot
 		// (Edit lives in the hover/focus actions, canEdit permitting).
@@ -256,7 +258,6 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 		);
 	}
 
-	const { applyPatch } = useContext(PullRequestContext);
 	// const renderedBody = <div dangerouslySetInnerHTML={{ __html: bodyHTML }} />;
 	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={body ?? ''} />;
 	const containsSuggestion = (body || bodyHTML || '').includes('```diff');
@@ -334,11 +335,18 @@ export function AddComment({ pendingCommentText, hasWritePermission, isIssue, is
 	const form = useRef<HTMLFormElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-	emitter.addListener('quoteReply', message => {
-		updatePR({ pendingCommentText: `> ${message} \n\n` });
-		textareaRef.current!.scrollIntoView();
-		textareaRef.current!.focus();
-	});
+	useEffect(() => {
+		// Registering on every render leaked one listener per render; subscribe once with cleanup.
+		const quoteReply = (message: string) => {
+			updatePR({ pendingCommentText: `> ${message} \n\n` });
+			textareaRef.current!.scrollIntoView();
+			textareaRef.current!.focus();
+		};
+		emitter.addListener('quoteReply', quoteReply);
+		return () => {
+			emitter.removeListener('quoteReply', quoteReply);
+		};
+	}, [updatePR]);
 
 	const submit = useCallback(
 		async (command: (body: string) => Promise<any> = comment) => {
