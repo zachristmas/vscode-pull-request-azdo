@@ -99,7 +99,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 				try {
 					return await this._replyMessage(message, await this._item.getStatusChecks());
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			case 'pr.checkPolicies':
 				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
@@ -111,7 +111,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
 					);
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			// The sidebar webview posts pr.debug on every mount (activityBarView/app.tsx). Without a case
 			// it hit the throwing default below and rejected an uncaught promise per activation; mirror
@@ -135,7 +135,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 			this._folderRepositoryManager.getPullRequestRepositoryAccessAndMergeMethods(pullRequestModel),
 			// POL-05: pre-stage the sidebar compact policy summary here; POL-01's fetch failure must not
 			// sink the whole sidebar the way the other members here fail loudly.
-			pullRequestModel.getPolicyEvaluations().catch(() => undefined),
+			pullRequestModel.getPolicyEvaluations().catch(() => {}),
 			// POL-05: the checked-out-PR sidebar previously hardcoded status: { statuses: [] }, so the
 			// shared StatusChecks/PolicySection components (isSimple=true) never showed anything even
 			// though the overview side already renders both.
@@ -168,7 +168,9 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 					.get<MergeMethod>('defaultMergeMethod');
 				const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 				const currentUser = this._folderRepositoryManager.getCurrentUser();
-				this._existingReviewers = (pullRequest.item.reviewers ?? []).map(convertIdentityRefWithVoteToReviewer);
+				this._existingReviewers = (pullRequest.item.reviewers ?? []).map(reviewer =>
+					convertIdentityRefWithVoteToReviewer(reviewer),
+				);
 
 				this._postMessage({
 					command: 'pr.initialize',
@@ -244,69 +246,71 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 	// }
 
 	private updateReviewers(review?: IdentityRefWithVote): void {
-		if (review) {
-			const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
-			if (existingReviewer) {
-				existingReviewer.state = review.vote ?? 0;
-				existingReviewer.isRequired = review.isRequired ?? false;
-			} else {
-				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
-			}
+		if (!review) {
+			return;
+		}
+
+		const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
+		if (existingReviewer) {
+			existingReviewer.state = review.vote ?? 0;
+			existingReviewer.isRequired = review.isRequired ?? false;
+		} else {
+			this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 		}
 	}
 
-	private votePullRequest(message: IRequestMessage<number>): void {
-		this._item.submitVote(message.args).then(
-			review => {
-				this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-				//refresh the pr list as the vote changed
-				vscode.commands.executeCommand('azdopr.refreshList');
-			},
-			e => {
-				vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
-			},
-		);
+	private async votePullRequest(message: IRequestMessage<number>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.submitVote(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
+		//refresh the pr list as the vote changed
+		vscode.commands.executeCommand('azdopr.refreshList');
 	}
 
-	private approvePullRequest(message: IRequestMessage<string>): void {
-		this._item.submitVote(PullRequestVote.APPROVED).then(
-			review => {
-				this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-				//refresh the pr list as this one is approved
-				vscode.commands.executeCommand('azdopr.refreshList');
-			},
-			e => {
-				vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
+	private async approvePullRequest(message: IRequestMessage<string>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.submitVote(PullRequestVote.APPROVED);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
 
-				this._throwError(message, `${formatError(e)}`);
-			},
-		);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
+		//refresh the pr list as this one is approved
+		vscode.commands.executeCommand('azdopr.refreshList');
 	}
 
-	private submitReview(message: IRequestMessage<string>): void {
-		this._item.createThread(message.args).then(
-			review => {
-				// TODO Do I need to update reviewer?
-				// this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Submitting review failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
-			},
-		);
+	private async submitReview(message: IRequestMessage<string>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.createThread(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Submitting review failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		// TODO Do I need to update reviewer?
+		// this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
 	}
 
 	private async deleteBranch(message: IRequestMessage<any>) {
@@ -439,7 +443,7 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 					isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
 				} failed. ${formatError(e)}`,
 			);
-			this._throwError(message, `${formatError(e)}`);
+			this._throwError(message, formatError(e));
 		}
 	}
 

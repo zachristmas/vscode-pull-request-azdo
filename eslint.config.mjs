@@ -1,23 +1,14 @@
 import eslint from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import importX from 'eslint-plugin-import-x';
+import reactHooks from 'eslint-plugin-react-hooks';
 import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
 import tseslint from 'typescript-eslint';
 
-// Shadow mode (see repo convention): new rule sets enter as warnings only; individual rules get
-// promoted to 'error' on evidence, not on a date.
-function downgradeToWarn(rules) {
-	return Object.fromEntries(
-		Object.entries(rules).map(([id, conf]) => {
-			if (Array.isArray(conf)) {
-				return [id, conf[0] === 'off' ? conf : ['warn', ...conf.slice(1)]];
-			}
-			return [id, conf === 'off' ? 'off' : 'warn'];
-		}),
-	);
-}
-
+// Shadow mode is over: the 2026-07 lint burndown drove every sonarjs/unicorn recommended rule
+// to zero, so both sets now run at their natural (error) severity. New rule sets still enter
+// warn-first (see react-hooks below); individual rules get promoted on evidence, not on a date.
 // Flat-config port of the old .eslintrc.base.json (ESLint 7 / typescript-eslint 4 era).
 // Rule intent preserved 1:1, including the deliberate offs; import/* rules moved to
 // eslint-plugin-import-x (eslint-plugin-import has no ESLint 10 support).
@@ -139,8 +130,10 @@ export default tseslint.config(
 				},
 			],
 			'@typescript-eslint/await-thenable': 'error',
+			'import-x/no-named-as-default': 'error',
+			'import-x/no-named-as-default-member': 'error',
 			'@typescript-eslint/consistent-type-assertions': [
-				'warn',
+				'error',
 				{
 					assertionStyle: 'as',
 					objectLiteralTypeAssertions: 'allow-as-parameter',
@@ -171,7 +164,7 @@ export default tseslint.config(
 			'@typescript-eslint/no-unsafe-member-access': 'off',
 			'@typescript-eslint/no-unsafe-return': 'off',
 			'@typescript-eslint/no-unused-expressions': ['warn', { allowShortCircuit: true }],
-			'@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+			'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
 			'@typescript-eslint/no-use-before-define': 'off',
 			'@typescript-eslint/prefer-regexp-exec': 'off',
 			'@typescript-eslint/prefer-nullish-coalescing': 'off',
@@ -184,20 +177,20 @@ export default tseslint.config(
 		},
 	},
 	{
-		name: 'sonarjs-shadow',
+		name: 'sonarjs',
 		plugins: { sonarjs },
 		rules: {
-			...downgradeToWarn(sonarjs.configs.recommended.rules),
-			'sonarjs/cognitive-complexity': ['warn', 15],
+			...sonarjs.configs.recommended.rules,
+			'sonarjs/cognitive-complexity': ['error', 15],
 			// A legacy codebase self-reports its TODOs; the tag rule adds no signal here.
 			'sonarjs/todo-tag': 'off',
 		},
 	},
 	{
-		name: 'unicorn-shadow',
+		name: 'unicorn',
 		plugins: { unicorn },
 		rules: {
-			...downgradeToWarn(unicorn.configs.recommended.rules),
+			...unicorn.configs.recommended.rules,
 			// Churn-heavy stylistic rules that would bury the useful signal in this codebase
 			// (top offenders measured at 2283 warnings on first run; these are style-only):
 			'unicorn/prevent-abbreviations': 'off',
@@ -214,6 +207,33 @@ export default tseslint.config(
 			'unicorn/explicit-length-check': 'off',
 			'unicorn/no-negated-condition': 'off',
 			'unicorn/no-useless-else': 'off',
+			// Name-based match hits vscode.EventEmitter (the required platform event API) and
+			// the webviews npm events shim; converting either to EventTarget is wrong here.
+			'unicorn/prefer-event-target': 'off',
+			// Demands ES2025 Iterator#toArray(): no types in the es2023 lib and no runtime
+			// support on the Node 20 extension host. The flagged [...map.values()] spreads
+			// are the correct idiom for this target.
+			'unicorn/prefer-iterator-to-array': 'off',
+			// This is a CJS extension host; module strategy changes with the TS 7 /
+			// moduleResolution rework, not here. (The redundant 'use strict' directives the
+			// rule flagged were deleted anyway - tsc alwaysStrict emits its own.)
+			'unicorn/prefer-module': 'off',
+			// The extension:webworker bundle resolves node builtins through resolve.fallback
+			// keys in webpack.config.js that are keyed WITHOUT the node: scheme, and
+			// @types/node@12 has no node:* module declarations. The node: prefix breaks both.
+			// The sole webviews hit (common/events.ts) imports the npm events shim, not the
+			// builtin, so the rule is off globally. Revisit with the TS 7 / moduleResolution rework.
+			'unicorn/prefer-node-protocol': 'off',
+		},
+	},
+	{
+		name: 'react-hooks-shadow',
+		files: ['webviews/**/*.{ts,tsx}'],
+		plugins: { 'react-hooks': reactHooks },
+		// House rule: new rules ship warn-first; promote on evidence.
+		rules: {
+			'react-hooks/rules-of-hooks': 'warn',
+			'react-hooks/exhaustive-deps': 'warn',
 		},
 	},
 	prettier,

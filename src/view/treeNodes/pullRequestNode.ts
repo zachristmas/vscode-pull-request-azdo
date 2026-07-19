@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as path from 'path';
+import path from 'path';
 import { Comment, GitPullRequestCommentThread, PullRequestAsyncStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { DescriptionNode } from './descriptionNode';
@@ -14,7 +14,7 @@ import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { CommentPermissions, CommentWithPermissions, IFileChangeNode } from '../../azdo/interface';
 import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { getPositionFromThread, removeLeadingSlash } from '../../azdo/utils';
-import { mapThreadsToBase } from '../../common/commentingRanges';
+import { mapThreadsToBase, mapThreadsToModified } from '../../common/commentingRanges';
 import { getZeroBased } from '../../common/diffPositionMapping';
 import { GitChangeType, SlimFileChange } from '../../common/file';
 import Logger from '../../common/logger';
@@ -50,7 +50,7 @@ export function getDocumentThreadDatas(
 
 	const threads: ThreadData[] = [];
 
-	const commentsPerBase = mapThreadsToBase(matchingComments, isBase);
+	const commentsPerBase = isBase ? mapThreadsToBase(matchingComments) : mapThreadsToModified(matchingComments);
 
 	for (const azdoThread of commentsPerBase) {
 		const commentAbsolutePosition = getPositionFromThread(azdoThread);
@@ -79,7 +79,7 @@ export function getDocumentThreadDatas(
 }
 
 export class PRNode extends TreeNode {
-	static ID = 'PRNode';
+	static readonly ID = 'PRNode';
 
 	private _fileChanges: (RemoteFileChangeNode | InMemFileChangeNode)[] | undefined;
 	private _commentController?: vscode.CommentController;
@@ -239,6 +239,30 @@ export class PRNode extends TreeNode {
 				sha = change.previousFileSHA;
 			}
 
+			const headFilePath = path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(fileName));
+			const parentFilePath = path.resolve(
+				this._folderReposManager.repository.rootUri.fsPath,
+				removeLeadingSlash(parentFileName),
+			);
+			const headUri = toPRUriAzdo(
+				vscode.Uri.file(headFilePath),
+				this.pullRequestModel,
+				change.baseCommit,
+				headCommit,
+				fileName,
+				false,
+				change.status,
+			);
+			const baseUri = toPRUriAzdo(
+				vscode.Uri.file(parentFilePath),
+				this.pullRequestModel,
+				change.baseCommit,
+				headCommit,
+				parentFileName,
+				true,
+				change.status,
+			);
+
 			if (change instanceof SlimFileChange) {
 				return new RemoteFileChangeNode(
 					this,
@@ -247,31 +271,8 @@ export class PRNode extends TreeNode {
 					fileName,
 					change.previousFileName,
 					change.blobUrl,
-					toPRUriAzdo(
-						vscode.Uri.file(
-							path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(fileName)),
-						),
-						this.pullRequestModel,
-						change.baseCommit,
-						headCommit,
-						fileName,
-						false,
-						change.status,
-					),
-					toPRUriAzdo(
-						vscode.Uri.file(
-							path.resolve(
-								this._folderReposManager.repository.rootUri.fsPath,
-								removeLeadingSlash(parentFileName),
-							),
-						),
-						this.pullRequestModel,
-						change.baseCommit,
-						headCommit,
-						parentFileName,
-						true,
-						change.status,
-					),
+					headUri,
+					baseUri,
 					sha,
 					change.previousFileSHA,
 				);
@@ -284,28 +285,8 @@ export class PRNode extends TreeNode {
 				fileName,
 				change.previousFileName,
 				change.blobUrl,
-				toPRUriAzdo(
-					vscode.Uri.file(
-						path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(fileName)),
-					),
-					this.pullRequestModel,
-					change.baseCommit,
-					headCommit,
-					fileName,
-					false,
-					change.status,
-				),
-				toPRUriAzdo(
-					vscode.Uri.file(
-						path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName)),
-					),
-					this.pullRequestModel,
-					change.baseCommit,
-					headCommit,
-					parentFileName,
-					true,
-					change.status,
-				),
+				headUri,
+				baseUri,
 				change.isPartial,
 				change.patch,
 				change.diffHunks,
@@ -338,12 +319,12 @@ export class PRNode extends TreeNode {
 		// blocker signal beats the per-node policy-evaluation fetch (that would be an M-sized, throttled
 		// addition; ship the free version first per ROADMAP Section 2.2).
 		const mergeStatus = this.pullRequestModel.item.mergeStatus;
-		const blockerSuffix =
-			mergeStatus === PullRequestAsyncStatus.Conflicts
-				? ' - conflicts'
-				: mergeStatus === PullRequestAsyncStatus.RejectedByPolicy
-				? ' - blocked by policy'
-				: '';
+		let blockerSuffix = '';
+		if (mergeStatus === PullRequestAsyncStatus.Conflicts) {
+			blockerSuffix = ' - conflicts';
+		} else if (mergeStatus === PullRequestAsyncStatus.RejectedByPolicy) {
+			blockerSuffix = ' - blocked by policy';
+		}
 		const tooltip = `${tooltipPrefix}${title} by ${login}${blockerSuffix}`;
 		const description = `#${formattedPRNumber} by ${login}${blockerSuffix}${autoCompleteSuffix}`;
 
@@ -358,9 +339,7 @@ export class PRNode extends TreeNode {
 				(this._isLocal ? ':local' : '') +
 				(currentBranchIsForThisPR ? ':active' : ':nonactive') +
 				(isDraft ? ':draft' : ':ready'),
-			iconPath: this.pullRequestModel.item.createdBy?.imageUrl
-				? this.pullRequestModel.item.createdBy?.imageUrl
-				: new vscode.ThemeIcon('github'),
+			iconPath: this.pullRequestModel.item.createdBy?.imageUrl || new vscode.ThemeIcon('github'),
 		};
 	}
 

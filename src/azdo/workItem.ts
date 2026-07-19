@@ -13,7 +13,7 @@ import { ITelemetry } from '../common/telemetry';
 import { errorMessage } from '../common/utils';
 
 export class AzdoWorkItem implements vscode.Disposable {
-	static ID = 'WorkItem';
+	static readonly ID = 'WorkItem';
 	private _toDispose: vscode.Disposable[] = [];
 	private _hub: Azdo | undefined;
 	private _workTracking?: IWorkItemTrackingApi;

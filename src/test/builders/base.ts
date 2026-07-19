@@ -74,7 +74,7 @@ type FieldTemplate<F, T extends Template<F>> = ScalarFieldTemplate<F> | LinkedFi
  * @param fieldTemplate Instance of a field template from some template object.
  */
 function isLinked<F, T extends Template<F>>(fieldTemplate: FieldTemplate<F, T>): fieldTemplate is LinkedFieldTemplate<F, T> {
-	return (fieldTemplate as LinkedFieldTemplate<F, T>).linked !== undefined;
+	return 'linked' in fieldTemplate;
 }
 
 /**
@@ -163,14 +163,16 @@ abstract class BaseBuilder<R> {
 	build(): R {
 		// Populate any missing fields.
 		for (const fieldName in this._template) {
-			if (!(fieldName in this._underConstruction)) {
-				const fieldTemplate: FieldTemplate<any, any> = this._template[fieldName];
-				if (isLinked(fieldTemplate)) {
-					const builder = new fieldTemplate.linked();
-					this._underConstruction[fieldName] = builder.build();
-				} else {
-					this._underConstruction[fieldName] = fieldTemplate.default;
-				}
+			if (Object.hasOwn(this._underConstruction, fieldName)) {
+				continue;
+			}
+
+			const fieldTemplate: FieldTemplate<any, any> = this._template[fieldName];
+			if (isLinked(fieldTemplate)) {
+				const builder = new fieldTemplate.linked();
+				this._underConstruction[fieldName] = builder.build();
+			} else {
+				this._underConstruction[fieldName] = fieldTemplate.default;
 			}
 		}
 
@@ -231,6 +233,7 @@ export function createBuilderClass<R>() {
 
 		// Dynamically construct a scalar setter function for a named field. This setter method's signature must match that
 		// of ScalarSetterFn<F>.
+		/* eslint-disable unicorn/no-this-outside-of-class -- prototype setter factories; `this` is the builder instance at call time */
 		function defineScalarSetter<F, N extends keyof T>(fieldName: N) {
 			DynamicBuilder.prototype[fieldName] = function (value: F) {
 				this._underConstruction[fieldName] = value;
@@ -248,6 +251,7 @@ export function createBuilderClass<R>() {
 				return this;
 			};
 		}
+		/* eslint-enable unicorn/no-this-outside-of-class */
 
 		for (const fieldName in template) {
 			const fieldTemplate = template[fieldName];

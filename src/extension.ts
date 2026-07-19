@@ -1,10 +1,7 @@
- 
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-'use strict';
-
 import * as vscode from 'vscode';
 import TelemetryReporter from 'vscode-extension-telemetry';
 import { LiveShare } from 'vsls/vscode.js';
@@ -28,6 +25,7 @@ import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from './constants';
 import { handleDeepLinkUri } from './deepLinkHandler';
 import { registerBuiltinGitProvider, registerLiveShareGitProvider } from './gitProviders/api';
 import { MockGitProvider } from './gitProviders/mockGitProvider';
+import { MockRepository } from './gitProviders/mockRepository';
 import { FileTypeDecorationProvider } from './view/fileTypeDecorationProvider';
 import { getInMemPRContentProvider } from './view/inMemPRContentProvider';
 import { PullRequestChangesTreeDataProvider } from './view/prChangesTreeDataProvider';
@@ -37,18 +35,22 @@ import { ReviewsManager } from './view/reviewsManager';
 
 const aiKey: string = '00000000-0000-0000-0000-000000000000';
 
-// fetch.promise polyfill
-const PolyfillPromise = require('es6-promise').Promise;
 const fetch = require('node-fetch');
 
-fetch.Promise = PolyfillPromise;
+// The built-in Promise replaces the old es6-promise polyfill.
+fetch.Promise = Promise;
 
-let telemetry: TelemetryReporter;
+// Mutable module state lives in an object so functions mutate properties, not top-level bindings.
+// telemetry: created in activate(), read by deactivate().
+// deepLinkProcessor: deep links can arrive before init() has built the repositories manager
+// (activation is still running, or no repository is open yet). Buffer them and drain once the
+// processor is wired up.
+const extensionState: {
+	telemetry: TelemetryReporter | undefined;
+	deepLinkProcessor: ((uri: vscode.Uri) => void) | undefined;
+} = { telemetry: undefined, deepLinkProcessor: undefined };
 
-// Deep links can arrive before init() has built the repositories manager (activation is still
-// running, or no repository is open yet). Buffer them and drain once the processor is wired up.
 const pendingDeepLinkUris: vscode.Uri[] = [];
-let deepLinkProcessor: ((uri: vscode.Uri) => void) | undefined;
 
 async function init(
 	context: vscode.ExtensionContext,
@@ -57,6 +59,7 @@ async function init(
 	repositories: Repository[],
 	tree: PullRequestsTreeDataProvider,
 	liveshareApiPromise: Promise<LiveShare | undefined>,
+	telemetry: TelemetryReporter,
 ): Promise<void> {
 	context.subscriptions.push(Logger);
 	Logger.appendLine('Git repository found, initializing review manager and pr tree view.');
@@ -74,11 +77,13 @@ async function init(
 	const fileReviewedStatusService = new FileReviewedStatusService(localStorageService);
 
 	vscode.authentication.onDidChangeSessions(async e => {
-		if (e.provider.id === 'microsoft') {
-			await reposManager.clearCredentialCache();
-			if (reviewManagers) {
-				reviewManagers.forEach(reviewManager => reviewManager.updateState());
-			}
+		if (e.provider.id !== 'microsoft') {
+			return;
+		}
+
+		await reposManager.clearCredentialCache();
+		if (reviewManagers) {
+			reviewManagers.forEach(reviewManager => reviewManager.updateState());
 		}
 	});
 
@@ -86,7 +91,7 @@ async function init(
 	// Sort the repositories to match folders in a multiroot workspace (if possible).
 	const workspaceFolders = vscode.workspace.workspaceFolders;
 	if (workspaceFolders) {
-		repositories = repositories.sort((a, b) => {
+		repositories = repositories.toSorted((a, b) => {
 			let indexA = workspaceFolders.length;
 			let indexB = workspaceFolders.length;
 			for (let i = 0; i < workspaceFolders.length; i++) {
@@ -134,12 +139,15 @@ async function init(
 	tree.initialize(reposManager);
 	registerCommands(context, reposManager, reviewManagers, workItem, userManager, telemetry, credentialStore, tree);
 
-	deepLinkProcessor = uri => {
+	const deepLinkProcessor = (uri: vscode.Uri) => {
 		handleDeepLinkUri(uri, reposManager, context.extensionPath, workItem, userManager).catch(e => {
 			Logger.appendLine(`Handling vscode:// deep link failed: ${e}`);
 		});
 	};
-	pendingDeepLinkUris.splice(0).forEach(deepLinkProcessor);
+	extensionState.deepLinkProcessor = deepLinkProcessor;
+	const bufferedDeepLinkUris = [...pendingDeepLinkUris];
+	pendingDeepLinkUris.length = 0;
+	bufferedDeepLinkUris.forEach(uri => deepLinkProcessor(uri));
 	const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
 	await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 
@@ -203,7 +211,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	const apiImpl = new GitApiImpl();
 
 	const version = vscode.extensions.getExtension(EXTENSION_ID)!.packageJSON.version;
-	telemetry = new TelemetryReporter(EXTENSION_ID, version, aiKey);
+	const telemetry = new TelemetryReporter(EXTENSION_ID, version, aiKey);
+	extensionState.telemetry = telemetry;
 	context.subscriptions.push(telemetry);
 
 	PersistentState.init(context);
@@ -213,8 +222,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
 	context.subscriptions.push(
 		uriHandler.event(uri => {
-			if (deepLinkProcessor) {
-				deepLinkProcessor(uri);
+			if (extensionState.deepLinkProcessor) {
+				extensionState.deepLinkProcessor(uri);
 				return;
 			}
 			pendingDeepLinkUris.push(uri);
@@ -236,7 +245,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	if (builtInGitProvider) {
 		context.subscriptions.push(builtInGitProvider);
 	} else {
-		const mockGitProvider = new MockGitProvider();
+		// Seed the remote here; doing it inside the MockGitProvider constructor made it an async constructor.
+		const mockRepository = new MockRepository();
+		void mockRepository.addRemote('origin', 'https://anksinha@dev.azure.com/anksinha/test/_git/test');
+		const mockGitProvider = new MockGitProvider(mockRepository);
 		context.subscriptions.push(apiImpl.registerGitProvider(mockGitProvider));
 	}
 
@@ -260,16 +272,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	);
 
 	if (apiImpl.repositories.length > 0) {
-		await init(context, apiImpl, credentialStore, apiImpl.repositories, prTree, liveshareApiPromise);
+		await init(context, apiImpl, credentialStore, apiImpl.repositories, prTree, liveshareApiPromise, telemetry);
 	} else {
-		onceEvent(apiImpl.onDidOpenRepository)(r => init(context, apiImpl, credentialStore, [r], prTree, liveshareApiPromise));
+		onceEvent(apiImpl.onDidOpenRepository)(r =>
+			init(context, apiImpl, credentialStore, [r], prTree, liveshareApiPromise, telemetry),
+		);
 	}
 
 	return apiImpl;
 }
 
 export async function deactivate() {
-	if (telemetry) {
-		telemetry.dispose();
+	if (extensionState.telemetry) {
+		extensionState.telemetry.dispose();
 	}
 }

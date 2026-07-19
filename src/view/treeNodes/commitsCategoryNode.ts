@@ -9,6 +9,8 @@ import { CommitNode } from './commitNode';
 import { TreeNode, TreeNodeParent } from './treeNode';
 import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { PullRequestModel } from '../../azdo/pullRequestModel';
+import Logger from '../../common/logger';
+import { formatError } from '../../common/utils';
 
 export class CommitsNode extends TreeNode implements vscode.TreeItem {
 	public label: string = 'Commits';
@@ -41,9 +43,11 @@ export class CommitsNode extends TreeNode implements vscode.TreeItem {
 			const commitNodes = commits.map(
 				commit => new CommitNode(this, this._folderRepoManager, this._pr, commit, this._comments),
 			);
-			return Promise.resolve(commitNodes);
+			return commitNodes;
 		} catch (e) {
-			return Promise.resolve([]);
+			// Surface the failure instead of silently rendering an empty Commits node.
+			Logger.appendLine(`Fetching commits failed: ${formatError(e)}`, 'CommitsCategoryNode');
+			return [];
 		}
 	}
 }

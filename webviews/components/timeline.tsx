@@ -6,7 +6,7 @@
 import { GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { Identity } from 'azure-devops-node-api/interfaces/IdentitiesInterfaces';
 import * as React from 'react';
- 
+
 import { useContext, useRef, useState } from 'react';
 
 import { CommentView, ReplyToThread } from './comment';
@@ -35,23 +35,26 @@ export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestComm
 		    ordering to oldest-first without also moving the composer to the bottom. */}
 		{threads
 			// valueOf() tolerates both real Date instances and the serialized strings the host sends
-			.sort(
+			.toSorted(
 				(a, b) =>
 					new Date(b.publishedDate?.valueOf() ?? NaN).getTime() -
 					new Date(a.publishedDate?.valueOf() ?? NaN).getTime(),
 			)
 			.map(
-				thread =>
-					// TODO: Maybe make TimelineEvent a tagged union type?
-					isSystemThread(thread) ? (
-						<SystemThreadView key={thread.id} thread={thread} />
-					) : isUserCommentThread(thread) || hasVisibleComments(thread) ? (
+				// TODO: Maybe make TimelineEvent a tagged union type?
+				thread => {
+					if (isSystemThread(thread)) {
+						return <SystemThreadView key={thread.id} thread={thread} />;
+					}
+					if (isUserCommentThread(thread) || hasVisibleComments(thread)) {
 						// hasVisibleComments: threads created via raw REST/integrations can miss the
 						// id-1/commentType shape isUserCommentThread expects; render them as a
 						// (possibly position-less) comment card rather than dropping them - the header
 						// already counts them and the diff editor already shows them.
-						<CommentEventView key={thread.id} thread={thread} currentUser={currentUser} />
-					) : null,
+						return <CommentEventView key={thread.id} thread={thread} currentUser={currentUser} />;
+					}
+					return null;
+				},
 				// isCommitEvent(event)
 				// 	? <CommitEventView key={event.id} {...event} />
 				// 	:
@@ -124,12 +127,12 @@ export const CommitEventView = (event: CommitEvent) => (
 	</div>
 );
 
-const association = ({ authorAssociation }: ReviewEvent, format = (assoc: string) => `(${assoc.toLowerCase()})`) =>
-	authorAssociation.toLowerCase() === 'user'
-		? format('you')
-		: authorAssociation && authorAssociation !== 'NONE'
-		? format(authorAssociation)
-		: null;
+const association = ({ authorAssociation }: ReviewEvent, format = (assoc: string) => `(${assoc.toLowerCase()})`) => {
+	if (authorAssociation.toLowerCase() === 'user') {
+		return format('you');
+	}
+	return authorAssociation && authorAssociation !== 'NONE' ? format(authorAssociation) : null;
+};
 
 const positionKey = (comment: GitPullRequestCommentThread) =>
 	// comment.position !== null
@@ -233,7 +236,7 @@ const THREAD_STATUS_TONE: { [status: number]: string } = {
 	3: 'muted', // WontFix
 };
 
-const RESOLVED_STATUSES = [2, 3, 4]; // Fixed, WontFix, Closed
+const RESOLVED_STATUSES = new Set([2, 3, 4]); // Fixed, WontFix, Closed
 
 // A native <select> dressed as a status pill: colored dot + label + the select's own chevron. Native
 // keeps the accessibility and z-index simplicity while reading as a modern chip.
@@ -253,13 +256,45 @@ const ThreadStatusPill = ({ status, onChange }: { status: number; onChange: (sta
 	);
 };
 
+// Header row for a comment thread: file chip (when the thread anchors to a file) plus status
+// pill (when the status is one we can render). Null when neither applies.
+function renderThreadHeader(
+	thread: GitPullRequestCommentThread,
+	status: number,
+	openDiff: (thread: GitPullRequestCommentThread) => void,
+	onThreadStatusChange: (newStatus: string) => Promise<void>,
+) {
+	const hasFile = !!thread.threadContext && !!thread.threadContext.filePath;
+	const hasStatus = ThreadStatusOrder.includes(status.toString());
+
+	if (!hasFile && !hasStatus) {
+		return null;
+	}
+
+	// Same threadContext-derived position as positionKey above; position-less threads (file-level
+	// comments) keep the bare path chip.
+	const threadLine = thread.threadContext?.rightFileStart?.line ?? thread.threadContext?.leftFileStart?.line;
+
+	return (
+		<div className="thread-header">
+			{hasFile ? (
+				// item 2: real button so the diff opens via keyboard too (was a click-only <a>).
+				<button type="button" className="thread-file-chip" onClick={() => openDiff(thread)}>
+					{thread.threadContext!.filePath}
+					{threadLine !== undefined ? `:${threadLine}` : ''}
+				</button>
+			) : null}
+			{hasStatus ? <ThreadStatusPill status={status} onChange={onThreadStatusChange} /> : null}
+		</div>
+	);
+}
+
 const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestCommentThread; currentUser: Identity }) => {
 	const { replyThread, openDiff, changeThreadStatus } = useContext(PullRequestContext);
 	const [inEditMode, setEditMode] = useState(false);
 
 	const status = thread.status ?? 0;
-	const hasStatus = ThreadStatusOrder.includes(status.toString());
-	const isResolved = RESOLVED_STATUSES.includes(status);
+	const isResolved = RESOLVED_STATUSES.has(status);
 	// Per-render collapse state (no persistence); resolved threads start collapsed so long PRs aren't
 	// buried in settled conversations, but they stay one click away. Only ever hides content while the
 	// thread is still resolved - reopening via the (always-visible) header pill can't strand a
@@ -283,26 +318,11 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 		await changeThreadStatus(parseInt(newStatus), thread);
 	};
 
-	const hasFile = !!thread.threadContext && !!thread.threadContext.filePath;
-	// Same threadContext-derived position as positionKey above; position-less threads (file-level
-	// comments) keep the bare path chip.
-	const threadLine = thread.threadContext?.rightFileStart?.line ?? thread.threadContext?.leftFileStart?.line;
 	const commentCount = thread.comments?.length ?? 0;
 
 	return (
 		<div className={`thread-container${isResolved ? ' resolved' : ''}`}>
-			{hasFile || hasStatus ? (
-				<div className="thread-header">
-					{hasFile ? (
-						// item 2: real button so the diff opens via keyboard too (was a click-only <a>).
-						<button type="button" className="thread-file-chip" onClick={() => openDiff(thread)}>
-							{thread.threadContext!.filePath}
-							{threadLine !== undefined ? `:${threadLine}` : ''}
-						</button>
-					) : null}
-					{hasStatus ? <ThreadStatusPill status={status} onChange={onThreadStatusChange} /> : null}
-				</div>
-			) : null}
+			{renderThreadHeader(thread, status, openDiff, onThreadStatusChange)}
 			{isResolved ? (
 				<button className="thread-collapse-toggle" aria-expanded={!contentHidden} onClick={() => setCollapsed(c => !c)}>
 					<span className={`thread-chevron${contentHidden ? '' : ' expanded'}`}>{chevronIcon}</span>
@@ -347,7 +367,7 @@ export const MergedEventView = (event: MergedEvent) => (
 			<div className="message">
 				merged commit{nbsp}
 				<a className="sha" href={event.commitUrl}>
-					{event.sha.substr(0, 7)}
+					{event.sha.slice(0, 7)}
 				</a>
 				{nbsp}
 				into {event.mergeRef}

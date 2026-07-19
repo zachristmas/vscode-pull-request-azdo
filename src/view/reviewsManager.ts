@@ -14,7 +14,7 @@ import { PullRequestsTreeDataProvider } from './prsTreeDataProvider';
 import { ReviewManager } from './reviewManager';
 
 export class ReviewsManager {
-	public static ID = 'Reviews';
+	public static readonly ID = 'Reviews';
 	private _disposables: vscode.Disposable[];
 
 	constructor(
@@ -37,21 +37,23 @@ export class ReviewsManager {
 	private registerListeners(): void {
 		this._disposables.push(
 			vscode.workspace.onDidChangeConfiguration(async e => {
-				if (e.affectsConfiguration('githubPullRequests.showInSCM')) {
-					if (this._prFileChangesProvider) {
-						this._prFileChangesProvider.dispose();
-						this._prFileChangesProvider = new PullRequestChangesTreeDataProvider(this._context);
-
-						for (const reviewManager of this._reviewManagers) {
-							reviewManager.updateState();
-						}
-					}
-
-					this._prsTreeDataProvider.dispose();
-					this._prsTreeDataProvider = new PullRequestsTreeDataProvider(this._telemetry);
-					this._prsTreeDataProvider.initialize(this._reposManager);
-					this._disposables.push(this._prsTreeDataProvider);
+				if (!e.affectsConfiguration('githubPullRequests.showInSCM')) {
+					return;
 				}
+
+				if (this._prFileChangesProvider) {
+					this._prFileChangesProvider.dispose();
+					this._prFileChangesProvider = new PullRequestChangesTreeDataProvider(this._context);
+
+					for (const reviewManager of this._reviewManagers) {
+						reviewManager.updateState();
+					}
+				}
+
+				this._prsTreeDataProvider.dispose();
+				this._prsTreeDataProvider = new PullRequestsTreeDataProvider(this._telemetry);
+				this._prsTreeDataProvider.initialize(this._reposManager);
+				this._disposables.push(this._prsTreeDataProvider);
 			}),
 		);
 	}

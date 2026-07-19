@@ -61,7 +61,7 @@ describe('PullRequestManager', function () {
 			const pr = new PullRequestModel(telemetry, repository, remote, prItem);
 
 			manager.activePullRequest = pr;
-			assert(changeFired.called);
+			assert.ok(changeFired.called);
 			assert.deepStrictEqual(manager.activePullRequest, pr);
 		});
 	});

@@ -2,8 +2,6 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-'use strict';
-
 import * as vscode from 'vscode';
 import { GHPRComment, GHPRCommentThread, TemporaryComment } from './azdo/prComment';
 import Logger from './common/logger';
@@ -41,6 +39,4 @@ export function resolveCommentHandler(commentThread: GHPRCommentThread): Comment
 	}
 
 	Logger.appendLine(`Unable to find handler for comment thread ${commentThread.threadId}`);
-
-	return;
 }

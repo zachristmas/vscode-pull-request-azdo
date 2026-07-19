@@ -10,6 +10,7 @@ import {
 	GitPullRequestCompletionOptions,
 	GitPullRequestMergeStrategy,
 	IdentityRefWithVote,
+	LineDiffBlock,
 	LineDiffBlockChangeType,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
@@ -112,7 +113,7 @@ export function convertPolicyEvaluation(
 	typeMap: Map<string, string>,
 ): PullRequestPolicyEvaluation | undefined {
 	const configuration = record.configuration;
-	if (!configuration || configuration.isEnabled === false) {
+	if (!configuration || !configuration.isEnabled) {
 		return undefined;
 	}
 
@@ -165,10 +166,10 @@ function buildRequiredReviewersDetail(settings: RequiredReviewersPolicySettings)
 }
 
 function buildMergeStrategyDetail(settings: MergeStrategyPolicySettings): string {
-	const allowed: string[] = [];
 	if (settings.useSquashMerge) {
 		return 'Allowed: Squash';
 	}
+	const allowed: string[] = [];
 	if (settings.allowNoFastForward) {
 		allowed.push('Merge commit');
 	}
@@ -241,7 +242,7 @@ export function computeMergeMethodsAvailability(configurations: PolicyConfigurat
 					RebaseMerge: !!settings.allowRebaseMerge,
 			  };
 		(Object.keys(availability) as MergeMethod[]).forEach(method => {
-			availability[method] = availability[method] && allowed[method];
+			availability[method] &&= allowed[method];
 		});
 	});
 
@@ -273,7 +274,6 @@ export function matchesRefScope(
 				return !!entry.refName && targetRefName.startsWith(entry.refName);
 			case 'DefaultBranch':
 				return targetRefName === defaultBranchRefName;
-			case 'Exact':
 			default:
 				return !!entry.refName && entry.refName.toLowerCase() === targetRefName.toLowerCase();
 		}
@@ -304,10 +304,10 @@ export function convertBranchRefToBranchName(branchRef: string): string {
 	if (splitref.length < 2) {
 		return branchRef;
 	}
-	if (splitref[1] === 'heads' || splitref[1] === 'tags' || splitref[1] === 'remotes') {
-		return splitref.slice(2, splitref.length).join('/');
+	if (['heads', 'tags', 'remotes'].includes(splitref[1])) {
+		return splitref.slice(2).join('/');
 	}
-	return splitref.slice(1, splitref.length).join('/');
+	return splitref.slice(1).join('/');
 }
 
 export async function readableToString(readable?: NodeJS.ReadableStream): Promise<string | undefined> {
@@ -331,6 +331,110 @@ export function loginComparator(a: IAccount, b: IAccount) {
 
 // 3 lines before and after the hunk
 const OVERFLOW = 3;
+
+// Per-change-type diff-line builders for appendBlockDiffLines. Each returns the updated
+// positionInHunk.
+function appendAddedBlockLines(hunk: DiffHunk, block: LineDiffBlock, startPositionInHunk: number): number {
+	const newLineNumber = block.modifiedLineNumberStart!;
+	let positionInHunk = startPositionInHunk;
+
+	for (let i = 0; i < block.modifiedLinesCount!; i++) {
+		hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
+		positionInHunk++;
+	}
+
+	return positionInHunk;
+}
+
+function appendDeletedBlockLines(hunk: DiffHunk, block: LineDiffBlock, startPositionInHunk: number): number {
+	const oldLineNumber = block.originalLineNumberStart!;
+	let positionInHunk = startPositionInHunk;
+
+	for (let i = 0; i < block.originalLinesCount!; i++) {
+		hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
+		positionInHunk++;
+	}
+
+	return positionInHunk;
+}
+
+function appendEditedBlockLines(
+	hunk: DiffHunk,
+	block: LineDiffBlock,
+	startPositionInHunk: number,
+	overflowStartLineNumber: number,
+	overflowEndLineNumber: number,
+): number {
+	const oldLineNumber = block.originalLineNumberStart!;
+	const newLineNumber = block.modifiedLineNumberStart!;
+	let positionInHunk = startPositionInHunk;
+
+	// Add no change lines for overflow BEFORE the actual change
+	for (let i = overflowStartLineNumber; i < newLineNumber; i++) {
+		hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
+		positionInHunk++;
+	}
+
+	const overlap = Math.min(block.originalLinesCount!, block.modifiedLinesCount!);
+	for (let i = 0; i < overlap; i++) {
+		hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
+		positionInHunk++;
+	}
+
+	for (let i = 0; i < overlap; i++) {
+		hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
+		positionInHunk++;
+	}
+
+	for (let i = 0; i < Math.abs(block.originalLinesCount! - block.modifiedLinesCount!); i++) {
+		let type = DiffChangeType.Context;
+		let o = oldLineNumber + overlap + i;
+		let m = newLineNumber + overlap + i;
+		if (i + overlap >= block.originalLinesCount!) {
+			type = DiffChangeType.Add;
+			o = -1;
+		}
+		if (i + overlap >= block.modifiedLinesCount!) {
+			type = DiffChangeType.Delete;
+			m = -1;
+		}
+		hunk.diffLines.push(new DiffLine(type, o, m, positionInHunk));
+		positionInHunk++;
+	}
+
+	// Add no change lines for overflow AFTER the actual change
+	for (let i = newLineNumber + block.modifiedLinesCount!; i < overflowEndLineNumber; i++) {
+		hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
+		positionInHunk++;
+	}
+
+	return positionInHunk;
+}
+
+// Extracted from getDiffHunkFromFileDiff so the per-block switch (and its case breaks) is not
+// nested inside the block loop. Returns the updated positionInHunk.
+function appendBlockDiffLines(
+	hunk: DiffHunk,
+	block: LineDiffBlock,
+	startPositionInHunk: number,
+	overflowStartLineNumber: number,
+	overflowEndLineNumber: number,
+): number {
+	switch (block.changeType) {
+		case LineDiffBlockChangeType.Add: {
+			return appendAddedBlockLines(hunk, block, startPositionInHunk);
+		}
+		case LineDiffBlockChangeType.Delete: {
+			return appendDeletedBlockLines(hunk, block, startPositionInHunk);
+		}
+		case LineDiffBlockChangeType.Edit: {
+			return appendEditedBlockLines(hunk, block, startPositionInHunk, overflowStartLineNumber, overflowEndLineNumber);
+		}
+		default: {
+			return startPositionInHunk;
+		}
+	}
+}
 
 export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 	const diff: DiffHunk[] = [];
@@ -369,56 +473,7 @@ export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 		// 	positionInHunk++;
 		// }
 
-		if (block.changeType === LineDiffBlockChangeType.Add) {
-			for (let i = 0; i < block.modifiedLinesCount!; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
-				positionInHunk++;
-			}
-		} else if (block.changeType === LineDiffBlockChangeType.Delete) {
-			for (let i = 0; i < block.originalLinesCount!; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
-				positionInHunk++;
-			}
-		} else if (block.changeType === LineDiffBlockChangeType.Edit) {
-			// Add no change lines for overflow BEFORE the actual change
-			for (let i = overflowStartLineNumber; i < newLineNumber; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
-				positionInHunk++;
-			}
-
-			const overlap = Math.min(block.originalLinesCount!, block.modifiedLinesCount!);
-			for (let i = 0; i < overlap; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
-				positionInHunk++;
-			}
-
-			for (let i = 0; i < overlap; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
-				positionInHunk++;
-			}
-
-			for (let i = 0; i < Math.abs(block.originalLinesCount! - block.modifiedLinesCount!); i++) {
-				let type = DiffChangeType.Context;
-				let o = oldLineNumber + overlap + i;
-				let m = newLineNumber + overlap + i;
-				if (i + overlap >= block.originalLinesCount!) {
-					type = DiffChangeType.Add;
-					o = -1;
-				}
-				if (i + overlap >= block.modifiedLinesCount!) {
-					type = DiffChangeType.Delete;
-					m = -1;
-				}
-				hunk.diffLines.push(new DiffLine(type, o, m, positionInHunk));
-				positionInHunk++;
-			}
-
-			// Add no change lines for overflow AFTER the actual change
-			for (let i = newLineNumber + block.modifiedLinesCount!; i < overflowEndLineNumber; i++) {
-				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
-				positionInHunk++;
-			}
-		}
+		positionInHunk = appendBlockDiffLines(hunk, block, positionInHunk, overflowStartLineNumber, overflowEndLineNumber);
 
 		diff.push(hunk);
 	}
@@ -443,19 +498,16 @@ export function getRelatedUsersFromPullrequest(
 		commits = pr.commits;
 	}
 
-	const related_users: { login: string; name?: string; email?: string }[] = [];
-
-	related_users.push({
-		login: pr.createdBy?.uniqueName ?? pr.createdBy?.id ?? '',
-		email: pr.createdBy?.uniqueName,
-		name: pr.createdBy?.displayName,
-	});
-
-	related_users.push(
+	const related_users: { login: string; name?: string; email?: string }[] = [
+		{
+			login: pr.createdBy?.uniqueName ?? pr.createdBy?.id ?? '',
+			email: pr.createdBy?.uniqueName,
+			name: pr.createdBy?.displayName,
+		},
 		...(pr.reviewers ?? []).map(r => {
 			return { name: r.displayName, login: r.uniqueName ?? r.id ?? '', email: r.uniqueName };
 		}),
-		...([] as IdentityRef[]).concat(...(threads?.map(t => t.comments?.map(c => c.author!) || []) || [])).map(r => {
+		...(threads?.map(t => t.comments?.map(c => c.author!) || []) || []).flat().map(r => {
 			return { name: r.displayName, login: r.uniqueName ?? r.id ?? '', email: r.uniqueName };
 		}),
 		...(commits
@@ -464,7 +516,7 @@ export function getRelatedUsersFromPullrequest(
 			.map(r => {
 				return { name: r?.name, login: r?.email || '', email: r?.email };
 			}) || []),
-	);
+	];
 
 	return related_users;
 }
@@ -524,16 +576,14 @@ export function generateCommentReactions(reactions: Reaction[] | undefined) {
 
 		const matchedReaction = reactions.find(re => re.label === reaction.label);
 
-		if (matchedReaction) {
-			return {
-				label: matchedReaction.label,
-				authorHasReacted: matchedReaction.viewerHasReacted,
-				count: matchedReaction.count,
-				iconPath: reaction.icon || '',
-			};
-		} else {
-			return { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
-		}
+		return matchedReaction
+			? {
+					label: matchedReaction.label,
+					authorHasReacted: matchedReaction.viewerHasReacted,
+					count: matchedReaction.count,
+					iconPath: reaction.icon || '',
+			  }
+			: { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
 	});
 }
 export function updateCommentReactions(comment: vscode.Comment, reactions: Reaction[] | undefined) {
@@ -545,7 +595,7 @@ export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repo
 		if (
 			file.path.toLowerCase() === repository.rootUri.path.toLowerCase() ||
 			(file.path.toLowerCase().startsWith(repository.rootUri.path.toLowerCase()) &&
-				file.path.substring(repository.rootUri.path.length).startsWith('/'))
+				file.path.slice(repository.rootUri.path.length).startsWith('/'))
 		) {
 			return repository;
 		}
@@ -559,9 +609,9 @@ export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repo
 // to the code across pushes; fall back to orig* only when there is no threadContext.
 export function getPositionFromThread(comment: GitPullRequestCommentThread) {
 	// General/system comment threads (verified live: e.g. vote-change system comments) come back with
-	// threadContext: null, not undefined - the `!== undefined` check let null through to an unguarded
-	// property access below.
-	if (comment.threadContext !== undefined && comment.threadContext !== null) {
+	// threadContext: null, not undefined - the API typings only admit undefined, so a loose != null
+	// check is needed to keep null from reaching the unguarded property access below.
+	if (comment.threadContext != null) {
 		return comment.threadContext.rightFileStart === undefined
 			? comment.threadContext.leftFileStart?.line
 			: comment.threadContext.rightFileStart.line;
@@ -599,11 +649,9 @@ export function updateCommentReviewState(thread: GHPRCommentThread, newDraftMode
 }
 
 export function updateCommentThreadLabel(thread: GHPRCommentThread) {
-	if (thread.comments.length) {
-		thread.label = `Status: ${CommentThreadStatus[thread.rawThread?.status ?? 0].toString()}`;
-	} else {
-		thread.label = 'Start discussion';
-	}
+	thread.label = thread.comments.length
+		? `Status: ${CommentThreadStatus[thread.rawThread?.status ?? 0]}`
+		: 'Start discussion';
 }
 
 export function createVSCodeCommentThread(thread: ThreadData, commentController: vscode.CommentController): GHPRCommentThread {
@@ -627,7 +675,7 @@ export function updateThread(vscodeThread: GHPRCommentThread, comments: GHPRComm
 }
 
 export function removeLeadingSlash(path: string) {
-	return path.replace(/^\//g, '');
+	return path.replaceAll(/^\//g, '');
 }
 
 export function getCommentThreadStatusKeys(): string[] {
@@ -635,7 +683,7 @@ export function getCommentThreadStatusKeys(): string[] {
 		.filter(value => typeof value === 'string')
 		.filter(f => f !== CommentThreadStatus[CommentThreadStatus.Unknown])
 		.filter(f => f !== CommentThreadStatus[CommentThreadStatus.ByDesign]) // ByDesign is not shown in the Azdo UI
-		.map(f => f.toString());
+		.map(f => f);
 }
 
 export class UserCompletion extends vscode.CompletionItem {
@@ -646,12 +694,13 @@ export class UserCompletion extends vscode.CompletionItem {
 }
 
 export function isCommentResolved(status: CommentThreadStatus | undefined): boolean {
-	return (
-		status === CommentThreadStatus.ByDesign ||
-		status === CommentThreadStatus.Closed ||
-		status === CommentThreadStatus.Fixed ||
-		status === CommentThreadStatus.WontFix
-	);
+	const resolvedStatuses: (CommentThreadStatus | undefined)[] = [
+		CommentThreadStatus.ByDesign,
+		CommentThreadStatus.Closed,
+		CommentThreadStatus.Fixed,
+		CommentThreadStatus.WontFix,
+	];
+	return resolvedStatuses.includes(status);
 }
 
 export function convertRawFileChangeToFileChangeNode(fileChange: IRawFileChange): IFileChangeNode {

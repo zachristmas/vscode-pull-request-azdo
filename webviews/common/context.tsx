@@ -118,10 +118,10 @@ export class PRContext {
 			console.error('No comments to delete for review:', pullRequestReviewId, review);
 			return;
 		}
-		this.pr.events.splice(index, 1, {
+		this.pr.events[index] = {
 			...review,
 			comments: review.comments.filter(c => c.id !== id),
-		});
+		};
 		this.updatePR(this.pr);
 	};
 
@@ -149,7 +149,7 @@ export class PRContext {
 	public close = async (body?: string) => {
 		try {
 			this.appendReview(await this.postMessage({ command: 'azdopr.close', args: body }));
-		} catch (_) {
+		} catch {
 			// Ignore
 		}
 	};
@@ -265,7 +265,7 @@ export class PRContext {
 		}
 	};
 
-	public static instance = new PRContext();
+	public static readonly instance = new PRContext();
 }
 
 const PullRequestContext = createContext<PRContext>(PRContext.instance);

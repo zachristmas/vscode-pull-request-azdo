@@ -1,4 +1,4 @@
-import * as path from 'path';
+import path from 'path';
 import { expect } from 'chai';
 import * as dotenv from 'dotenv';
 import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
@@ -21,7 +21,8 @@ describe('AzdoRepository', function () {
 	let telemetry: MockTelemetry;
 	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 
-	this.timeout(1000000);
+	// eslint-disable-next-line unicorn/no-this-outside-of-class -- mocha suite context
+	this.timeout(1_000_000);
 
 	before(function () {
 		dotenv.config({ path: path.resolve(__dirname, '../../../.env') });

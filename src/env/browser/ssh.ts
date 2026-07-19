@@ -4,7 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 import { parse as parseConfig } from 'ssh-config';
 
-const SSH_URL_RE = /^(?:([^@:]+)@)?([^:/]+):?(.+)$/;
+// The lookahead pins the host to the exact length the old `([^:/]+):?(.+)` backtracking settled
+// on (maximal non-[:/] run, or that run minus one char when no separator follows), making the
+// split deterministic and linear instead of super-linear.
+const SSH_URL_RE = /^(?:([^@:]+)@)?([^:/]+(?=[:/]|[^:/]$)):?(.+)$/;
 const URL_SCHEME_RE = /^([a-z-]+):\/\//;
 
 export const sshParse = (url: string): Config | undefined => {
@@ -51,7 +54,7 @@ export const sshParse = (url: string): Config | undefined => {
  * @param {ConfigResolver?} resolveConfig ssh config resolver (default: from ~/.ssh/config)
  * @returns {Config}
  */
- export const resolve = (url: string, resolveConfig = Resolvers.current) => {
+export const resolve = (url: string, resolveConfig = Resolvers.current) => {
 	const config = sshParse(url);
 	return config && resolveConfig(config);
 };
@@ -82,14 +85,13 @@ export type ConfigResolver = (config: Config) => Config;
 
 export function chainResolvers(...chain: (ConfigResolver | undefined)[]): ConfigResolver {
 	const resolvers = chain.filter(x => !!x) as ConfigResolver[];
-	return (config: Config) =>
-		resolvers.reduce(
-			(resolved, next) => ({
-				...resolved,
-				...next(resolved),
-			}),
-			config,
-		);
+	return (config: Config) => {
+		let resolved = config;
+		for (const next of resolvers) {
+			resolved = { ...resolved, ...next(resolved) };
+		}
+		return resolved;
+	};
 }
 
 export function resolverFromConfig(text: string): ConfigResolver {
@@ -97,12 +99,12 @@ export function resolverFromConfig(text: string): ConfigResolver {
 	return h => config.compute(h.Host);
 }
 
-export class Resolvers {
-	static default = baseResolver;
+export const Resolvers = {
+	default: baseResolver,
 
-	static fromConfig(conf: string) {
+	fromConfig(conf: string) {
 		return chainResolvers(baseResolver, resolverFromConfig(conf));
-	}
+	},
 
-	static current = Resolvers.default;
-}
+	current: baseResolver,
+};

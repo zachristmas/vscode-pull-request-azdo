@@ -85,14 +85,14 @@ export class TemporaryComment implements vscode.Comment {
 	/**
 	 * The list of reactions to the comment
 	 */
-	public commentReactions?: vscode.CommentReaction[] | undefined;
+	public commentReactions?: vscode.CommentReaction[];
 
 	/**
 	 * The context value, used to determine whether the command should be visible/enabled based on clauses in package.json
 	 */
 	public contextValue: string;
 
-	static idPool = 0;
+	private static idPool = 0;
 
 	public parentCommentId?: number;
 
@@ -174,7 +174,7 @@ export class GHPRComment implements vscode.Comment {
 	/**
 	 * The list of reactions to the comment
 	 */
-	public reactions?: vscode.CommentReaction[] | undefined;
+	public reactions?: vscode.CommentReaction[];
 
 	/**
 	 * The complete comment data returned from GitHub

@@ -1,16 +1,15 @@
-/* eslint-disable import-x/order */
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as path from 'path';
+import path from 'path';
 import * as vscode from 'vscode';
 
-export class Resource {
-	static icons: any;
+export const Resource = {
+	icons: undefined as any,
 
-	static initialize(context: vscode.ExtensionContext) {
+	initialize(context: vscode.ExtensionContext) {
 		Resource.icons = {
 			reactions: {
 				THUMBS_UP: context.asAbsolutePath(path.join('resources', 'icons', 'reactions', 'thumbs_up.png')),
@@ -23,5 +22,5 @@ export class Resource {
 				ROCKET: context.asAbsolutePath(path.join('resources', 'icons', 'reactions', 'rocket.png')),
 			},
 		};
-	}
-}
+	},
+};

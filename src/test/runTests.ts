@@ -1,4 +1,4 @@
-import * as path from 'path';
+import path from 'path';
 import * as dotenv from 'dotenv';
 import { runTests } from 'vscode-test';
 
@@ -28,4 +28,5 @@ async function go() {
 	}
 }
 
+// eslint-disable-next-line unicorn/prefer-top-level-await -- CJS test entry point; TLA needs ESM
 go();

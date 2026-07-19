@@ -66,7 +66,7 @@ export function parseAzdoRemoteUrl(url: string | undefined): ParsedAzdoRemote | 
 		return undefined;
 	}
 	for (const { pattern, org, project, repo } of PATTERNS) {
-		const m = url.match(pattern);
+		const m = pattern.exec(url);
 		if (m) {
 			return {
 				orgUrl: `https://dev.azure.com/${m[org]}`,

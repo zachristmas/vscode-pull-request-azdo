@@ -2,9 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-'use strict';
-
-import * as path from 'path';
+import path from 'path';
 import {
 	Comment,
 	GitPullRequestCommentThread,
@@ -33,14 +31,14 @@ import {
 import { AzdoWorkItem } from './workItem';
 
 export class PullRequestOverviewPanel extends WebviewBase {
-	public static ID: string = 'PullRequestOverviewPanel';
+	public static readonly ID: string = 'PullRequestOverviewPanel';
 	/**
 	 * UX-04: one panel per PR, keyed by PR id. Opening a second PR now opens a new tab instead of
 	 * repurposing the single existing panel (which silently discarded scroll position, expanded
 	 * threads, and any in-progress vote/comment state). Users manage tab volume with the editor's
 	 * own machinery, the same as any other document.
 	 */
-	public static panels: Map<number, PullRequestOverviewPanel> = new Map();
+	public static readonly panels: Map<number, PullRequestOverviewPanel> = new Map();
 
 	protected static readonly _viewType: string = 'PullRequestOverview';
 	protected readonly _panel: vscode.WebviewPanel;
@@ -65,16 +63,19 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		azdoUserManager: AzdoUserManager,
 		toTheSide: boolean = false,
 	) {
-		const activeColumn = toTheSide
-			? vscode.ViewColumn.Beside
-			: vscode.window.activeTextEditor
-			? vscode.window.activeTextEditor.viewColumn
-			: vscode.ViewColumn.One;
+		let activeColumn: vscode.ViewColumn | undefined;
+		if (toTheSide) {
+			activeColumn = vscode.ViewColumn.Beside;
+		} else if (vscode.window.activeTextEditor) {
+			activeColumn = vscode.window.activeTextEditor.viewColumn;
+		} else {
+			activeColumn = vscode.ViewColumn.One;
+		}
 
 		const prNumber = pr.getPullRequestId();
 
 		// Reveal the existing panel for this PR if one is already open; otherwise open a new tab.
-		let panel = PullRequestOverviewPanel.panels.get(prNumber);
+		let panel = this.panels.get(prNumber);
 		if (panel) {
 			panel._panel.reveal(activeColumn, true);
 		} else {
@@ -88,14 +89,14 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				azdoUserManager,
 				prNumber,
 			);
-			PullRequestOverviewPanel.panels.set(prNumber, panel);
+			this.panels.set(prNumber, panel);
 		}
 
 		await panel.update(folderRepositoryManager, pr);
 	}
 
 	public static refresh(): void {
-		for (const panel of PullRequestOverviewPanel.panels.values()) {
+		for (const panel of this.panels.values()) {
 			panel.refreshPanel();
 		}
 	}
@@ -157,10 +158,12 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		// shows current data instead of a stale snapshot (item 3).
 		this._panel.onDidChangeViewState(
 			() => {
-				if (this._panel.visible && this._refreshWhenVisible) {
-					this._refreshWhenVisible = false;
-					this.update(this._folderRepositoryManager, this._item);
+				if (!(this._panel.visible && this._refreshWhenVisible)) {
+					return;
 				}
+
+				this._refreshWhenVisible = false;
+				this.update(this._folderRepositoryManager, this._item);
 			},
 			null,
 			this._disposables,
@@ -168,13 +171,15 @@ export class PullRequestOverviewPanel extends WebviewBase {
 
 		this._folderRepositoryManager.onDidChangeActiveIssue(
 			_ => {
-				if (this._folderRepositoryManager && this._item) {
-					const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
-					this._postMessage({
-						command: 'pr.update-checkout-status',
-						isCurrentlyCheckedOut: isCurrentlyCheckedOut,
-					});
+				if (!(this._folderRepositoryManager && this._item)) {
+					return;
 				}
+
+				const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
+				this._postMessage({
+					command: 'pr.update-checkout-status',
+					isCurrentlyCheckedOut: isCurrentlyCheckedOut,
+				});
 			},
 			null,
 			this._disposables,
@@ -200,13 +205,15 @@ export class PullRequestOverviewPanel extends WebviewBase {
 
 	registerFolderRepositoryListener() {
 		this._changeActivePullRequestListener = this._folderRepositoryManager.onDidChangeActivePullRequest(_ => {
-			if (this._folderRepositoryManager && this._item) {
-				const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
-				this._postMessage({
-					command: 'pr.update-checkout-status',
-					isCurrentlyCheckedOut,
-				});
+			if (!(this._folderRepositoryManager && this._item)) {
+				return;
 			}
+
+			const isCurrentlyCheckedOut = this._item.equals(this._folderRepositoryManager.activePullRequest);
+			this._postMessage({
+				command: 'pr.update-checkout-status',
+				isCurrentlyCheckedOut,
+			});
 		});
 	}
 
@@ -227,7 +234,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				this.getWorkItemsWithPr(pullRequestModel),
 				// POL-01: policy data is progressive enhancement - a fetch failure must not sink the
 				// whole panel the way the other members here fail loudly.
-				pullRequestModel.getPolicyEvaluations().catch(() => undefined),
+				pullRequestModel.getPolicyEvaluations().catch(() => {}),
 			]);
 			const [
 				pullRequest,
@@ -241,7 +248,6 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				policies,
 			] = result;
 			const canEditPr = pullRequest?.canEdit();
-			const requestedReviewers = pullRequestModel.item.reviewers;
 			if (!pullRequest) {
 				throw new Error(
 					`Fail to resolve Pull Request #${pullRequestModel.getPullRequestId()} in ${pullRequestModel.remote.owner}/${
@@ -249,6 +255,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					}`,
 				);
 			}
+			const requestedReviewers = pullRequestModel.item.reviewers;
 
 			this._item = pullRequest;
 			this._repositoryDefaultBranch = defaultBranch!;
@@ -263,7 +270,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				.get<MergeMethod>('defaultMergeMethod');
 			const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 
-			this._existingReviewers = requestedReviewers?.map(convertIdentityRefWithVoteToReviewer) ?? [];
+			this._existingReviewers = requestedReviewers?.map(reviewer => convertIdentityRefWithVoteToReviewer(reviewer)) ?? [];
 
 			Logger.debug('pr.initialize', PullRequestOverviewPanel.ID);
 			this._postMessage({
@@ -354,6 +361,11 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		if (result !== this.MESSAGE_UNHANDLED) {
 			return;
 		}
+		// Handled before the switch to keep the switch under the max-switch-cases lint limit.
+		if (message.command === 'alert') {
+			vscode.window.showErrorMessage(message.args);
+			return;
+		}
 		switch (message.command) {
 			case 'pr.checkout':
 				return this.checkoutPullRequest(message);
@@ -397,7 +409,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				try {
 					return await this._replyMessage(message, await this._item.getStatusChecks());
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			case 'pr.checkPolicies':
 				// Exempt: getPolicyEvaluations swallows its own failures and returns undefined.
@@ -409,7 +421,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 						await this._item.requeuePolicyEvaluation(message.args.evaluationId),
 					);
 				} catch (e) {
-					return this._throwError(message, `${formatError(e)}`);
+					return this._throwError(message, formatError(e));
 				}
 			case 'pr.add-reviewers':
 				return this.addReviewerToPr(message);
@@ -433,9 +445,6 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return;
 			case 'pr.debug':
 				return this.webviewDebug(message);
-			case 'alert':
-				vscode.window.showErrorMessage(message.args);
-				return;
 			default:
 				// Never drop a message silently: an unhandled command leaves the webview's awaited
 				// postMessage promise pending forever. Mirror the sidebar host's throwing default. (item 1e)
@@ -616,15 +625,13 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				disposables.push(
 					quickpick.onDidChangeValue(async value => {
 						const id = Number.parseInt(value);
-						if (Number.isInteger(id)) {
-							if (!quickpick.items.some(w => w.label === value)) {
-								quickpick.busy = true;
-								const wt = await this._workItem.getWorkItemById(id);
-								if (!!wt) {
-									quickpick.items = quickpick.items.concat([new WorkItemPick(wt)]);
-								}
-								quickpick.busy = false;
+						if (Number.isSafeInteger(id) && quickpick.items.every(w => w.label !== value)) {
+							quickpick.busy = true;
+							const wt = await this._workItem.getWorkItemById(id);
+							if (!!wt) {
+								quickpick.items = [...quickpick.items, new WorkItemPick(wt)];
 							}
+							quickpick.busy = false;
 						}
 					}),
 					quickpick.onDidChangeSelection(value => {
@@ -715,7 +722,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	private async openDiff(message: IRequestMessage<{ thread: GitPullRequestCommentThread }>): Promise<void> {
 		try {
 			const thread = message.args.thread;
-			return PullRequestModel.openDiffFromComment(this._folderRepositoryManager, this._item, thread);
+			return await PullRequestModel.openDiffFromComment(this._folderRepositoryManager, this._item, thread);
 		} catch (e) {
 			Logger.appendLine(`Open diff view failed: ${formatError(e)}`, PullRequestOverviewPanel.ID);
 		}
@@ -899,7 +906,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					isDraft ? 'Converting pull request to draft' : 'Marking pull request ready for review'
 				} failed. ${formatError(e)}`,
 			);
-			this._throwError(message, `${formatError(e)}`);
+			this._throwError(message, formatError(e));
 		}
 	}
 
@@ -913,76 +920,78 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	}
 
 	private updateReviewers(review?: IdentityRefWithVote): void {
-		if (review) {
-			const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
-			if (existingReviewer) {
-				existingReviewer.state = review.vote ?? 0;
-				existingReviewer.isRequired = review.isRequired ?? false;
-			} else {
-				this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
-			}
+		if (!review) {
+			return;
+		}
+
+		const existingReviewer = this._existingReviewers.find(reviewer => review.id === reviewer.reviewer.id);
+		if (existingReviewer) {
+			existingReviewer.state = review.vote ?? 0;
+			existingReviewer.isRequired = review.isRequired ?? false;
+		} else {
+			this._existingReviewers.push(convertIdentityRefWithVoteToReviewer(review));
 		}
 	}
 
-	private votePullRequest(message: IRequestMessage<number>): void {
-		this._item.submitVote(message.args).then(
-			review => {
-				this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-				//refresh the pr list as this one is approved
-				vscode.commands.executeCommand('azdopr.refreshList');
-			},
-			e => {
-				vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
+	private async votePullRequest(message: IRequestMessage<number>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.submitVote(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
 
-				this._throwError(message, `${formatError(e)}`);
-			},
-		);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
+		//refresh the pr list as this one is approved
+		vscode.commands.executeCommand('azdopr.refreshList');
 	}
 
-	private createThread(message: IRequestMessage<string>): void {
-		this._item.createThread(message.args).then(
-			thread => {
-				this._replyMessage(message, {
-					thread: thread,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Creating thread failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
-			},
-		);
+	private async createThread(message: IRequestMessage<string>): Promise<void> {
+		let thread;
+		try {
+			thread = await this._item.createThread(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Creating thread failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this._replyMessage(message, {
+			thread: thread,
+		});
 	}
 
-	private replyThread(message: IRequestMessage<{ text: string; threadId: number }>): void {
-		this._item.createCommentOnThread(message.args.threadId, message.args.text).then(
-			result => {
-				this._replyMessage(message, {
-					comment: result,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Commenting on thread failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
-			},
-		);
+	private async replyThread(message: IRequestMessage<{ text: string; threadId: number }>): Promise<void> {
+		let result;
+		try {
+			result = await this._item.createCommentOnThread(message.args.threadId, message.args.text);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Commenting on thread failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this._replyMessage(message, {
+			comment: result,
+		});
 	}
 
-	private changeThreadStatus(message: IRequestMessage<{ status: number; threadId: number }>): void {
-		this._item.updateThreadStatus(message.args.threadId, message.args.status).then(
-			result => {
-				this._replyMessage(message, {
-					thread: result,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Updating thread status failed. ${formatError(e)}`);
-				this._throwError(message, `${formatError(e)}`);
-			},
-		);
+	private async changeThreadStatus(message: IRequestMessage<{ status: number; threadId: number }>): Promise<void> {
+		let result;
+		try {
+			result = await this._item.updateThreadStatus(message.args.threadId, message.args.status);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Updating thread status failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this._replyMessage(message, {
+			thread: result,
+		});
 	}
 
 	private editComment(message: IRequestMessage<{ comment: Comment; threadId: number; text: string }>) {
@@ -1033,7 +1042,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	}
 	private editTitle(message: IRequestMessage<{ text: string }>) {
 		this._item
-			.updatePullRequest(message.args.text, undefined)
+			.updatePullRequest(message.args.text)
 			.then(result => {
 				this._replyMessage(message, { body: result.description, bodyHTML: result.description });
 			})

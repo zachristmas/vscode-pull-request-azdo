@@ -1,5 +1,5 @@
 // This file is providing the test runner to use when running extension tests.
-import * as path from 'path';
+import path from 'path';
 import { glob } from 'glob';
 import Mocha from 'mocha';
 
@@ -9,7 +9,7 @@ import { mockWebviewEnvironment } from './mocks/mockWebviewEnvironment';
 // Since we are not running in a tty environment, we just implement the method statically.
 // This is copied verbatim from the upstream, default Mocha test runner:
 // https://github.com/microsoft/vscode-extension-vscode/blob/master/lib/testrunner.ts
- 
+
 const tty = require('tty') as any;
 
 if (!tty.getWindowSize) {
@@ -40,12 +40,12 @@ async function runAllExtensionTests(testsRoot: string): Promise<number> {
 
 	// await vscode.extensions.getExtension(extensionId)!.activate();
 
-	mockWebviewEnvironment.install(global);
+	mockWebviewEnvironment.install(globalThis);
 
 	const mocha = new Mocha({
 		ui: 'bdd',
 		color: true,
-		timeout: 600000,
+		timeout: 600_000,
 		// Scope a run to one suite: MOCHA_GREP="PullRequestOverview" yarn test
 		grep: process.env.MOCHA_GREP ? new RegExp(process.env.MOCHA_GREP) : undefined,
 	});
@@ -69,15 +69,20 @@ async function runAllExtensionTests(testsRoot: string): Promise<number> {
 	return new Promise(resolve => mocha.run(resolve));
 }
 
+async function runAndReport(testsRoot: string, clb: (error: Error | null, failures?: number) => void): Promise<void> {
+	let failures: number;
+	try {
+		failures = await runAllExtensionTests(testsRoot);
+	} catch (error: any) {
+		console.log(error.stack);
+		clb(error);
+		return;
+	}
+	clb(null, failures);
+}
+
 export function run(testsRoot: string, clb: (error: Error | null, failures?: number) => void): void {
-	 
 	require('source-map-support').install();
 
-	runAllExtensionTests(testsRoot).then(
-		failures => clb(null, failures),
-		error => {
-			console.log(error.stack);
-			clb(error);
-		},
-	);
+	void runAndReport(testsRoot, clb);
 }

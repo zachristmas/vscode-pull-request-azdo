@@ -1,4 +1,4 @@
-import * as path from 'path';
+import path from 'path';
 import { BrowserType, runTests } from '@vscode/test-web';
 
 async function go() {
@@ -25,4 +25,5 @@ async function go() {
 	}
 }
 
+// eslint-disable-next-line unicorn/prefer-top-level-await -- CJS test entry point; TLA needs ESM
 go();

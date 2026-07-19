@@ -1,6 +1,6 @@
 // Global Mocha test hooks.
 
-import * as util from 'util';
+import { format } from 'util';
 
 const original = {
 	log: console.log,
@@ -8,19 +8,20 @@ const original = {
 };
 
 beforeEach(function () {
+	// eslint-disable-next-line unicorn/no-this-outside-of-class -- mocha hook context
 	const currentTest = this.currentTest as {
 		consoleOutputs?: string[];
 		consoleErrors?: string[];
 	};
 	console.log = function captureLog(...args: unknown[]) {
 		original.log.apply(console, args);
-		const formatted = util.format(...args);
-		currentTest.consoleOutputs = (currentTest.consoleOutputs || []).concat(formatted);
+		const formatted = format(...args);
+		currentTest.consoleOutputs = [...(currentTest.consoleOutputs || []), formatted];
 	};
 	console.error = function captureError(...args: unknown[]) {
 		original.error.apply(console, args);
-		const formatted = util.format(...args);
-		currentTest.consoleErrors = (currentTest.consoleErrors || []).concat(formatted);
+		const formatted = format(...args);
+		currentTest.consoleErrors = [...(currentTest.consoleErrors || []), formatted];
 	};
 });
 

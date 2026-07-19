@@ -46,11 +46,13 @@ export class RepositoryChangesNode extends DescriptionNode implements vscode.Tre
 	}
 
 	private revealActiveEditorInTree(activeEditorUri: string | undefined): void {
-		if (this.parent.view.visible && activeEditorUri) {
-			const matchingFile = this._localFileChanges.find(change => change.filePath.toString() === activeEditorUri);
-			if (matchingFile) {
-				this.reveal(matchingFile, { select: true });
-			}
+		if (!(activeEditorUri && this.parent.view.visible)) {
+			return;
+		}
+
+		const matchingFile = this._localFileChanges.find(change => change.filePath.toString() === activeEditorUri);
+		if (matchingFile) {
+			this.reveal(matchingFile, { select: true });
 		}
 	}
 

@@ -26,7 +26,7 @@ export const PULL_REQUEST_PAGE_SIZE = 20;
 export type IMetadata = GitRepository;
 
 export class AzdoRepository implements vscode.Disposable {
-	static ID = 'AzdoRepository';
+	static readonly ID = 'AzdoRepository';
 	protected _initialized: boolean = false;
 	protected _hub: Azdo | undefined;
 	protected _metadata: IMetadata | undefined;
@@ -145,7 +145,8 @@ export class AzdoRepository implements vscode.Disposable {
 	}
 
 	async getRepositoryId(): Promise<string | undefined> {
-		return (await this.getMetadata())?.id;
+		const metadata = await this.getMetadata();
+		return metadata?.id;
 	}
 
 	private unresolvedRepositoryMessage(): string {

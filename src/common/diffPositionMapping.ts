@@ -11,7 +11,7 @@ import { DiffChangeType, DiffHunk, DiffLine, parseDiffHunk } from './diffHunk';
  * no content, in which case it is 0. Normalize the position to be zero based.
  * @param line The line in a file from the diff header
  */
-export function getZeroBased(line: number): number {
+export function getZeroBased(line: number | undefined): number {
 	if (line === undefined || line === 0) {
 		return 0;
 	}
@@ -30,9 +30,9 @@ export function getZeroBased(line: number): number {
  */
 export function getAbsolutePosition(comment: IComment, fileDiffHunks: DiffHunk[], isBase: boolean): number {
 	let commentAbsolutePosition = -1;
-	// Ignore outdated comments
-	if (comment.position !== null) {
-		const diffLine = getDiffLineByPosition(fileDiffHunks, comment.position!);
+	// Ignore outdated comments (position is number | undefined, but null shows up at runtime too)
+	if (comment.position != null) {
+		const diffLine = getDiffLineByPosition(fileDiffHunks, comment.position);
 
 		if (diffLine) {
 			if (isBase && diffLine.type === DiffChangeType.Delete) {
@@ -49,13 +49,13 @@ export function getAbsolutePosition(comment: IComment, fileDiffHunks: DiffHunk[]
 }
 
 export function getLastDiffLine(prPatch: string): DiffLine | undefined {
-	let lastDiffLine = undefined;
+	let lastDiffLine;
 	const prDiffReader = parseDiffHunk(prPatch);
 	let prDiffIter = prDiffReader.next();
 
 	while (!prDiffIter.done) {
 		const diffHunk = prDiffIter.value;
-		lastDiffLine = diffHunk.diffLines[diffHunk.diffLines.length - 1];
+		lastDiffLine = diffHunk.diffLines.at(-1);
 
 		prDiffIter = prDiffReader.next();
 	}
@@ -64,8 +64,7 @@ export function getLastDiffLine(prPatch: string): DiffLine | undefined {
 }
 
 export function getDiffLineByPosition(diffHunks: DiffHunk[], diffLineNumber: number): DiffLine | undefined {
-	for (let i = 0; i < diffHunks.length; i++) {
-		const diffHunk = diffHunks[i];
+	for (const diffHunk of diffHunks) {
 		for (let j = 0; j < diffHunk.diffLines.length; j++) {
 			if (diffHunk.diffLines[j].positionInHunk === diffLineNumber) {
 				return diffHunk.diffLines[j];
@@ -99,7 +98,26 @@ export function mapNewPositionToOld(patch: string, line: number): number {
 	return line + delta;
 }
 
-export function mapHeadLineToDiffHunkPosition(
+// Finds the diff-hunk position of the line whose old (isBase) or new line number matches, or -1.
+function findDiffHunkPositionForLine(diffHunks: DiffHunk[], lineInPRDiff: number, isBase: boolean): number {
+	const positionInDiffHunk = -1;
+
+	for (const diffHunk of diffHunks) {
+		for (let j = 0; j < diffHunk.diffLines.length; j++) {
+			if (isBase) {
+				if (diffHunk.diffLines[j].oldLineNumber === lineInPRDiff) {
+					return diffHunk.diffLines[j].positionInHunk;
+				}
+			} else if (diffHunk.diffLines[j].newLineNumber === lineInPRDiff) {
+				return diffHunk.diffLines[j].positionInHunk;
+			}
+		}
+	}
+
+	return positionInDiffHunk;
+}
+
+export function mapLineInHeadToDiffHunkPosition(
 	diffHunks: DiffHunk[],
 	localDiff: string,
 	line: number,
@@ -120,25 +138,7 @@ export function mapHeadLineToDiffHunkPosition(
 		localDiffIter = localDiffReader.next();
 	}
 
-	const positionInDiffHunk = -1;
-
-	for (let i = 0; i < diffHunks.length; i++) {
-		const diffHunk = diffHunks[i];
-
-		for (let j = 0; j < diffHunk.diffLines.length; j++) {
-			if (isBase) {
-				if (diffHunk.diffLines[j].oldLineNumber === lineInPRDiff) {
-					return diffHunk.diffLines[j].positionInHunk;
-				}
-			} else {
-				if (diffHunk.diffLines[j].newLineNumber === lineInPRDiff) {
-					return diffHunk.diffLines[j].positionInHunk;
-				}
-			}
-		}
-	}
-
-	return positionInDiffHunk;
+	return findDiffHunkPositionForLine(diffHunks, lineInPRDiff, isBase);
 }
 
 export function mapOldPositionToNew(patch: string, line: number): number {
@@ -165,11 +165,9 @@ export function mapOldPositionToNew(patch: string, line: number): number {
 }
 
 export function mapCommentsToHead(diffHunks: DiffHunk[], localDiff: string, comments: IComment[]) {
-	for (let i = 0; i < comments.length; i++) {
-		const comment = comments[i];
-
+	for (const comment of comments) {
 		// Ignore outdated comments
-		if (comment.position === null || comment.position === undefined) {
+		if (comment.position == null) {
 			continue;
 		}
 

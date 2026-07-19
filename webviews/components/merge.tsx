@@ -7,10 +7,10 @@ import { BuildResult } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { GitStatusState, PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as React from 'react';
- 
+
 import { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { Dropdown } from './dropdown';
-import { alertIcon, checkIcon, deleteIcon, pendingIcon } from './icon';
+import { alertIcon, checkIcon, crossIcon, pendingIcon } from './icon';
 import { nbsp } from './space';
 import { Avatar } from './user';
 import {
@@ -28,34 +28,29 @@ import { Reviewer } from '../components/reviewer';
 // UX-05: check/delete/dot are shared gray glyphs; wrapping them in a text-* class recolors them
 // (CSS fill: currentColor) so the status/policy icons match their summary line, not stay gray.
 const successIcon = <span className="text-success">{checkIcon}</span>;
-const dangerIcon = <span className="text-danger">{deleteIcon}</span>;
+const dangerIcon = <span className="text-danger">{crossIcon}</span>;
 const mutedIcon = <span className="text-muted">{pendingIcon}</span>;
 
-export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
-	if (pr.isIssue) {
-		return null;
-	}
+// Wrapper keeps the isIssue bail-out outside the component that owns hooks, so hooks run
+// unconditionally (rules-of-hooks).
+export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) =>
+	pr.isIssue ? null : <PullRequestStatusChecks pr={pr} isSimple={isSimple} />;
+
+const PullRequestStatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
 	const { state } = pr;
 	const { checkStatus } = useContext(PullRequestContext);
 	// POL-09: statuses were fetched once per overview load; refresh them on the same 3s cycle the
 	// mergeability poll already uses so build results update without reopening the panel.
 	const [status, setStatus] = useState(pr.status);
-	const [showDetails, toggleDetails] = useReducer(
-		show => !show,
-		status.statuses.some(s => s.state === GitStatusState.Failed),
-	) as [boolean, () => void];
+	const [showDetails, setShowDetails] = useState(() => status.statuses.some(s => s.state === GitStatusState.Failed));
+	const toggleDetails = () => setShowDetails(shown => !shown);
 
 	useEffect(() => {
-		if (status.statuses.some(s => s.state === GitStatusState.Failed || s.state === GitStatusState.Error)) {
-			if (!showDetails) {
-				toggleDetails();
-			}
-		} else {
-			if (showDetails) {
-				toggleDetails();
-			}
-		}
-	}, status.statuses);
+		// Force details open while any check is failing, closed once all recover (manual toggles
+		// still apply between status refreshes) - same net effect as the old toggle-based version,
+		// whose dependency list was `status.statuses` itself rather than an array literal.
+		setShowDetails(status.statuses.some(s => s.state === GitStatusState.Failed || s.state === GitStatusState.Error));
+	}, [status.statuses]);
 
 	useEffect(() => {
 		const handle = setInterval(async () => {
@@ -78,50 +73,53 @@ export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: bool
 		return () => clearInterval(handle);
 	});
 
-	return (
-		<div id="status-checks">
-			{state === PullRequestStatus.Completed ? (
-				<>
-					<div className="branch-status-message text-success">{'Pull request successfully merged.'}</div>
-					{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
-					    default branch when the deleted branch is active) already existed but was
-					    unreachable here - nothing offered to clean up the now-merged branch. */}
-					<DeleteBranch {...pr} />
-				</>
-			) : state === PullRequestStatus.Abandoned ? (
-				<>
-					<div className="branch-status-message text-muted">{'This pull request is abandoned.'}</div>
-					{/* <DeleteBranch {...pr} /> */}
-				</>
-			) : (
-				<>
-					<PolicySection pr={pr} />
-					{status.statuses.length ? (
-						<>
-							<div className="status-section">
-								<div className="status-item">
-									<StateIcon state={status.state} />
-									<div className={statusStateTextClass(status.state)}>{getSummaryLabel(status.statuses)}</div>
-									{/* item 2: real button so it's keyboard-operable (was <a aria-role> - not focusable,
-									    and aria-role is not a valid attribute). */}
-									<button type="button" className="link-button" onClick={toggleDetails}>
-										{showDetails ? 'Hide' : 'Show'}
-									</button>
-								</div>
-								{showDetails ? <StatusCheckDetails statuses={status.statuses} /> : null}
+	let stateContent: JSX.Element;
+	if (state === PullRequestStatus.Completed) {
+		stateContent = (
+			<>
+				<div className="branch-status-message text-success">{'Pull request successfully merged.'}</div>
+				{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
+				    default branch when the deleted branch is active) already existed but was
+				    unreachable here - nothing offered to clean up the now-merged branch. */}
+				<DeleteBranch {...pr} />
+			</>
+		);
+	} else if (state === PullRequestStatus.Abandoned) {
+		stateContent = (
+			<>
+				<div className="branch-status-message text-muted">{'This pull request is abandoned.'}</div>
+				{/* <DeleteBranch {...pr} /> */}
+			</>
+		);
+	} else {
+		stateContent = (
+			<>
+				<PolicySection pr={pr} />
+				{status.statuses.length ? (
+					<>
+						<div className="status-section">
+							<div className="status-item">
+								<StateIcon state={status.state} />
+								<div className={statusStateTextClass(status.state)}>{getSummaryLabel(status.statuses)}</div>
+								{/* item 2: real button so it's keyboard-operable (was <a aria-role> - not focusable,
+								    and aria-role is not a valid attribute). */}
+								<button type="button" className="link-button" onClick={toggleDetails}>
+									{showDetails ? 'Hide' : 'Show'}
+								</button>
 							</div>
-						</>
-					) : null}
-					{isSimple
-						? pr.reviewers
-							? pr.reviewers.map(state => <Reviewer key={state.reviewer.id} {...state} canDelete={false} />)
-							: []
-						: null}
-					<MergeStatusAndActions pr={pr} isSimple={isSimple} />
-				</>
-			)}
-		</div>
-	);
+							{showDetails ? <StatusCheckDetails statuses={status.statuses} /> : null}
+						</div>
+					</>
+				) : null}
+				{isSimple && pr.reviewers
+					? pr.reviewers.map(state => <Reviewer key={state.reviewer.id} {...state} canDelete={false} />)
+					: null}
+				<MergeStatusAndActions pr={pr} isSimple={isSimple} />
+			</>
+		);
+	}
+
+	return <div id="status-checks">{stateContent}</div>;
 };
 
 export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
@@ -151,7 +149,7 @@ export const MergeStatusAndActions = ({ pr, isSimple }: { pr: PullRequest; isSim
 			// resolving), back off to 15s - a 3s cadence there is the refresh storm UX-04 flagged.
 			if (!activelyChecking && autoCompleteArmed) {
 				const now = Date.now();
-				if (now - lastArmedPoll.current < 15000) {
+				if (now - lastArmedPoll.current < 15_000) {
 					return;
 				}
 				lastArmedPoll.current = now;
@@ -259,10 +257,12 @@ export function pendingBlockingPolicies(policies?: PullRequestPolicyEvaluation[]
 	return (policies ?? []).filter(
 		p =>
 			p.isBlocking &&
-			(p.status === PolicyEvaluationStatus.Queued ||
-				p.status === PolicyEvaluationStatus.Running ||
-				p.status === PolicyEvaluationStatus.Rejected ||
-				p.status === PolicyEvaluationStatus.Broken),
+			[
+				PolicyEvaluationStatus.Queued,
+				PolicyEvaluationStatus.Running,
+				PolicyEvaluationStatus.Rejected,
+				PolicyEvaluationStatus.Broken,
+			].includes(p.status),
 	);
 }
 
@@ -279,11 +279,8 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 	const pending = pendingBlockingPolicies(policies);
 	const [showDetails, toggleDetails] = useReducer(
 		show => !show,
-		(policies ?? []).some(
-			p =>
-				p.status === PolicyEvaluationStatus.Rejected ||
-				p.status === PolicyEvaluationStatus.Broken ||
-				p.status === PolicyEvaluationStatus.Running,
+		(policies ?? []).some(p =>
+			[PolicyEvaluationStatus.Rejected, PolicyEvaluationStatus.Broken, PolicyEvaluationStatus.Running].includes(p.status),
 		),
 	) as [boolean, () => void];
 
@@ -307,7 +304,7 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 			// storm UX-04 flagged.
 			if (!stillEvaluating && autoCompleteArmed) {
 				const now = Date.now();
-				if (now - lastArmedPoll.current < 15000) {
+				if (now - lastArmedPoll.current < 15_000) {
 					return;
 				}
 				lastArmedPoll.current = now;
@@ -324,10 +321,9 @@ const PolicySection = ({ pr }: { pr: PullRequest }) => {
 		return null;
 	}
 
+	const policyNoun = pending.length === 1 ? 'policy' : 'policies';
 	const summaryLabel =
-		pending.length > 0
-			? `${pending.length} blocking ${pending.length === 1 ? 'policy' : 'policies'} not satisfied`
-			: 'All branch policies passed';
+		pending.length > 0 ? `${pending.length} blocking ${policyNoun} not satisfied` : 'All branch policies passed';
 
 	return (
 		<div className="status-section policy-section">
@@ -385,7 +381,12 @@ const PolicyRow = ({
 		}
 	}, [requeuePolicy, policy.evaluationId, onRequeue]);
 
-	const buildLabel = policy.build?.isExpired ? 'Re-queue' : !policy.build?.buildId ? 'Queue' : 'Re-run';
+	let buildLabel = 'Re-run';
+	if (policy.build?.isExpired) {
+		buildLabel = 'Re-queue';
+	} else if (!policy.build?.buildId) {
+		buildLabel = 'Queue';
+	}
 
 	return (
 		<div className="status-check">
@@ -394,7 +395,7 @@ const PolicyRow = ({
 				<span className="status-check-detail-text">
 					{policy.displayName}
 					{policy.detail ? `: ${policy.detail}` : ''}
-					{policy.kind === 'build' ? `${buildDetailSuffix(policy)}` : ''}
+					{policy.kind === 'build' ? buildDetailSuffix(policy) : ''}
 					{!policy.isBlocking ? ' (optional)' : ''}
 				</span>
 			</div>
@@ -417,7 +418,8 @@ function buildDetailSuffix(policy: PullRequestPolicyEvaluation): string {
 	}
 	const resultText = buildResultText(policy.build.result);
 	const expiredText = policy.build.isExpired ? ', expired' : '';
-	return ` (Build ${policy.build.buildNumber ?? policy.build.buildId}${expiredText}${resultText ? `: ${resultText}` : ''})`;
+	const resultSuffix = resultText ? `: ${resultText}` : '';
+	return ` (Build ${policy.build.buildNumber ?? policy.build.buildId}${expiredText}${resultSuffix})`;
 }
 
 function buildResultText(result?: number): string {
@@ -435,7 +437,7 @@ function buildResultText(result?: number): string {
 	}
 }
 
-function PolicyStatusIcon({ status }: { status: PolicyEvaluationStatus }) {
+function PolicyStatusIcon({ status }: { readonly status: PolicyEvaluationStatus }) {
 	switch (status) {
 		case PolicyEvaluationStatus.Approved:
 			return successIcon;
@@ -458,15 +460,19 @@ export const MergeStatus = ({
 	mergeFailureMessage?: string;
 	hasPolicySection?: boolean;
 }) => {
+	let mergeIcon: JSX.Element | null = null;
+	if (!isSimple) {
+		if (mergeable === PullRequestMergeability.Succeeded) {
+			mergeIcon = successIcon;
+		} else if (mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure) {
+			mergeIcon = dangerIcon;
+		} else {
+			mergeIcon = mutedIcon;
+		}
+	}
 	return (
 		<div className="status-item status-section">
-			{isSimple
-				? null
-				: mergeable === PullRequestMergeability.Succeeded
-				? successIcon
-				: mergeable === PullRequestMergeability.RejectedByPolicy || mergeable === PullRequestMergeability.Failure
-				? dangerIcon
-				: mutedIcon}
+			{mergeIcon}
 			<div className={mergeabilityTextClass(mergeable)}>
 				{getMergeabilityDescription(mergeable, mergeFailureMessage, hasPolicySection)}
 			</div>
@@ -490,8 +496,6 @@ function getMergeabilityDescription(
 			return `Completion is blocked by branch policy.${hasPolicySection ? ' See policies above.' : ''}`;
 		case PullRequestMergeability.Failure:
 			return mergeFailureMessage || 'This pull request could not be completed.';
-		case PullRequestMergeability.Queued:
-		case PullRequestMergeability.NotSet:
 		default:
 			return 'Checking if this branch can be merged...';
 	}
@@ -575,7 +579,7 @@ export const PrActions = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean
 		return <SetAutoComplete {...pr} />;
 	}
 
-	if (mergeable === PullRequestMergeability.Succeeded && hasWritePermission) {
+	if (hasWritePermission && mergeable === PullRequestMergeability.Succeeded) {
 		return isSimple ? <MergeSimple {...pr} /> : <Merge {...pr} />;
 	}
 
@@ -593,12 +597,10 @@ export const MergeSimple = (pr: PullRequest) => {
 		updatePR({ state });
 	}
 
-	const availableOptions = (Object.keys(MERGE_METHODS) as MergeMethod[])
-		.filter(method => pr.mergeMethodsAvailability[method])
-		.reduce((methods: { [method: string]: string }, key) => {
-			methods[key] = MERGE_METHODS[key];
-			return methods;
-		}, {});
+	const enabledMethods = (Object.keys(MERGE_METHODS) as MergeMethod[]).filter(method => pr.mergeMethodsAvailability[method]);
+	const availableOptions: { [method: string]: string } = Object.fromEntries(
+		enabledMethods.map(key => [key, MERGE_METHODS[key]]),
+	);
 
 	return <Dropdown options={availableOptions} defaultOption={pr.defaultMergeMethod} submitAction={submitAction} />;
 };
@@ -653,7 +655,15 @@ export const SetAutoComplete = (pr: PullRequest) => {
 	);
 };
 
-function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMethod; cancel: () => void }) {
+function ConfirmMerge({
+	pr,
+	method,
+	cancel,
+}: {
+	readonly pr: PullRequest;
+	readonly method: MergeMethod;
+	readonly cancel: () => void;
+}) {
 	return <ConfirmComplete pr={pr} method={method} mode="complete" cancel={cancel} />;
 }
 
@@ -665,10 +675,10 @@ function ConfirmComplete({
 	mode,
 	cancel,
 }: {
-	pr: PullRequest;
-	method: MergeMethod;
-	mode: 'complete' | 'autocomplete';
-	cancel: () => void;
+	readonly pr: PullRequest;
+	readonly method: MergeMethod;
+	readonly mode: 'complete' | 'autocomplete';
+	readonly cancel: () => void;
 }) {
 	const { complete, setAutoComplete } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
@@ -685,7 +695,7 @@ function ConfirmComplete({
 					const args = {
 						deleteSourceBranch: deleteBranch.checked,
 						transitionWorkItems: transitionWorkItems.checked,
-						mergeStrategy: method.toString(),
+						mergeStrategy: method,
 						mergeCommitMessage: mergeCommitMessage.value.trim() || undefined,
 					};
 					if (mode === 'autocomplete') {
@@ -790,9 +800,9 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 		!!status.state ? status.state.toString() : GitStatusState.NotSet.toString(),
 	);
 	const statusPhrases = [];
-	for (const statusType of Object.keys(statusTypes)) {
-		const numOfType = statusTypes[statusType].length;
-		const statusAdjective = GitStatusState[Number(statusType)].toString();
+	for (const [statusType, statusesOfType] of Object.entries(statusTypes)) {
+		const numOfType = statusesOfType.length;
+		const statusAdjective = GitStatusState[Number(statusType)];
 
 		const status = numOfType > 1 ? `${numOfType} ${statusAdjective} checks` : `${numOfType} ${statusAdjective} check`;
 
@@ -802,7 +812,7 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 	return statusPhrases.join(' and ');
 }
 
-function StateIcon({ state }: { state: GitStatusState }) {
+function StateIcon({ state }: { readonly state: GitStatusState }) {
 	switch (state) {
 		case GitStatusState.Succeeded:
 			return successIcon;

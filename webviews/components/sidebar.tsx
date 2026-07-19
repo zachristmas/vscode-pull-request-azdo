@@ -6,10 +6,10 @@
 import { PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as React from 'react';
- 
+
 import { useContext, useEffect, useRef, useState } from 'react';
 import { getClosedCommentDescription } from './header';
-import { checkIcon, deleteIcon, plusIcon } from './icon';
+import { checkIcon, crossIcon, plusIcon } from './icon';
 import { REVIEW_STATE_ICON, Reviewer, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
 import { ReviewState } from '../../src/azdo/interface';
@@ -88,7 +88,7 @@ function WorkItem(workItem: WorkItem & { canDelete: boolean }) {
 						aria-label={`Remove work item ${workItem.id}`}
 						onClick={() => removeWorkItemFromPR(workItem.id!)}
 					>
-						{deleteIcon}
+						{crossIcon}
 					</button>
 					{nbsp}
 				</>
@@ -182,13 +182,13 @@ const VotePanel = ({ vote }: { vote: number }) => {
 			await votePullRequest(parseInt(value));
 			setCastState('success');
 			successTimer.current = setTimeout(() => setCastState('idle'), 2500);
-		} catch (_) {
+		} catch {
 			// postMessage rejections used to vanish (votePullRequest never caught); surface them instead.
 			setCastState('error');
 		}
 	};
 
-	const voteKey = VOTE_STATE_TEXT[liveVote] ? liveVote : '0';
+	const voteKey = Object.hasOwn(VOTE_STATE_TEXT, liveVote) ? liveVote : '0';
 	const busy = castState === 'busy';
 
 	return (

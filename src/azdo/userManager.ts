@@ -6,7 +6,7 @@ import { ITelemetry } from '../common/telemetry';
 import { errorMessage } from '../common/utils';
 
 export class AzdoUserManager implements vscode.Disposable {
-	static ID = 'UserManager';
+	static readonly ID = 'UserManager';
 	private _toDispose: vscode.Disposable[] = [];
 	private _hub: Azdo | undefined;
 	private _entitlementApi?: IUserEntitlementApi;
@@ -43,7 +43,7 @@ export class AzdoUserManager implements vscode.Disposable {
 
 			this._identityCache = [
 				...this._identityCache,
-				...members.filter(m => !this._identityCache.some(i => i.id === m.id)),
+				...members.filter(m => this._identityCache.every(i => i.id !== m.id)),
 			];
 			Logger.debug(`Searching for Identities filter: ${filter} - finished.`, AzdoUserManager.ID);
 

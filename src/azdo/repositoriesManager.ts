@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as path from 'path';
+import path from 'path';
 import * as vscode from 'vscode';
 import { CredentialStore } from './credentials';
 import { FolderRepositoryManager, ReposManagerState, ReposManagerStateContext } from './folderRepositoryManager';
@@ -64,7 +64,7 @@ export interface PullRequestDefaults {
 export const NO_MILESTONE: string = 'No Milestone';
 
 export class RepositoriesManager implements vscode.Disposable {
-	static ID = 'RepositoriesManager';
+	static readonly ID = 'RepositoriesManager';
 
 	private _subs: vscode.Disposable[];
 
@@ -79,6 +79,7 @@ export class RepositoriesManager implements vscode.Disposable {
 		private _telemetry: ITelemetry,
 	) {
 		this._subs = [];
+		// eslint-disable-next-line sonarjs/no-async-constructor -- fire-and-forget context-key seed; restructuring construction is out of scope
 		vscode.commands.executeCommand('setContext', ReposManagerStateContext, this._state);
 
 		this._subs.push(
@@ -99,8 +100,8 @@ export class RepositoriesManager implements vscode.Disposable {
 			const index = workspaceFolders.findIndex(
 				folder => folder.uri.toString() === folderManager.repository.rootUri.toString(),
 			);
-			if (index > -1) {
-				const arrayEnd = this._folderManagers.slice(index, this._folderManagers.length);
+			if (index !== -1) {
+				const arrayEnd = this._folderManagers.slice(index);
 				this._folderManagers = this._folderManagers.slice(0, index);
 				this._folderManagers.push(folderManager);
 				this._folderManagers.push(...arrayEnd);
@@ -114,7 +115,7 @@ export class RepositoriesManager implements vscode.Disposable {
 		const existingFolderManagerIndex = this._folderManagers.findIndex(
 			manager => manager.repository.rootUri.toString() === repo.rootUri.toString(),
 		);
-		if (existingFolderManagerIndex > -1) {
+		if (existingFolderManagerIndex !== -1) {
 			const folderManager = this._folderManagers[existingFolderManagerIndex];
 			this._folderManagers.splice(existingFolderManagerIndex);
 			folderManager.dispose();
@@ -125,14 +126,14 @@ export class RepositoriesManager implements vscode.Disposable {
 		if (issueModel === undefined) {
 			return undefined;
 		}
-		const issueRemoteUrl = issueModel.remote.url.substring(
+		const issueRemoteUrl = issueModel.remote.url.slice(
 			0,
-			issueModel.remote.url.length - path.extname(issueModel.remote.url).length,
+			Math.max(0, issueModel.remote.url.length - path.extname(issueModel.remote.url).length),
 		);
 		for (const folderManager of this._folderManagers) {
 			if (
 				folderManager.azdoRepositories
-					.map(repo => repo.remote.url.substring(0, repo.remote.url.length - path.extname(repo.remote.url).length))
+					.map(repo => repo.remote.url.slice(0, Math.max(0, repo.remote.url.length - path.extname(repo.remote.url).length)))
 					.includes(issueRemoteUrl)
 			) {
 				return folderManager;
@@ -144,8 +145,8 @@ export class RepositoriesManager implements vscode.Disposable {
 	getManagerForFile(uri: vscode.Uri): FolderRepositoryManager | undefined {
 		for (const folderManager of this._folderManagers) {
 			const managerPath = folderManager.repository.rootUri.path;
-			const testUriRelativePath = uri.path.substring(
-				managerPath.length > 1 ? managerPath.length + 1 : managerPath.length,
+			const testUriRelativePath = uri.path.slice(
+				Math.max(0, managerPath.length > 1 ? managerPath.length + 1 : managerPath.length),
 			);
 			if (vscode.Uri.joinPath(folderManager.repository.rootUri, testUriRelativePath).path === uri.path) {
 				return folderManager;
@@ -178,10 +179,7 @@ export class RepositoriesManager implements vscode.Disposable {
 	async authenticate(): Promise<boolean> {
 		// return !!(await this._credentialStore.login());
 		await this._credentialStore.forceAuthentication();
-		if (this._credentialStore.getHub() !== undefined) {
-			return true;
-		}
-		return false;
+		return this._credentialStore.getHub() !== undefined;
 	}
 
 	dispose() {

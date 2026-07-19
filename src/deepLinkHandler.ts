@@ -17,11 +17,20 @@ interface DeepLinkTarget {
 	azdoRepository: AzdoRepository;
 }
 
+// Regex-free so a hostile org URL can't trigger super-linear backtracking.
+function trimTrailingSlashes(value: string): string {
+	let end = value.length;
+	while (end > 0 && value.charAt(end - 1) === '/') {
+		end--;
+	}
+	return value.slice(0, end);
+}
+
 // Normalizes both org-url shapes (https://dev.azure.com/<org> and legacy
 // https://<org>.visualstudio.com) down to the bare org name for comparison.
 function orgNameFromUrl(orgUrl: string): string | undefined {
-	const trimmed = orgUrl.trim().replace(/\/+$/, '');
-	const devAzure = trimmed.match(/^https?:\/\/dev\.azure\.com\/([^/]+)$/i);
+	const trimmed = trimTrailingSlashes(orgUrl.trim());
+	const devAzure = /^https?:\/\/dev\.azure\.com\/([^/]+)$/i.exec(trimmed);
 	if (devAzure) {
 		try {
 			return decodeURIComponent(devAzure[1]).toLowerCase();
@@ -29,33 +38,46 @@ function orgNameFromUrl(orgUrl: string): string | undefined {
 			return devAzure[1].toLowerCase();
 		}
 	}
-	const legacy = trimmed.match(/^https?:\/\/([^./]+)\.visualstudio\.com(?:\/DefaultCollection)?$/i);
+	const legacy = /^https?:\/\/([^./]+)\.visualstudio\.com(?:\/DefaultCollection)?$/i.exec(trimmed);
 	if (legacy) {
 		return legacy[1].toLowerCase();
 	}
 	return undefined;
 }
 
+function matchCandidate(
+	folderManager: FolderRepositoryManager,
+	azdoRepository: AzdoRepository,
+	wantedOrg: string,
+	wantedRepo: string,
+	wantedProject: string,
+): { target: DeepLinkTarget; projectMatches: boolean } | undefined {
+	const parsed = parseAzdoRemoteUrl(azdoRepository.remote.url);
+	if (!parsed) {
+		return undefined;
+	}
+	const org = orgNameFromUrl(parsed.orgUrl) ?? parsed.orgUrl.toLowerCase();
+	if (org !== wantedOrg || parsed.repositoryName.toLowerCase() !== wantedRepo) {
+		return undefined;
+	}
+	return {
+		target: { folderManager, azdoRepository },
+		projectMatches: parsed.projectName.toLowerCase() === wantedProject,
+	};
+}
+
 function findDeepLinkTarget(reposManager: RepositoriesManager, params: PullRequestDeepLinkParams): DeepLinkTarget | undefined {
-	const wantedOrg = orgNameFromUrl(params.orgUrl) ?? params.orgUrl.trim().replace(/\/+$/, '').toLowerCase();
+	const wantedOrg = orgNameFromUrl(params.orgUrl) ?? trimTrailingSlashes(params.orgUrl.trim()).toLowerCase();
 	const wantedRepo = params.repo.toLowerCase();
 	const wantedProject = params.project.toLowerCase();
 
 	const candidates: { target: DeepLinkTarget; projectMatches: boolean }[] = [];
 	for (const folderManager of reposManager.folderManagers) {
 		for (const azdoRepository of folderManager.azdoRepositories) {
-			const parsed = parseAzdoRemoteUrl(azdoRepository.remote.url);
-			if (!parsed) {
-				continue;
+			const candidate = matchCandidate(folderManager, azdoRepository, wantedOrg, wantedRepo, wantedProject);
+			if (candidate) {
+				candidates.push(candidate);
 			}
-			const org = orgNameFromUrl(parsed.orgUrl) ?? parsed.orgUrl.toLowerCase();
-			if (org !== wantedOrg || parsed.repositoryName.toLowerCase() !== wantedRepo) {
-				continue;
-			}
-			candidates.push({
-				target: { folderManager, azdoRepository },
-				projectMatches: parsed.projectName.toLowerCase() === wantedProject,
-			});
 		}
 	}
 

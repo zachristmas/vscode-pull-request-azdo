@@ -3,6 +3,9 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/* eslint-disable unicorn/prefer-https, sonarjs/no-clear-text-protocols --
+ * the http:// URIs below are protocol-PARSING fixtures (asserting scheme detection),
+ * not endpoints anything connects to. */
 import { strict as assert } from 'assert';
 import { Protocol, ProtocolType } from '../../common/protocol';
 import * as ssh from '../../env/node/ssh';
@@ -152,8 +155,9 @@ describe('Protocol', () => {
 				expectedOwner: 'Microsoft',
 				expectedRepositoryName: 'vscode',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
+	// testRemote registers nested suites at run time; describe() conversion would newly run them.
 	it('should handle SSH remotes', () =>
 		[
 			{
@@ -184,8 +188,9 @@ describe('Protocol', () => {
 				expectedOwner: '',
 				expectedRepositoryName: 'project',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
+	// testRemote registers nested suites at run time; describe() conversion would newly run them.
 	it('should handle SCP-like remotes', () =>
 		[
 			{
@@ -223,8 +228,9 @@ describe('Protocol', () => {
 				expectedOwner: '',
 				expectedRepositoryName: 'project',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
+	// testRemote registers nested suites at run time; describe() conversion would newly run them.
 	it('should handle local remotes', () =>
 		[
 			{
@@ -241,7 +247,7 @@ describe('Protocol', () => {
 				expectedOwner: '',
 				expectedRepositoryName: '',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
 	describe('toString when generating github remotes', () =>
 		[

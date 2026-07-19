@@ -2,9 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-'use strict';
-
-import * as pathLib from 'path';
+import pathLib from 'path';
 import { GitPullRequestCommentThread, GitPullRequestMergeStrategy } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { GitErrorCodes } from './api/api1';
@@ -38,6 +36,9 @@ import { PRNode } from './view/treeNodes/pullRequestNode';
 const _onDidUpdatePR = new vscode.EventEmitter<PullRequest | void>();
 export const onDidUpdatePR: vscode.Event<PullRequest | void> = _onDidUpdatePR.event;
 
+/** The shapes a pull request command argument can arrive in (tree node, description node, or the model itself). */
+type PullRequestArg = PRNode | DescriptionNode | PullRequestModel;
+
 function ensurePR(folderRepoManager: FolderRepositoryManager, pr?: PRNode | PullRequestModel): PullRequestModel {
 	// If the command is called from the command palette, no arguments are passed.
 	if (!pr) {
@@ -55,7 +56,7 @@ function ensurePR(folderRepoManager: FolderRepositoryManager, pr?: PRNode | Pull
 async function chooseItem<T>(
 	activePullRequests: T[],
 	propertyGetter: (itemValue: T) => string,
-	placeHolder?: string,
+	placeholder?: string,
 ): Promise<T | undefined> {
 	if (activePullRequests.length === 1) {
 		return activePullRequests[0];
@@ -69,7 +70,8 @@ async function chooseItem<T>(
 			itemValue: currentItem,
 		};
 	});
-	return (await vscode.window.showQuickPick(items, { placeHolder }))?.itemValue;
+	const selection = await vscode.window.showQuickPick(items, { placeHolder: placeholder });
+	return selection?.itemValue;
 }
 
 /**
@@ -79,7 +81,7 @@ async function chooseItem<T>(
  */
 async function resolveTargetPullRequest(
 	reposManager: RepositoriesManager,
-	pr?: PRNode | DescriptionNode | PullRequestModel,
+	pr?: PullRequestArg,
 ): Promise<PullRequestModel | undefined> {
 	if (pr) {
 		return pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
@@ -97,6 +99,59 @@ async function resolveTargetPullRequest(
 interface PullRequestFileTarget {
 	pullRequest: PullRequestModel;
 	fileName: string;
+}
+
+/** Resolve the target for a pr_azdo diff editor: match the PR encoded in the URI query. */
+async function resolveFileTargetFromPRUri(
+	reposManager: RepositoriesManager,
+	editorUri: vscode.Uri,
+): Promise<PullRequestFileTarget | undefined> {
+	const params = fromPRUri(editorUri);
+	if (!params) {
+		return undefined;
+	}
+	for (const folderManager of reposManager.folderManagers) {
+		const azdoRepo = folderManager.azdoRepositories.find(repo => repo.remote.remoteName === params.remoteName);
+		if (!azdoRepo) {
+			continue;
+		}
+		const active = folderManager.activePullRequest;
+		const pullRequest =
+			active?.getPullRequestId() === params.prNumber
+				? active
+				: await folderManager.resolvePullRequest(
+						azdoRepo.remote.owner,
+						azdoRepo.remote.repositoryName,
+						params.prNumber,
+				  );
+		if (pullRequest) {
+			return { pullRequest, fileName: params.fileName };
+		}
+	}
+	return undefined;
+}
+
+/** Resolve the target for a review_azdo editor: the checked-out PR of the owning folder. */
+function resolveFileTargetFromReviewUri(
+	reposManager: RepositoriesManager,
+	editorUri: vscode.Uri,
+): PullRequestFileTarget | undefined {
+	const pullRequest = reposManager.getManagerForFile(editorUri)?.activePullRequest;
+	return pullRequest ? { pullRequest, fileName: fromReviewUri(editorUri).path } : undefined;
+}
+
+/** Resolve the target for a plain workspace file: the checked-out PR plus the repo-relative path. */
+function resolveFileTargetFromWorkspaceFile(
+	reposManager: RepositoriesManager,
+	editorUri: vscode.Uri,
+): PullRequestFileTarget | undefined {
+	const folderManager = reposManager.getManagerForFile(editorUri);
+	const pullRequest = folderManager?.activePullRequest;
+	if (!pullRequest) {
+		return undefined;
+	}
+	const relative = pathLib.relative(folderManager!.repository.rootUri.fsPath, editorUri.fsPath);
+	return { pullRequest, fileName: `/${relative.split(pathLib.sep).join('/')}` };
 }
 
 /**
@@ -118,44 +173,15 @@ async function resolvePullRequestFileTarget(
 	}
 
 	if (editorUri.scheme === URI_SCHEME_PR) {
-		const params = fromPRUri(editorUri);
-		if (!params) {
-			return undefined;
-		}
-		for (const folderManager of reposManager.folderManagers) {
-			const azdoRepo = folderManager.azdoRepositories.find(repo => repo.remote.remoteName === params.remoteName);
-			if (!azdoRepo) {
-				continue;
-			}
-			const active = folderManager.activePullRequest;
-			const pullRequest =
-				active?.getPullRequestId() === params.prNumber
-					? active
-					: await folderManager.resolvePullRequest(
-							azdoRepo.remote.owner,
-							azdoRepo.remote.repositoryName,
-							params.prNumber,
-					  );
-			if (pullRequest) {
-				return { pullRequest, fileName: params.fileName };
-			}
-		}
-		return undefined;
+		return await resolveFileTargetFromPRUri(reposManager, editorUri);
 	}
 
 	if (editorUri.scheme === URI_SCHEME_REVIEW) {
-		const pullRequest = reposManager.getManagerForFile(editorUri)?.activePullRequest;
-		return pullRequest ? { pullRequest, fileName: fromReviewUri(editorUri).path } : undefined;
+		return resolveFileTargetFromReviewUri(reposManager, editorUri);
 	}
 
 	if (editorUri.scheme === 'file') {
-		const folderManager = reposManager.getManagerForFile(editorUri);
-		const pullRequest = folderManager?.activePullRequest;
-		if (!pullRequest) {
-			return undefined;
-		}
-		const relative = pathLib.relative(folderManager!.repository.rootUri.fsPath, editorUri.fsPath);
-		return { pullRequest, fileName: `/${relative.split(pathLib.sep).join('/')}` };
+		return resolveFileTargetFromWorkspaceFile(reposManager, editorUri);
 	}
 
 	return undefined;
@@ -201,32 +227,29 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(
-			'azdopr.openPullRequestInAzdo',
-			async (e: PRNode | DescriptionNode | PullRequestModel) => {
-				if (!e) {
-					const activePullRequests: PullRequestModel[] = reposManager.folderManagers
-						.map(folderManager => folderManager.activePullRequest!)
-						.filter(activePR => !!activePR);
+		vscode.commands.registerCommand('azdopr.openPullRequestInAzdo', async (e: PullRequestArg) => {
+			if (!e) {
+				const activePullRequests: PullRequestModel[] = reposManager.folderManagers
+					.map(folderManager => folderManager.activePullRequest!)
+					.filter(activePR => !!activePR);
 
-					if (activePullRequests.length >= 1) {
-						const result = await chooseItem<PullRequestModel>(activePullRequests, itemValue => itemValue.url);
-						if (result) {
-							vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(result.url));
-						}
+				if (activePullRequests.length >= 1) {
+					const result = await chooseItem<PullRequestModel>(activePullRequests, itemValue => itemValue.url);
+					if (result) {
+						vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(result.url));
 					}
-				} else if (e instanceof PRNode || e instanceof DescriptionNode) {
-					vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.pullRequestModel.url));
-				} else {
-					vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.url));
 				}
+			} else if (e instanceof PRNode || e instanceof DescriptionNode) {
+				vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.pullRequestModel.url));
+			} else {
+				vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.url));
+			}
 
-				/* __GDPR__
+			/* __GDPR__
 			"pr.openInAzdo" : {}
 		*/
-				telemetry.sendTelemetryEvent('azdopr.openInAzdo');
-			},
-		),
+			telemetry.sendTelemetryEvent('azdopr.openInAzdo');
+		}),
 	);
 
 	const createPullRequestForActiveFolder = async (draft: boolean) => {
@@ -273,48 +296,42 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(
-			'azdopr.copyPullRequestUrl',
-			async (e?: PRNode | DescriptionNode | PullRequestModel) => {
-				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
-				if (!pullRequestModel) {
-					return;
-				}
-				await vscode.env.clipboard.writeText(pullRequestModel.url);
-				vscode.window.showInformationMessage('Pull request URL copied to clipboard.');
+		vscode.commands.registerCommand('azdopr.copyPullRequestUrl', async (e?: PullRequestArg) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
+			if (!pullRequestModel) {
+				return;
+			}
+			await vscode.env.clipboard.writeText(pullRequestModel.url);
+			vscode.window.showInformationMessage('Pull request URL copied to clipboard.');
 
-				/* __GDPR__
+			/* __GDPR__
 			"azdopr.copyPullRequestUrl" : {}
 		*/
-				telemetry.sendTelemetryEvent('azdopr.copyPullRequestUrl');
-			},
-		),
+			telemetry.sendTelemetryEvent('azdopr.copyPullRequestUrl');
+		}),
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(
-			'azdopr.copyVscodeDeepLink',
-			async (e?: PRNode | DescriptionNode | PullRequestModel) => {
-				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
-				if (!pullRequestModel) {
-					return;
-				}
-				const params = deepLinkParamsFromPullRequest(pullRequestModel);
-				if (!params) {
-					vscode.window.showErrorMessage(
-						'Unable to build a deep link: the organization or project of this pull request could not be determined.',
-					);
-					return;
-				}
-				await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
-				vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
+		vscode.commands.registerCommand('azdopr.copyVscodeDeepLink', async (e?: PullRequestArg) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
+			if (!pullRequestModel) {
+				return;
+			}
+			const params = deepLinkParamsFromPullRequest(pullRequestModel);
+			if (!params) {
+				vscode.window.showErrorMessage(
+					'Unable to build a deep link: the organization or project of this pull request could not be determined.',
+				);
+				return;
+			}
+			await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
+			vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
 
-				/* __GDPR__
+			/* __GDPR__
 			"azdopr.copyVscodeDeepLink" : {}
 		*/
-				telemetry.sendTelemetryEvent('azdopr.copyVscodeDeepLink');
-			},
-		),
+			telemetry.sendTelemetryEvent('azdopr.copyVscodeDeepLink');
+		}),
 	);
 
 	context.subscriptions.push(
@@ -510,7 +527,8 @@ export function registerCommands(
 			const input = await vscode.window.showInputBox({
 				prompt: vscode.l10n.t('Pull request ID to checkout'),
 				placeHolder: vscode.l10n.t('e.g. 5994'),
-				validateInput: (v: string) => (/^\d+$/.test(v.trim()) ? undefined : vscode.l10n.t('Enter a numeric pull request ID')),
+				validateInput: (v: string) =>
+					/^\d+$/.test(v.trim()) ? undefined : vscode.l10n.t('Enter a numeric pull request ID'),
 			});
 			if (!input) {
 				return;
@@ -531,14 +549,10 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('azdopr.pick', async (pr: PRNode | DescriptionNode | PullRequestModel) => {
+		vscode.commands.registerCommand('azdopr.pick', async (pr: PullRequestArg) => {
 			let pullRequestModel: PullRequestModel;
 
-			if (pr instanceof PRNode || pr instanceof DescriptionNode) {
-				pullRequestModel = pr.pullRequestModel;
-			} else {
-				pullRequestModel = pr;
-			}
+			pullRequestModel = pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
 
 			const fromDescriptionPage = pr instanceof PullRequestModel;
 			/* __GDPR__
@@ -563,14 +577,10 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('azdopr.exit', async (pr: PRNode | DescriptionNode | PullRequestModel) => {
+		vscode.commands.registerCommand('azdopr.exit', async (pr: PullRequestArg) => {
 			let pullRequestModel: PullRequestModel;
 
-			if (pr instanceof PRNode || pr instanceof DescriptionNode) {
-				pullRequestModel = pr.pullRequestModel;
-			} else {
-				pullRequestModel = pr;
-			}
+			pullRequestModel = pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
 
 			const fromDescriptionPage = pr instanceof PullRequestModel;
 			/* __GDPR__
@@ -767,7 +777,7 @@ export function registerCommands(
 				.then(async value => {
 					if (value === 'Yes') {
 						try {
-							let newComment: GitPullRequestCommentThread | undefined = undefined;
+							let newComment: GitPullRequestCommentThread | undefined;
 							if (message) {
 								newComment = await pullRequest.createThread(message);
 							}
@@ -870,14 +880,14 @@ export function registerCommands(
 							'vscode.diff',
 							fileChange.parentFilePath,
 							emptyFileUri,
-							`${fileChange.fileName}`,
+							fileChange.fileName,
 							{ preserveFocus: true },
 					  )
 					: vscode.commands.executeCommand(
 							'vscode.diff',
 							emptyFileUri,
 							fileChange.parentFilePath,
-							`${fileChange.fileName}`,
+							fileChange.fileName,
 							{ preserveFocus: true },
 					  );
 			}
@@ -902,14 +912,14 @@ export function registerCommands(
 			if (fileChange.comments && fileChange.comments.length) {
 				const sortedOutdatedComments = fileChange.comments
 					.filter(comment => getPositionFromThread(comment) === undefined)
-					.sort((a, b) => {
+					.toSorted((a, b) => {
 						return getPositionFromThread(a)! - getPositionFromThread(b)!;
 					});
 
 				if (sortedOutdatedComments.length) {
-					const lastHunk = fileChange.diffHunks[fileChange.diffHunks.length - 1];
+					const lastHunk = fileChange.diffHunks.at(-1)!;
 					// const diffLine =  getDiffLineByPosition(fileChange.diffHunks, sortedOutdatedComments[0].originalPosition!);
-					const diffLine = lastHunk.diffLines[lastHunk.diffLines.length - 1];
+					const diffLine = lastHunk.diffLines.at(-1);
 
 					if (diffLine) {
 						const lineNumber = Math.max(
@@ -927,7 +937,7 @@ export function registerCommands(
 				'vscode.diff',
 				previousFileUri,
 				fileChange.filePath,
-				`${fileChange.fileName} from ${(commit || '').substr(0, 8)}`,
+				`${fileChange.fileName} from ${(commit || '').slice(0, 8)}`,
 				options,
 			);
 		}),
@@ -956,7 +966,6 @@ export function registerCommands(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.configureRemotes', async () => {
-			 
 			const { name, publisher } = require('../package.json') as { name: string; publisher: string };
 			const extensionId = `${publisher}.${name}`;
 
@@ -1065,11 +1074,9 @@ export function registerCommands(
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.openChangedFile', (value: GitFileChangeNode) => {
 			const openDiff = vscode.workspace.getConfiguration().get('git.openDiffOnClick');
-			if (openDiff) {
-				return vscode.commands.executeCommand('azdopr.openDiffView', value);
-			} else {
-				return vscode.commands.executeCommand('azdoreview.openFile', value);
-			}
+			return openDiff
+				? vscode.commands.executeCommand('azdopr.openDiffView', value)
+				: vscode.commands.executeCommand('azdoreview.openFile', value);
 		}),
 	);
 

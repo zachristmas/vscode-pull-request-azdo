@@ -14,7 +14,7 @@ import {
 import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';
 import * as vscode from 'vscode';
-import { IGit, Repository } from '../../api/api';
+import { Repository } from '../../api/api';
 import { GitApiImpl } from '../../api/api1';
 import { AzdoRepository } from '../../azdo/azdoRepository';
 import { CredentialStore } from '../../azdo/credentials';
@@ -34,7 +34,6 @@ import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { PullRequestsTreeDataProvider } from '../../view/prsTreeDataProvider';
 import { ReviewCommentController } from '../../view/reviewCommentController';
 import { GitFileChangeNode, RemoteFileChangeNode } from '../../view/treeNodes/fileChangeNode';
-import { MockAzdoRepository } from '../mocks/mockAzdoRepository';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
@@ -43,6 +42,20 @@ import { asReal } from '../mocks/stub';
 
 const protocol = new Protocol('https://github.com/github/test.git');
 const remote = new Remote('test', 'github/test', protocol);
+
+function createGHPRCommentThread(threadId: string, uri: vscode.Uri): GHPRCommentThread {
+	return {
+		threadId: Number.parseInt(threadId),
+		uri,
+		range: new vscode.Range(new vscode.Position(21, 0), new vscode.Position(21, 0)),
+		comments: [],
+		collapsibleState: vscode.CommentThreadCollapsibleState.Expanded,
+		label: 'Start discussion',
+		dispose: () => {},
+		rawThread: createMock<GitPullRequestCommentThread>(),
+		canReply: false,
+	};
+}
 
 class TestReviewCommentController extends ReviewCommentController {
 	/**
@@ -96,7 +109,13 @@ describe('ReviewCommentController', function () {
 
 		provider = new PullRequestsTreeDataProvider(telemetry);
 		fileReviewedStatusService = sinon.createStubInstance(FileReviewedStatusService);
-		manager = new FolderRepositoryManager(repository, telemetry, gitImpl, credentialStore, asReal(fileReviewedStatusService));
+		manager = new FolderRepositoryManager(
+			repository,
+			telemetry,
+			gitImpl,
+			credentialStore,
+			asReal(fileReviewedStatusService),
+		);
 		sinon.stub(credentialStore, 'isAuthenticated').returns(false);
 		await manager.updateRepositories();
 
@@ -154,20 +173,6 @@ describe('ReviewCommentController', function () {
 		);
 	}
 
-	function createGHPRCommentThread(threadId: string, uri: vscode.Uri): GHPRCommentThread {
-		return {
-			threadId: Number.parseInt(threadId),
-			uri,
-			range: new vscode.Range(new vscode.Position(21, 0), new vscode.Position(21, 0)),
-			comments: [],
-			collapsibleState: vscode.CommentThreadCollapsibleState.Expanded,
-			label: 'Start discussion',
-			dispose: () => {},
-			rawThread: createMock<GitPullRequestCommentThread>(),
-			canReply: false,
-		};
-	}
-
 	describe('createOrReplyComment', function () {
 		it('creates a new comment on an empty thread in a local file', async function () {
 			const fileName = 'data/products.json';
@@ -180,7 +185,7 @@ describe('ReviewCommentController', function () {
 				localFileChanges,
 				[],
 				[],
-				c => {
+				_c => {
 					return {
 						canDelete: false,
 						canEdit: false,
@@ -207,7 +212,7 @@ describe('ReviewCommentController', function () {
 			// });
 
 			sinon.stub(activePullRequest.azdoRepository.azdo!.connection, 'getGitApi').resolves({
-				createThread: async (c: unknown, r: unknown, n: unknown, p: unknown) => {
+				createThread: async (_c: unknown, _r: unknown, _n: unknown, _p: unknown) => {
 					return {
 						id: 1,
 						comments: [
@@ -224,7 +229,7 @@ describe('ReviewCommentController', function () {
 						status: CommentThreadStatus.Active,
 					};
 				},
-				getPullRequestIterations: (r: unknown, n: unknown, p: unknown, i: unknown) => {
+				getPullRequestIterations: (_r: unknown, _n: unknown, _p: unknown, _i: unknown) => {
 					return [];
 				},
 			} as any);
@@ -239,7 +244,7 @@ describe('ReviewCommentController', function () {
 
 			sinon.stub(vscode.workspace, 'asRelativePath').callsFake((pathOrUri: string | vscode.Uri): string => {
 				const path = pathOrUri.toString();
-				return path.substring('/root/'.length);
+				return path.slice('/root/'.length);
 			});
 
 			sinon.stub(repository, 'diffWithHEAD').returns(Promise.resolve(''));
@@ -257,7 +262,7 @@ describe('ReviewCommentController', function () {
 			await reviewCommentController.createOrReplyComment(thread, 'hello world');
 
 			assert.strictEqual(thread.comments.length, 1);
-			assert(replaceCommentSpy.calledOnce);
+			assert.ok(replaceCommentSpy.calledOnce);
 			assert.strictEqual(thread.comments[0].parent, thread);
 
 			assert.strictEqual(Object.keys(workspaceFileChangeCommentThreads).length, 1);

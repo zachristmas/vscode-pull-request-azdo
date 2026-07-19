@@ -26,7 +26,7 @@ export class DiffLine {
 	}
 
 	public get text(): string {
-		return this._raw.substr(1);
+		return this._raw.slice(1);
 	}
 
 	constructor(
@@ -95,15 +95,72 @@ export function* LineReader(text: string): IterableIterator<string> {
 			index++;
 		}
 
-		yield text.substr(startIndex, length);
+		yield text.slice(startIndex, startIndex + length);
 	}
+}
+
+// Parses a @@ header line into a fresh DiffHunk seeded with its Control line.
+function createHunkFromHeader(line: string, positionInHunk: number): DiffHunk {
+	const matches = DIFF_HUNK_HEADER.exec(line);
+	const oriStartLine = Number(matches![1]);
+	// https://www.gnu.org/software/diffutils/manual/diffutils.html#Detailed-Unified
+	// `count` is added when the changes have more than 1 line.
+	const oriLen = Number(matches![3]) || 1;
+	const newStartLine = Number(matches![5]);
+	const newLen = Number(matches![7]) || 1;
+
+	const diffHunk = new DiffHunk(oriStartLine, oriLen, newStartLine, newLen, positionInHunk);
+	// @rebornix todo, once we have enough tests, this should be removed.
+	diffHunk.diffLines.push(new DiffLine(DiffChangeType.Control, -1, -1, positionInHunk, line));
+	return diffHunk;
+}
+
+// Appends a non-header line to the hunk and advances the line counters.
+// Returns the updated counters.
+function appendLineToHunk(
+	diffHunk: DiffHunk,
+	line: string,
+	oldLine: number,
+	newLine: number,
+	positionInHunk: number,
+): { oldLine: number; newLine: number } {
+	const type = getDiffChangeType(line);
+
+	if (type === DiffChangeType.Control) {
+		if (diffHunk.diffLines && diffHunk.diffLines.length) {
+			diffHunk.diffLines.at(-1)!.endwithLineBreak = false;
+		}
+		return { oldLine, newLine };
+	}
+
+	diffHunk.diffLines.push(
+		new DiffLine(
+			type,
+			type !== DiffChangeType.Add ? oldLine : -1,
+			type !== DiffChangeType.Delete ? newLine : -1,
+			positionInHunk,
+			line,
+		),
+	);
+
+	const lineCount = 1 + countCarriageReturns(line);
+
+	// type is Context, Delete or Add here: Context advances both counters,
+	// Delete only the old one, Add only the new one.
+	if (type !== DiffChangeType.Add) {
+		oldLine += lineCount;
+	}
+	if (type !== DiffChangeType.Delete) {
+		newLine += lineCount;
+	}
+	return { oldLine, newLine };
 }
 
 export function* parseDiffHunk(diffHunkPatch: string): IterableIterator<DiffHunk> {
 	const lineReader = LineReader(diffHunkPatch);
 
 	let itr = lineReader.next();
-	let diffHunk: DiffHunk | undefined = undefined;
+	let diffHunk: DiffHunk | undefined;
 	let positionInHunk = -1;
 	let oldLine = -1;
 	let newLine = -1;
@@ -119,50 +176,11 @@ export function* parseDiffHunk(diffHunkPatch: string): IterableIterator<DiffHunk
 				positionInHunk = 0;
 			}
 
-			const matches = DIFF_HUNK_HEADER.exec(line);
-			const oriStartLine = (oldLine = Number(matches![1]));
-			// http://www.gnu.org/software/diffutils/manual/diffutils.html#Detailed-Unified
-			// `count` is added when the changes have more than 1 line.
-			const oriLen = Number(matches![3]) || 1;
-			const newStartLine = (newLine = Number(matches![5]));
-			const newLen = Number(matches![7]) || 1;
-
-			diffHunk = new DiffHunk(oriStartLine, oriLen, newStartLine, newLen, positionInHunk);
-			// @rebornix todo, once we have enough tests, this should be removed.
-			diffHunk.diffLines.push(new DiffLine(DiffChangeType.Control, -1, -1, positionInHunk, line));
+			diffHunk = createHunkFromHeader(line, positionInHunk);
+			oldLine = diffHunk.oldLineNumber;
+			newLine = diffHunk.newLineNumber;
 		} else if (diffHunk) {
-			const type = getDiffChangeType(line);
-
-			if (type === DiffChangeType.Control) {
-				if (diffHunk.diffLines && diffHunk.diffLines.length) {
-					diffHunk.diffLines[diffHunk.diffLines.length - 1].endwithLineBreak = false;
-				}
-			} else {
-				diffHunk.diffLines.push(
-					new DiffLine(
-						type,
-						type !== DiffChangeType.Add ? oldLine : -1,
-						type !== DiffChangeType.Delete ? newLine : -1,
-						positionInHunk,
-						line,
-					),
-				);
-
-				const lineCount = 1 + countCarriageReturns(line);
-
-				switch (type) {
-					case DiffChangeType.Context:
-						oldLine += lineCount;
-						newLine += lineCount;
-						break;
-					case DiffChangeType.Delete:
-						oldLine += lineCount;
-						break;
-					case DiffChangeType.Add:
-						newLine += lineCount;
-						break;
-				}
-			}
+			({ oldLine, newLine } = appendLineToHunk(diffHunk, line, oldLine, newLine, positionInHunk));
 		}
 
 		if (positionInHunk !== -1) {
@@ -181,21 +199,9 @@ export function parsePatch(patch: string): DiffHunk[] {
 	let diffHunkIter = diffHunkReader.next();
 	const diffHunks = [];
 
-	const right = [];
 	while (!diffHunkIter.done) {
 		const diffHunk = diffHunkIter.value;
 		diffHunks.push(diffHunk);
-
-		for (let j = 0; j < diffHunk.diffLines.length; j++) {
-			const diffLine = diffHunk.diffLines[j];
-			if (diffLine.type === DiffChangeType.Delete || diffLine.type === DiffChangeType.Control) {
-			} else if (diffLine.type === DiffChangeType.Add) {
-				right.push(diffLine.text);
-			} else {
-				const codeInFirstLine = diffLine.text;
-				right.push(codeInFirstLine);
-			}
-		}
 
 		diffHunkIter = diffHunkReader.next();
 	}
@@ -207,13 +213,11 @@ export function getModifiedContentFromDiffHunk(originalContent: string, patch: s
 	const left = originalContent.split(/\r?\n/);
 	const diffHunkReader = parseDiffHunk(patch);
 	let diffHunkIter = diffHunkReader.next();
-	const diffHunks = [];
 
 	const right = [];
 	let lastCommonLine = 0;
 	while (!diffHunkIter.done) {
 		const diffHunk = diffHunkIter.value;
-		diffHunks.push(diffHunk);
 
 		const oriStartLine = diffHunk.oldLineNumber;
 
@@ -337,7 +341,7 @@ export async function parseSingleDiffAzdo(
 			try {
 				await repository.getObjectDetails(review.headCommit, removeLeadingSlash(review.filename));
 				localObjectExists = true;
-			} catch (err) {
+			} catch {
 				/* noop */
 			}
 			break;
@@ -345,7 +349,7 @@ export async function parseSingleDiffAzdo(
 			try {
 				await repository.getObjectDetails(parentCommit, removeLeadingSlash(review.filename));
 				localObjectExists = true;
-			} catch (err) {
+			} catch {
 				/* noop */
 			}
 			break;
@@ -354,7 +358,7 @@ export async function parseSingleDiffAzdo(
 			try {
 				await repository.getObjectDetails(parentCommit, removeLeadingSlash(review.previous_filename!));
 				localObjectExists = true;
-			} catch (err) {
+			} catch {
 				/* noop */
 			}
 			break;

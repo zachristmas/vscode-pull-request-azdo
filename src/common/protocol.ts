@@ -46,8 +46,9 @@ export class Protocol {
 				this.owner = this.getOwnerName(this.url.path) || '';
 				this.org = this.getOrg(this.url.path, this.owner, this.repositoryName) || '';
 			}
-		} catch (e) {
+		} catch {
 			Logger.appendLine(`Failed to parse '${uriString}'`);
+			// eslint-disable-next-line sonarjs/no-async-constructor -- fire-and-forget user warning; Protocol is constructed during remote parsing everywhere
 			vscode.window.showWarningMessage(
 				`Unable to parse remote '${uriString}'. Please check that it is correctly formatted.`,
 			);
@@ -55,9 +56,9 @@ export class Protocol {
 	}
 
 	private getOrg(path: string, ownerName: string, repositoryName: string) {
-		let normalized = path.replace(/\\/g, '/');
+		let normalized = path.replaceAll('\\', '/');
 		if (normalized.endsWith('/')) {
-			normalized = normalized.substr(0, normalized.length - 1);
+			normalized = normalized.slice(0, -1);
 		}
 
 		const fragments = normalized.split('/');
@@ -100,7 +101,9 @@ export class Protocol {
 
 	getHostName(authority: string) {
 		// <username>:<password>@<authority>:<port>
-		const matches = /^(?:.*:?@)?([^:]*)(?::.*)?$/.exec(authority);
+		// `(?:[^@]*@)*` consumes deterministically through the LAST `@`, exactly where the old
+		// greedy `(?:.*:?@)?` ended up, but without its super-linear backtracking.
+		const matches = /^(?:[^@]*@)*([^:@]*)(?::.*)?$/.exec(authority);
 
 		if (matches && matches.length >= 2) {
 			// normalize to fix #903.
@@ -112,12 +115,12 @@ export class Protocol {
 	}
 
 	getRepositoryName(path: string) {
-		let normalized = path.replace(/\\/g, '/');
+		let normalized = path.replaceAll('\\', '/');
 		if (normalized.endsWith('/')) {
-			normalized = normalized.substr(0, normalized.length - 1);
+			normalized = normalized.slice(0, -1);
 		}
 		const lastIndex = normalized.lastIndexOf('/');
-		const lastSegment = normalized.substr(lastIndex + 1);
+		const lastSegment = normalized.slice(lastIndex + 1);
 		if (lastSegment === '' || lastSegment === '/') {
 			return;
 		}
@@ -126,17 +129,15 @@ export class Protocol {
 	}
 
 	getOwnerName(path: string) {
-		let normalized = path.replace(/\\/g, '/');
+		let normalized = path.replaceAll('\\', '/');
 		if (normalized.endsWith('/')) {
-			normalized = normalized.substr(0, normalized.length - 1);
+			normalized = normalized.slice(0, -1);
 		}
 
 		const fragments = normalized.split('/');
 		if (fragments.length > 1) {
-			return fragments[fragments.length - 2];
+			return fragments.at(-2);
 		}
-
-		return;
 	}
 
 	normalizeUri(): vscode.Uri | undefined {
@@ -148,14 +149,11 @@ export class Protocol {
 			return this.url;
 		}
 
-		let scheme = 'https';
-		if (this.url && (this.url.scheme === 'http' || this.url.scheme === 'https')) {
-			scheme = this.url.scheme;
-		}
+		const scheme = this.url && (this.url.scheme === 'http' || this.url.scheme === 'https') ? this.url.scheme : 'https';
 
 		try {
 			return vscode.Uri.parse(`${scheme}://${this.host.toLocaleLowerCase()}/${this.nameWithOwner.toLocaleLowerCase()}`);
-		} catch (e) {
+		} catch {
 			return;
 		}
 	}
@@ -184,8 +182,6 @@ export class Protocol {
 		if (normalizedUri) {
 			return normalizedUri.toString();
 		}
-
-		return;
 	}
 
 	update(change: { type?: ProtocolType; host?: string; owner?: string; repositoryName?: string }): Protocol {

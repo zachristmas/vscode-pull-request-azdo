@@ -42,7 +42,7 @@ function parseQuery(query: string): Map<string, string> {
 		const rawKey = eq === -1 ? pair : pair.slice(0, eq);
 		const rawValue = eq === -1 ? '' : pair.slice(eq + 1);
 		try {
-			result.set(decodeURIComponent(rawKey), decodeURIComponent(rawValue.replace(/\+/g, '%20')));
+			result.set(decodeURIComponent(rawKey), decodeURIComponent(rawValue.replaceAll('+', '%20')));
 		} catch {
 			// skip malformed pairs rather than failing the whole link
 		}
@@ -59,7 +59,7 @@ export function parsePullRequestDeepLink(uri: { path: string; query: string }): 
 	const project = query.get('project');
 	const repo = query.get('repo');
 	const prNumber = Number(query.get('pr'));
-	if (!orgUrl || !project || !repo || !Number.isInteger(prNumber) || prNumber <= 0) {
+	if (!orgUrl || !project || !repo || !Number.isSafeInteger(prNumber) || prNumber <= 0) {
 		return undefined;
 	}
 	const filePath = query.get('path') || undefined;

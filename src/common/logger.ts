@@ -27,14 +27,13 @@ class Log {
 			case LogLevel.Off:
 				return;
 			case LogLevel.Debug:
-				const hrtime = new Date().getTime() / 1000;
-				const timeStamp = `${hrtime}s`;
-				const info = component ? `${component}> ${message}` : `${message}`;
-				this._outputChannel.appendLine(`[Debug ${timeStamp}] ${info}`);
+				const hrtime = Date.now() / 1000;
+				const timestamp = `${hrtime}s`;
+				const info = component ? `${component}> ${message}` : message;
+				this._outputChannel.appendLine(`[Debug ${timestamp}] ${info}`);
 				return;
-			case LogLevel.Info:
 			default:
-				this._outputChannel.appendLine(`[Info] ` + (component ? `${component}> ${message}` : `${message}`));
+				this._outputChannel.appendLine(`[Info] ` + (component ? `${component}> ${message}` : message));
 				return;
 		}
 	}
@@ -60,7 +59,6 @@ class Log {
 			case 'off':
 				this._logLevel = LogLevel.Off;
 				break;
-			case 'info':
 			default:
 				this._logLevel = LogLevel.Info;
 				break;

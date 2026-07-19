@@ -8,10 +8,56 @@ import { v4 as uuid } from 'uuid';
 import { chevronIcon } from './icon';
 
 const { useState } = React;
-const enum KEYCODES {
-	esc = 27,
-	down = 40,
-	up = 38,
+
+// Keyboard-navigation helpers for Dropdown: move focus between the rendered option buttons
+// (ids `${dropdownId}option{index}`) based on which element currently has focus.
+function focusNextDropdownOption(
+	dropdownId: string,
+	expandOptionsButtonId: string,
+	options: { [key: string]: string },
+	currentElement: Element,
+): void {
+	if (!currentElement.id || currentElement.id === expandOptionsButtonId) {
+		const firstOptionId = `${dropdownId}option0`;
+		const firstOptionButton = document.querySelector<HTMLElement>(`#${CSS.escape(firstOptionId)}`);
+		firstOptionButton?.focus();
+	} else {
+		const regex = new RegExp(`${dropdownId}option([0-9])`);
+		const result = currentElement.id.match(regex);
+		if (result?.length) {
+			const index = parseInt(result[1]);
+			if (index < Object.entries(options).length - 1) {
+				const nextOptionId = `${dropdownId}option${index + 1}`;
+				const nextOption = document.querySelector<HTMLElement>(`#${CSS.escape(nextOptionId)}`);
+				nextOption?.focus();
+			}
+		}
+	}
+}
+
+function focusPreviousDropdownOption(
+	dropdownId: string,
+	expandOptionsButtonId: string,
+	options: { [key: string]: string },
+	currentElement: Element,
+): void {
+	if (!currentElement.id || currentElement.id === expandOptionsButtonId) {
+		const lastIndex = Object.entries(options).length - 1;
+		const lastOptionId = `${dropdownId}option${lastIndex}`;
+		const lastOptionButton = document.querySelector<HTMLElement>(`#${CSS.escape(lastOptionId)}`);
+		lastOptionButton?.focus();
+	} else {
+		const regex = new RegExp(`${dropdownId}option([0-9])`);
+		const result = currentElement.id.match(regex);
+		if (result?.length) {
+			const index = parseInt(result[1]);
+			if (index > 0) {
+				const nextOptionId = `${dropdownId}option${index - 1}`;
+				const nextOption = document.querySelector<HTMLElement>(`#${CSS.escape(nextOptionId)}`);
+				nextOption?.focus();
+			}
+		}
+	}
 }
 
 // Generic so callers can use a narrower key type (e.g. MergeMethod) for submitAction.
@@ -37,61 +83,42 @@ export const Dropdown = <T extends string>({
 	const onMethodChange = (e: React.MouseEvent<HTMLButtonElement>) => {
 		selectMethod((e.target as HTMLButtonElement).value as T);
 		setOptionsVisible(false);
-		const primaryButton = document.getElementById(`confirm-button${dropdownId}`);
+		const primaryButtonId = `confirm-button${dropdownId}`;
+		const primaryButton = document.querySelector<HTMLElement>(`#${CSS.escape(primaryButtonId)}`);
 		primaryButton?.focus();
 	};
 
 	const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-		if (areOptionsVisible) {
-			// a keydown reaching this handler means something inside the dropdown has focus
-			const currentElement = document.activeElement!;
+		if (!areOptionsVisible) {
+			return;
+		}
 
-			switch (e.keyCode) {
-				case KEYCODES.esc:
-					setOptionsVisible(false);
-					const expandOptionsButton = document.getElementById(EXPAND_OPTIONS_BUTTON);
-					expandOptionsButton?.focus();
-					break;
+		// a keydown reaching this handler means something inside the dropdown has focus
+		const currentElement = document.activeElement!;
 
-				case KEYCODES.down:
-					if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
-						const firstOptionButton = document.getElementById(`${dropdownId}option0`);
-						firstOptionButton?.focus();
-					} else {
-						const regex = new RegExp(`${dropdownId}option([0-9])`);
-						const result = currentElement.id.match(regex);
-						if (result?.length) {
-							const index = parseInt(result[1]);
-							if (index < Object.entries(options).length - 1) {
-								const nextOption = document.getElementById(`${dropdownId}option${index + 1}`);
-								nextOption?.focus();
-							}
-						}
-					}
-					break;
+		switch (e.key) {
+			case 'Escape':
+				setOptionsVisible(false);
+				const expandOptionsButton = document.querySelector<HTMLElement>(`#${CSS.escape(EXPAND_OPTIONS_BUTTON)}`);
+				expandOptionsButton?.focus();
+				break;
 
-				case KEYCODES.up:
-					if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
-						const lastIndex = Object.entries(options).length - 1;
-						const lastOptionButton = document.getElementById(`${dropdownId}option${lastIndex}`);
-						lastOptionButton?.focus();
-					} else {
-						const regex = new RegExp(`${dropdownId}option([0-9])`);
-						const result = currentElement.id.match(regex);
-						if (result?.length) {
-							const index = parseInt(result[1]);
-							if (index > 0) {
-								const nextOption = document.getElementById(`${dropdownId}option${index - 1}`);
-								nextOption?.focus();
-							}
-						}
-					}
-					break;
-			}
+			case 'ArrowDown':
+				focusNextDropdownOption(dropdownId, EXPAND_OPTIONS_BUTTON, options, currentElement);
+				break;
+
+			case 'ArrowUp':
+				focusPreviousDropdownOption(dropdownId, EXPAND_OPTIONS_BUTTON, options, currentElement);
+				break;
 		}
 	};
 
-	const expandButtonClass = Object.entries(options).length === 1 ? 'hidden' : areOptionsVisible ? 'open' : '';
+	let expandButtonClass = '';
+	if (Object.entries(options).length === 1) {
+		expandButtonClass = 'hidden';
+	} else if (areOptionsVisible) {
+		expandButtonClass = 'open';
+	}
 
 	return (
 		<div className="select-container" onKeyDown={onKeyDown}>
@@ -118,10 +145,10 @@ function Confirm<T extends string>({
 	selected,
 	submitAction,
 }: {
-	dropdownId: string;
-	options: { [key: string]: string };
-	selected: T;
-	submitAction: (selected: T) => Promise<void>;
+	readonly dropdownId: string;
+	readonly options: { [key: string]: string };
+	readonly selected: T;
+	readonly submitAction: (selected: T) => Promise<void>;
 }) {
 	const [isBusy, setBusy] = useState(false);
 

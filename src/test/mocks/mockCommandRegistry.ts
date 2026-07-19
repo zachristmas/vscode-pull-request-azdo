@@ -32,9 +32,8 @@ import * as vscode from 'vscode';
 export class MockCommandRegistry {
 	private _commands: { [commandName: string]: (args: any[]) => any } = {};
 
-	static install(sinon: SinonSandbox) {
-		// tslint:disable-next-line: no-unused-expression
-		new this(sinon);
+	static install(sinon: SinonSandbox): MockCommandRegistry {
+		return new this(sinon);
 	}
 
 	constructor(sinon: SinonSandbox) {

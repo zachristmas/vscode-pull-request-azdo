@@ -13,14 +13,13 @@ import gfm from 'remark-gfm';
 import { Dropdown } from './dropdown';
 import { commentIcon, editIcon } from './icon';
 import { nbsp, Spaced } from './space';
-import Timestamp from './timestamp';
+import { Timestamp } from './timestamp';
 import { AuthorLink, Avatar } from './user';
 import { PullRequestVote } from '../../src/azdo/interface';
 import { PullRequest, ReviewType } from '../common/cache';
 import PullRequestContext from '../common/context';
 import emitter from '../common/events';
 import { useStateProp } from '../common/hooks';
-// eslint-disable-next-line import-x/no-named-as-default
 
 const { useCallback, useContext, useEffect, useRef, useState } = React;
 export type Props = Partial<Comment> & {
@@ -93,11 +92,11 @@ export function CommentView(comment: Props) {
 }
 
 type CommentBoxProps = {
-	for: Partial<Comment>;
-	header?: React.ReactChild;
-	onMouseEnter?: any;
-	onMouseLeave?: any;
-	children?: any;
+	readonly for: Partial<Comment>;
+	readonly header?: React.ReactChild;
+	readonly onMouseEnter?: any;
+	readonly onMouseLeave?: any;
+	readonly children?: any;
 };
 
 function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children }: CommentBoxProps) {
@@ -140,10 +139,10 @@ type FormInputSet = {
 };
 
 type EditCommentProps = {
-	id: number;
-	body: string;
-	onCancel: () => void;
-	onSave: (body: string) => Promise<any>;
+	readonly id: number;
+	readonly body: string;
+	readonly onCancel: () => void;
+	readonly onSave: (body: string) => Promise<any>;
 };
 
 // UX-03: surface the composer affordances. The Cmd/Ctrl+Enter submit handler already exists on every
@@ -157,13 +156,15 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 
 	useEffect(() => {
 		const interval = setInterval(() => {
-			if (draftComment.current.dirty) {
-				updateDraft(id, draftComment.current.body);
-				draftComment.current.dirty = false;
+			if (!draftComment.current.dirty) {
+				return;
 			}
+
+			updateDraft(id, draftComment.current.body);
+			draftComment.current.dirty = false;
 		}, 500);
 		return () => clearInterval(interval);
-	}, [draftComment]);
+	}, [draftComment, id, updateDraft]);
 
 	const submit = useCallback(async () => {
 		const { markdown, submitButton }: FormInputSet = form.current!;
@@ -185,10 +186,12 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 
 	const onKeyDown = useCallback(
 		e => {
-			if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-				e.preventDefault();
-				submit();
+			if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) {
+				return;
 			}
+
+			e.preventDefault();
+			submit();
 		},
 		[submit],
 	);
@@ -243,6 +246,8 @@ const renderers = {
 };
 
 export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, body }: Embodied) => {
+	// Hook must run unconditionally (rules-of-hooks); it was previously below the early return.
+	const { applyPatch } = useContext(PullRequestContext);
 	if (!body && !bodyHTML) {
 		// UX-03: dashed-border muted placeholder rather than a bare line - it reads as a fillable slot
 		// (Edit lives in the hover/focus actions, canEdit permitting).
@@ -253,10 +258,9 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 		);
 	}
 
-	const { applyPatch } = useContext(PullRequestContext);
 	// const renderedBody = <div dangerouslySetInnerHTML={{ __html: bodyHTML }} />;
 	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={body ?? ''} />;
-	const containsSuggestion = (body || bodyHTML || '').indexOf('```diff') > -1;
+	const containsSuggestion = (body || bodyHTML || '').includes('```diff');
 	const applyPatchButton = containsSuggestion ? (
 		<button onClick={() => applyPatch(commentContent!, commentId!, threadId)}>Apply Patch</button>
 	) : (
@@ -272,8 +276,8 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 };
 
 export type ReplyToThreadProps = {
-	onCancel: () => void;
-	onSave: (body: string) => Promise<any>;
+	readonly onCancel: () => void;
+	readonly onSave: (body: string) => Promise<any>;
 };
 
 export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
@@ -299,10 +303,12 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 
 	const onKeyDown = useCallback(
 		e => {
-			if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-				e.preventDefault();
-				submit();
+			if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) {
+				return;
 			}
+
+			e.preventDefault();
+			submit();
 		},
 		[submit],
 	);
@@ -329,11 +335,18 @@ export function AddComment({ pendingCommentText, hasWritePermission, isIssue, is
 	const form = useRef<HTMLFormElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-	emitter.addListener('quoteReply', message => {
-		updatePR({ pendingCommentText: `> ${message} \n\n` });
-		textareaRef.current!.scrollIntoView();
-		textareaRef.current!.focus();
-	});
+	useEffect(() => {
+		// Registering on every render leaked one listener per render; subscribe once with cleanup.
+		const quoteReply = (message: string) => {
+			updatePR({ pendingCommentText: `> ${message} \n\n` });
+			textareaRef.current!.scrollIntoView();
+			textareaRef.current!.focus();
+		};
+		emitter.addListener('quoteReply', quoteReply);
+		return () => {
+			emitter.removeListener('quoteReply', quoteReply);
+		};
+	}, [updatePR]);
 
 	const submit = useCallback(
 		async (command: (body: string) => Promise<any> = comment) => {

@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import { GitPullRequest, GitRepository } from 'azure-devops-node-api/interfaces/GitInterfaces';
+import { GitPullRequest } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
 import { createMock } from 'ts-auto-mock';
 import * as vscode from 'vscode';
@@ -136,7 +136,7 @@ describe('GitHub Pull Requests view', function () {
 
 		const rootNodes = await provider.getChildren();
 
-		assert(rootNodes.every(n => n.getTreeItem().collapsibleState === vscode.TreeItemCollapsibleState.Collapsed));
+		assert.ok(rootNodes.every(n => n.getTreeItem().collapsibleState === vscode.TreeItemCollapsibleState.Collapsed));
 		assert.deepEqual(
 			rootNodes.map(n => n.getTreeItem().label),
 			['Local Pull Request Branches', 'Created By Me', 'Assigned To Me', 'All Active'],
@@ -225,7 +225,7 @@ describe('GitHub Pull Requests view', function () {
 
 			const rootNodes = await provider.getChildren();
 			const localNode = rootNodes.find(node => node.getTreeItem().label === 'Local Pull Request Branches');
-			assert(localNode);
+			assert.ok(localNode);
 
 			const localChildren = await localNode!.getChildren();
 			assert.strictEqual(localChildren.length, 2);

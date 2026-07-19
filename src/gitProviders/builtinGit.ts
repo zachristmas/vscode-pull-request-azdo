@@ -28,17 +28,8 @@ export class BuiltinGitProvider implements IGit, vscode.Disposable {
 	private _gitAPI: GitAPI;
 	private _disposables: vscode.Disposable[];
 
-	private constructor(extension: vscode.Extension<GitExtension>) {
-		const gitExtension = extension.exports;
-		try {
-			this._gitAPI = gitExtension.getAPI(1);
-		} catch (e) {
-			// The git extension will throw if a git model cannot be found, i.e. if git is not installed.
-			vscode.window.showErrorMessage(
-				'Activating the AzDO Pull Requests extension failed. Please make sure you have git installed.',
-			);
-			throw e;
-		}
+	private constructor(gitAPI: GitAPI) {
+		this._gitAPI = gitAPI;
 		this._disposables = [];
 		this._disposables.push(this._gitAPI.onDidCloseRepository(e => this._onDidCloseRepository.fire(e as any)));
 		this._disposables.push(this._gitAPI.onDidOpenRepository(e => this._onDidOpenRepository.fire(e as any)));
@@ -50,7 +41,19 @@ export class BuiltinGitProvider implements IGit, vscode.Disposable {
 		const extension = vscode.extensions.getExtension<GitExtension>('vscode.git');
 		if (extension) {
 			await extension.activate();
-			return new BuiltinGitProvider(extension);
+			const gitExtension = extension.exports;
+			let gitAPI: GitAPI;
+			try {
+				gitAPI = gitExtension.getAPI(1);
+			} catch (e) {
+				// The git extension will throw if a git model cannot be found, i.e. if git is not installed.
+				// Surfacing the message here (the ctor's only caller) keeps the ctor free of async work.
+				vscode.window.showErrorMessage(
+					'Activating the AzDO Pull Requests extension failed. Please make sure you have git installed.',
+				);
+				throw e;
+			}
+			return new BuiltinGitProvider(gitAPI);
 		}
 		return undefined;
 	}

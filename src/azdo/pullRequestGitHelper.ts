@@ -8,7 +8,7 @@
  */
 
 import { IResolvedPullRequestModel, PullRequestModel } from './pullRequestModel';
-import { Branch, Repository } from '../api/api';
+import { Repository } from '../api/api';
 import Logger from '../common/logger';
 import { Protocol } from '../common/protocol';
 import { parseRepositoryRemotes, Remote } from '../common/remote';
@@ -25,9 +25,9 @@ export interface PullRequestMetadata {
 	prNumber: number;
 }
 
-export class PullRequestGitHelper {
-	static ID = 'PullRequestGitHelper';
-	static async checkoutFromFork(
+export const PullRequestGitHelper = {
+	ID: 'PullRequestGitHelper',
+	async checkoutFromFork(
 		repository: Repository,
 		pullRequest: PullRequestModel & IResolvedPullRequestModel,
 		remoteName: string | undefined,
@@ -53,11 +53,11 @@ export class PullRequestGitHelper {
 		await repository.checkout(localBranchName);
 		// set remote tracking branch for the local branch
 		await repository.setBranchUpstream(localBranchName, `refs/remotes/${remoteName}/${pullRequest.head.ref}`);
-		await this.unshallow(repository);
+		await PullRequestGitHelper.unshallow(repository);
 		PullRequestGitHelper.associateBranchWithPullRequest(repository, pullRequest, localBranchName);
-	}
+	},
 
-	static async fetchAndCheckout(repository: Repository, remotes: Remote[], pullRequest: PullRequestModel): Promise<void> {
+	async fetchAndCheckout(repository: Repository, remotes: Remote[], pullRequest: PullRequestModel): Promise<void> {
 		if (!pullRequest.validatePullRequestModel('Checkout pull request failed')) {
 			return;
 		}
@@ -70,10 +70,9 @@ export class PullRequestGitHelper {
 
 		const branchName = pullRequest.head.ref;
 		const remoteName = remote.remoteName;
-		let branch: Branch;
 
 		try {
-			branch = await repository.getBranch(branchName);
+			const branch = await repository.getBranch(branchName);
 			Logger.debug(`Checkout ${branchName}`, PullRequestGitHelper.ID);
 			await repository.checkout(branchName);
 
@@ -87,7 +86,7 @@ export class PullRequestGitHelper {
 				Logger.debug(`Pull from upstream`, PullRequestGitHelper.ID);
 				await repository.pull();
 			}
-		} catch (err) {
+		} catch {
 			// there is no local branch with the same name, so we are good to fetch, create and checkout the remote branch.
 			Logger.appendLine(`Branch ${remoteName}/${branchName} doesn't exist on local disk yet.`, PullRequestGitHelper.ID);
 			const trackedBranchName = `refs/remotes/${remoteName}/${branchName}`;
@@ -97,26 +96,26 @@ export class PullRequestGitHelper {
 			// create branch
 			await repository.createBranch(branchName, true, trackedBranch.commit);
 			await repository.setBranchUpstream(branchName, trackedBranchName);
-			await this.unshallow(repository);
+			await PullRequestGitHelper.unshallow(repository);
 		}
 
 		await PullRequestGitHelper.associateBranchWithPullRequest(repository, pullRequest, branchName);
-	}
+	},
 
 	/**
 	 * Attempt to unshallow the repository. If it has been unshallowed in the interim, running with `--unshallow`
 	 * will fail, so fall back to a normal pull.
 	 */
-	static async unshallow(repository: Repository): Promise<void> {
+	async unshallow(repository: Repository): Promise<void> {
 		try {
 			await repository.pull(true);
 		} catch (e) {
 			Logger.appendLine(`Unshallowing failed: ${e}. Falling back to git pull`);
 			await repository.pull();
 		}
-	}
+	},
 
-	static async checkoutExistingPullRequestBranch(repository: Repository, pullRequest: PullRequestModel) {
+	async checkoutExistingPullRequestBranch(repository: Repository, pullRequest: PullRequestModel) {
 		const key = PullRequestGitHelper.buildPullRequestMetadata(pullRequest);
 		const configs = await repository.getConfigs();
 
@@ -150,9 +149,9 @@ export class PullRequestGitHelper {
 		} else {
 			return false;
 		}
-	}
+	},
 
-	static async getBranchNRemoteForPullRequest(
+	async getBranchNRemoteForPullRequest(
 		repository: Repository,
 		pullRequest: PullRequestModel,
 	): Promise<{
@@ -181,7 +180,7 @@ export class PullRequestGitHelper {
 			try {
 				const configKey = `branch.${branchName}.remote`;
 				const branchRemotes = configs.filter(config => config.key === configKey).map(config => config.value);
-				let remoteName: string | undefined = undefined;
+				let remoteName: string | undefined;
 				if (branchRemotes.length) {
 					remoteName = branchRemotes[0];
 				}
@@ -205,11 +204,7 @@ export class PullRequestGitHelper {
 					remoteInUse = configs.some(config => {
 						const matches = PullRequestRemoteRegex.exec(config.key);
 
-						if (matches && config.key !== `branch.${branchName}.remote` && config.value === remoteName!) {
-							return true;
-						}
-
-						return false;
+						return Boolean(matches && config.key !== `branch.${branchName}.remote` && config.value === remoteName!);
 					});
 				}
 
@@ -219,7 +214,7 @@ export class PullRequestGitHelper {
 					createdForPullRequest,
 					remoteInUse,
 				};
-			} catch (_) {
+			} catch {
 				return {
 					branch: branchName!,
 				};
@@ -227,46 +222,50 @@ export class PullRequestGitHelper {
 		}
 
 		return null;
-	}
+	},
 
-	static buildPullRequestMetadata(pullRequest: PullRequestModel) {
+	buildPullRequestMetadata(pullRequest: PullRequestModel) {
 		return `${pullRequest.base.repositoryCloneUrl.owner}#${
 			pullRequest.base.repositoryCloneUrl.repositoryName
 		}#${pullRequest.getPullRequestId()}`;
-	}
+	},
 
-	static parsePullRequestMetadata(value: string): PullRequestMetadata | undefined {
-		if (value) {
-			const matches = /(.*)#(.*)#(.*)/g.exec(value);
-			if (matches && matches.length === 4) {
-				const [, owner, repo, prNumber] = matches;
-				return {
-					owner: owner,
-					repositoryName: repo,
-					prNumber: Number(prNumber),
-				};
-			}
+	parsePullRequestMetadata(value: string): PullRequestMetadata | undefined {
+		if (!value) {
+			return;
 		}
-	}
 
-	static getMetadataKeyForBranch(branchName: string): string {
+		// Anchors + `[^#]*` pin the split to the last two `#`s, which is where the old greedy
+		// `(.*)#(.*)#(.*)` landed anyway, without its super-linear backtracking.
+		const matches = /^(.*)#([^#]*)#([^#]*)$/.exec(value);
+		if (matches && matches.length === 4) {
+			const [, owner, repo, prNumber] = matches;
+			return {
+				owner: owner,
+				repositoryName: repo,
+				prNumber: Number(prNumber),
+			};
+		}
+	},
+
+	getMetadataKeyForBranch(branchName: string): string {
 		return `branch.${branchName}.${PullRequestMetadataKey}`;
-	}
+	},
 
-	static async getMatchingPullRequestMetadataForBranch(
+	async getMatchingPullRequestMetadataForBranch(
 		repository: Repository,
 		branchName: string,
 	): Promise<PullRequestMetadata | undefined> {
 		try {
-			const configKey = this.getMetadataKeyForBranch(branchName);
+			const configKey = PullRequestGitHelper.getMetadataKeyForBranch(branchName);
 			const configValue = await repository.getConfig(configKey);
 			return PullRequestGitHelper.parsePullRequestMetadata(configValue);
-		} catch (_) {
+		} catch {
 			return;
 		}
-	}
+	},
 
-	static async createRemote(repository: Repository, baseRemote: Remote, cloneUrl: Protocol) {
+	async createRemote(repository: Repository, baseRemote: Remote, cloneUrl: Protocol) {
 		Logger.appendLine(`create remote for ${cloneUrl}.`, PullRequestGitHelper.ID);
 
 		const remotes = parseRepositoryRemotes(repository);
@@ -283,20 +282,20 @@ export class PullRequestGitHelper {
 		await repository.addRemote(remoteName, cloneUrl.toString()!);
 		await repository.setConfig(`remote.${remoteName}.${PullRequestRemoteMetadataKey}`, 'true');
 		return remoteName;
-	}
+	},
 
-	static async isRemoteCreatedForPullRequest(repository: Repository, remoteName: string) {
+	async isRemoteCreatedForPullRequest(repository: Repository, remoteName: string) {
 		try {
 			Logger.debug(`Check if remote '${remoteName}' is created for pull request - start`, PullRequestGitHelper.ID);
 			const isForPR = await repository.getConfig(`remote.${remoteName}.${PullRequestRemoteMetadataKey}`);
 			Logger.debug(`Check if remote '${remoteName}' is created for pull request - end`, PullRequestGitHelper.ID);
 			return isForPR === 'true';
-		} catch (_) {
+		} catch {
 			return false;
 		}
-	}
+	},
 
-	static async calculateUniqueBranchNameForPR(repository: Repository, pullRequest: PullRequestModel): Promise<string> {
+	async calculateUniqueBranchNameForPR(repository: Repository, pullRequest: PullRequestModel): Promise<string> {
 		const branchName = `pr/${pullRequest.item.createdBy?.uniqueName}/${pullRequest.getPullRequestId()}`;
 		let result = branchName;
 		let number = 1;
@@ -305,41 +304,41 @@ export class PullRequestGitHelper {
 			try {
 				await repository.getBranch(result);
 				result = `${branchName}-${number++}`;
-			} catch (err) {
+			} catch {
 				break;
 			}
 		}
 
 		return result;
-	}
+	},
 
-	static getUniqueRemoteName(repository: Repository, name: string) {
+	getUniqueRemoteName(repository: Repository, name: string) {
 		let uniqueName = name;
 		let number = 1;
 		const remotes = parseRepositoryRemotes(repository);
 
 		// eslint-disable-next-line no-loop-func
-		while (remotes.find(e => e.remoteName === uniqueName)) {
+		while (remotes.some(e => e.remoteName === uniqueName)) {
 			number += 1;
 			uniqueName = `${name}${number}`;
 		}
 
 		return uniqueName;
-	}
+	},
 
-	static getHeadRemoteForPullRequest(
+	getHeadRemoteForPullRequest(
 		remotes: Remote[],
 		pullRequest: PullRequestModel & IResolvedPullRequestModel,
 	): Remote | undefined {
 		return remotes.find(remote => remote.gitProtocol && remote.gitProtocol.equals(pullRequest.head.repositoryCloneUrl));
-	}
+	},
 
-	static async associateBranchWithPullRequest(repository: Repository, pullRequest: PullRequestModel, branchName: string) {
+	async associateBranchWithPullRequest(repository: Repository, pullRequest: PullRequestModel, branchName: string) {
 		Logger.appendLine(
 			`associate ${branchName} with Pull Request #${pullRequest.getPullRequestId()}`,
 			PullRequestGitHelper.ID,
 		);
 		const prConfigKey = `branch.${branchName}.${PullRequestMetadataKey}`;
 		await repository.setConfig(prConfigKey, PullRequestGitHelper.buildPullRequestMetadata(pullRequest));
-	}
-}
+	},
+};

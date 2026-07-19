@@ -107,8 +107,8 @@ export class VSLSGuest implements IGit, vscode.Disposable {
 		this._onDidCloseRepository.fire(repository);
 	}
 
-	public getRepository(folder: vscode.WorkspaceFolder): Repository {
-		return this._openRepositories.filter(repository => (repository as any).workspaceFolder === folder)[0];
+	public getRepository(folder: vscode.WorkspaceFolder): Repository | undefined {
+		return this._openRepositories.find(repository => (repository as any).workspaceFolder === folder);
 	}
 
 	public dispose() {
@@ -122,7 +122,9 @@ class LiveShareRepositoryProxyHandler {
 	constructor() {}
 
 	get(obj: any, prop: any) {
-		if (prop in obj) {
+		// Reflect.has keeps the prototype chain lookup that the `in` operator performed here;
+		// Object.hasOwn would miss inherited members.
+		if (Reflect.has(obj, prop)) {
 			return obj[prop];
 		}
 
@@ -142,8 +144,8 @@ class LiveShareRepositoryState implements RepositoryState {
 	mergeChanges: Change[] = [];
 	indexChanges: Change[] = [];
 	workingTreeChanges: Change[] = [];
-	_onDidChange = new vscode.EventEmitter<void>();
-	onDidChange = this._onDidChange.event;
+	#onDidChange = new vscode.EventEmitter<void>();
+	onDidChange = this.#onDidChange.event;
 
 	constructor(state: RepositoryState) {
 		this.HEAD = state.HEAD;
@@ -156,7 +158,7 @@ class LiveShareRepositoryState implements RepositoryState {
 		this.remotes = state.remotes;
 		this.refs = state.refs;
 
-		this._onDidChange.fire();
+		this.#onDidChange.fire();
 	}
 }
 

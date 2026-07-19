@@ -3,9 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-'use strict';
-
-import * as pathUtils from 'path';
+import pathUtils from 'path';
 import { VersionControlChangeType } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { EventEmitter, Uri, UriHandler } from 'vscode';
 import { Repository } from '../api/api';
@@ -43,7 +41,7 @@ export interface PRUriParams {
 export function fromPRUri(uri: Uri): PRUriParams | undefined {
 	try {
 		return JSON.parse(uri.query) as PRUriParams;
-	} catch (e) {}
+	} catch {}
 }
 
 export interface GitUriOptions {
@@ -52,15 +50,20 @@ export interface GitUriOptions {
 	base: boolean;
 }
 
-const ImageMimetypes = ['image/png', 'image/gif', 'image/jpeg', 'image/webp', 'image/tiff', 'image/bmp'];
+const ImageMimetypes = new Set(['image/png', 'image/gif', 'image/jpeg', 'image/webp', 'image/tiff', 'image/bmp']);
 
-// a 1x1 pixel transparent gif, from http://png-pixel.com/
+// a 1x1 pixel transparent gif, from https://png-pixel.com/
 export const EMPTY_IMAGE_URI = Uri.parse(`data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==`);
 
 export async function asImageDataURI(uri: Uri, repository: Repository): Promise<Uri | undefined> {
 	try {
 		const { commit, baseCommit, headCommit, isBase } = JSON.parse(uri.query);
-		const ref = uri.scheme === URI_SCHEME_REVIEW ? commit : isBase ? baseCommit : headCommit;
+		let ref: string;
+		if (uri.scheme === URI_SCHEME_REVIEW) {
+			ref = commit;
+		} else {
+			ref = isBase ? baseCommit : headCommit;
+		}
 		const { size, object } = await repository.getObjectDetails(ref, uri.fsPath);
 		const { mimetype } = await repository.detectObjectType(object);
 
@@ -68,7 +71,7 @@ export async function asImageDataURI(uri: Uri, repository: Repository): Promise<
 			return;
 		}
 
-		if (ImageMimetypes.indexOf(mimetype) > -1) {
+		if (ImageMimetypes.has(mimetype)) {
 			const contents = await repository.buffer(ref, uri.fsPath);
 			return Uri.parse(
 				`data:${mimetype};label:${pathUtils.basename(
@@ -76,7 +79,7 @@ export async function asImageDataURI(uri: Uri, repository: Repository): Promise<
 				)};description:${ref};size:${size};base64,${contents.toString('base64')}`,
 			);
 		}
-	} catch (err) {
+	} catch {
 		return;
 	}
 }
@@ -91,7 +94,7 @@ export function toReviewUri(
 	rootUri: Uri,
 ): Uri {
 	const params: ReviewUriParams = {
-		path: filePath ? filePath : uri.path,
+		path: filePath || uri.path,
 		ref,
 		commit: commit,
 		base: options.base,
@@ -102,7 +105,7 @@ export function toReviewUri(
 	let path = uri.path;
 
 	if (options.replaceFileExtension) {
-		path = `${path}.git`;
+		path += '.git';
 	}
 
 	return uri.with({
@@ -134,7 +137,7 @@ export function toResourceUri(uri: Uri, prNumber: number, fileName: string, stat
 export function fromFileChangeNodeUri(uri: Uri): FileChangeNodeUriParams | undefined {
 	try {
 		return JSON.parse(uri.query) as FileChangeNodeUriParams;
-	} catch (e) {}
+	} catch {}
 }
 
 export function toPRUriAzdo(
@@ -180,8 +183,10 @@ export function createPRUris(pr: AzdoPullRequestModel, folderManager: FolderRepo
 		fileChange.status === VersionControlChangeType.Delete ? fileChange.previous_filename! : fileChange.filename;
 	// Falls back to the head-side name for added files so the base URI stays resolvable (#109).
 	const parentFileName = fileChange.previous_filename || fileName;
+	const headFilePath = pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName));
+	const parentFilePath = pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName));
 	headUri = toPRUriAzdo(
-		Uri.file(pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName))),
+		Uri.file(headFilePath),
 		pr,
 		pr.base.sha,
 		headCommit,
@@ -190,7 +195,7 @@ export function createPRUris(pr: AzdoPullRequestModel, folderManager: FolderRepo
 		getGitChangeTypeFromVersionControlChangeType(fileChange.status),
 	);
 	baseUri = toPRUriAzdo(
-		Uri.file(pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName))),
+		Uri.file(parentFilePath),
 		pr,
 		pr.base.sha,
 		headCommit,

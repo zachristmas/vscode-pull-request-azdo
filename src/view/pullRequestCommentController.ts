@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as path from 'path';
+import path from 'path';
 import { v4 as uuid } from 'uuid';
 import * as vscode from 'vscode';
 import { FolderRepositoryManager } from '../azdo/folderRepositoryManager';
@@ -19,7 +19,7 @@ import { groupBy } from '../common/utils';
 import { URI_SCHEME_PR } from '../constants';
 
 export class PullRequestCommentController implements CommentHandler, CommentReactionHandler {
-	static ID = 'PullRequestCommentController';
+	static readonly ID = 'PullRequestCommentController';
 	private _pendingCommentThreadAdds: GHPRCommentThread[] = [];
 
 	private _commonCommentHandler: CommonCommentHandler;
@@ -99,11 +99,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 
 			const params = fromPRUri(editor.document.uri);
 
-			if (!params || params.prNumber !== this.pullRequestModel.getPullRequestId()) {
-				return false;
-			}
-
-			return true;
+			return !!params && params.prNumber === this.pullRequestModel.getPullRequestId();
 		});
 	}
 
@@ -120,7 +116,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 				return;
 			}
 			const { fileName, isBase } = params;
-			if (threadsByPath[fileName]) {
+			if (Object.hasOwn(threadsByPath, fileName)) {
 				const fileCache = this._commentThreadCache[this.getCommentThreadCacheKey(fileName, isBase)] ?? [];
 				const newThreads = threadsByPath[fileName]
 					.filter(
@@ -190,13 +186,13 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 			const fileName = thread.path;
 			const index = this._pendingCommentThreadAdds.findIndex(t => {
 				// threadId is not yet present in _pendingCommentThreadAdds
-				const samePath = this.gitRelativeRootPath(t.uri.path) === thread.path.replace(/^\/|\/$/g, '');
+				const samePath = this.gitRelativeRootPath(t.uri.path) === thread.path.replaceAll(/^\/|\/$/g, '');
 				const sameLine = t.range.start.line + 1 === thread.line;
 				return samePath && sameLine;
 			});
 
 			let newThread: GHPRCommentThread | undefined;
-			if (index > -1) {
+			if (index !== -1) {
 				const pendingThread = this._pendingCommentThreadAdds[index];
 				pendingThread.threadId = thread.id;
 				pendingThread.comments =
@@ -248,7 +244,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 			}
 
 			const key = this.getCommentThreadCacheKey(thread.path, thread.diffSide === DiffSide.LEFT);
-			if (this._commentThreadCache[key]) {
+			if (Object.hasOwn(this._commentThreadCache, key)) {
 				this._commentThreadCache[key].push(newThread);
 			} else {
 				this._commentThreadCache[key] = [newThread];
@@ -287,11 +283,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 
 		const params = fromPRUri(thread.uri);
 
-		if (!params || params.prNumber !== this.pullRequestModel.getPullRequestId()) {
-			return false;
-		}
-
-		return true;
+		return !!params && params.prNumber === this.pullRequestModel.getPullRequestId();
 	}
 
 	public async createOrReplyComment(thread: GHPRCommentThread, input: string, inDraft?: boolean): Promise<void> {
@@ -318,11 +310,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 		const commentThreadCache = this._commentThreadCache;
 		const key = this.getCommentThreadCacheKey(fileName, this.getCommentSide(thread) === DiffSide.LEFT);
 		const existingThreads = commentThreadCache[key];
-		if (existingThreads) {
-			commentThreadCache[key] = [...existingThreads, thread];
-		} else {
-			commentThreadCache[key] = [thread];
-		}
+		commentThreadCache[key] = existingThreads ? [...existingThreads, thread] : [thread];
 	}
 
 	public async editComment(thread: GHPRCommentThread, comment: GHPRComment | TemporaryComment): Promise<void> {
@@ -340,7 +328,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 
 	private gitRelativeRootPath(comparePath: string) {
 		// get path relative to git root directory. Handles windows path by converting it to unix path.
-		return path.relative(this._folderReposManager.repository.rootUri.path, comparePath).replace(/\\/g, '/');
+		return path.relative(this._folderReposManager.repository.rootUri.path, comparePath).replaceAll('\\', '/');
 	}
 
 	public async toggleReaction(_comment: GHPRComment, _reaction: vscode.CommentReaction): Promise<void> {

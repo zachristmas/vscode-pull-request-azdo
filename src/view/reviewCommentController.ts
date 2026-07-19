@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as nodePath from 'path';
+import nodePath from 'path';
 import { Comment, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { v4 as uuid } from 'uuid';
 import * as vscode from 'vscode';
@@ -121,6 +121,15 @@ export class ReviewCommentController
 	 * @param thread The comment thread information from GitHub.
 	 * @returns A GHPRCommentThread that has been created on an editor.
 	 */
+	private threadMapFor(thread: IReviewThread): { [key: string]: GHPRCommentThread[] } {
+		if (thread.isOutdated) {
+			return this._obsoleteFileChangeCommentThreads;
+		}
+		return thread.diffSide === DiffSide.RIGHT
+			? this._workspaceFileChangeCommentThreads
+			: this._reviewSchemeFileChangeCommentThreads;
+	}
+
 	private createReviewCommentThread(uri: vscode.Uri, path: string, thread: IReviewThread): GHPRCommentThread {
 		// ReviewUriParams.commit is optional; an undefined mergeBase is dropped by JSON.stringify
 		const reviewUri = toReviewUri(
@@ -158,7 +167,7 @@ export class ReviewCommentController
 			if (firstThread && !!firstThread.path) {
 				const fullPath = nodePath
 					.join(this._repository.rootUri.path, removeLeadingSlash(firstThread.path))
-					.replace(/\\/g, '/');
+					.replaceAll('\\', '/');
 				const uri = this._repository.rootUri.with({ path: fullPath });
 
 				let rightSideCommentThreads: GHPRCommentThread[] = [];
@@ -271,7 +280,7 @@ export class ReviewCommentController
 					});
 
 					let newThread: GHPRCommentThread | undefined;
-					if (index > -1) {
+					if (index !== -1) {
 						const pendingThread = this._pendingCommentThreadAdds[index];
 						pendingThread.threadId = thread.id;
 						pendingThread.comments =
@@ -283,16 +292,15 @@ export class ReviewCommentController
 					} else {
 						const fullPath = nodePath
 							.join(this._repository.rootUri.path, removeLeadingSlash(path))
-							.replace(/\\/g, '/');
+							.replaceAll('\\', '/');
 						const uri = this._repository.rootUri.with({ path: fullPath });
 						if (thread.isOutdated) {
 							// newThread = this.createOutdatedCommentThread(path, thread);
 						} else {
-							if (thread.diffSide === DiffSide.RIGHT) {
-								newThread = await this.createWorkspaceCommentThread(uri, removeLeadingSlash(path), thread);
-							} else {
-								newThread = this.createReviewCommentThread(uri, path, thread);
-							}
+							newThread =
+								thread.diffSide === DiffSide.RIGHT
+									? await this.createWorkspaceCommentThread(uri, removeLeadingSlash(path), thread)
+									: this.createReviewCommentThread(uri, path, thread);
 						}
 					}
 
@@ -301,13 +309,9 @@ export class ReviewCommentController
 						return;
 					}
 
-					const threadMap = thread.isOutdated
-						? this._obsoleteFileChangeCommentThreads
-						: thread.diffSide === DiffSide.RIGHT
-						? this._workspaceFileChangeCommentThreads
-						: this._reviewSchemeFileChangeCommentThreads;
+					const threadMap = this.threadMapFor(thread);
 
-					if (threadMap[removeLeadingSlash(path)]) {
+					if (Object.hasOwn(threadMap, removeLeadingSlash(path))) {
 						threadMap[removeLeadingSlash(path)].push(newThread);
 					} else {
 						threadMap[removeLeadingSlash(path)] = [newThread];
@@ -315,11 +319,7 @@ export class ReviewCommentController
 				});
 
 				e.changed.forEach(thread => {
-					const threadMap = thread.isOutdated
-						? this._obsoleteFileChangeCommentThreads
-						: thread.diffSide === DiffSide.RIGHT
-						? this._workspaceFileChangeCommentThreads
-						: this._reviewSchemeFileChangeCommentThreads;
+					const threadMap = this.threadMapFor(thread);
 
 					const index = threadMap[removeLeadingSlash(thread.path)]?.findIndex(t => t.threadId === thread.id);
 					if (index > -1) {
@@ -332,11 +332,7 @@ export class ReviewCommentController
 				});
 
 				e.removed.forEach(thread => {
-					const threadMap = thread.isOutdated
-						? this._obsoleteFileChangeCommentThreads
-						: thread.diffSide === DiffSide.RIGHT
-						? this._workspaceFileChangeCommentThreads
-						: this._reviewSchemeFileChangeCommentThreads;
+					const threadMap = this.threadMapFor(thread);
 
 					const index = threadMap[removeLeadingSlash(thread.path)]?.findIndex(t => t.threadId === thread.id);
 					if (index > -1) {
@@ -360,10 +356,10 @@ export class ReviewCommentController
 			return false;
 		}
 
-		for (let i = 0; i < a.length; i++) {
-			const findRet = b.find(editor => editor.document.uri.toString() === a[i].document.uri.toString());
+		for (const element of a) {
+			const matchFound = b.some(editor => editor.document.uri.toString() === element.document.uri.toString());
 
-			if (!findRet) {
+			if (!matchFound) {
 				return false;
 			}
 		}
@@ -383,14 +379,9 @@ export class ReviewCommentController
 			return false;
 		}
 
-		if (
-			thread.uri.scheme === currentWorkspace.uri.scheme &&
-			thread.uri.fsPath.startsWith(this._repository.rootUri.fsPath)
-		) {
-			return true;
-		}
-
-		return false;
+		return (
+			thread.uri.scheme === currentWorkspace.uri.scheme && thread.uri.fsPath.startsWith(this._repository.rootUri.fsPath)
+		);
 	}
 
 	async provideCommentingRanges(
@@ -401,7 +392,7 @@ export class ReviewCommentController
 
 		try {
 			query = fromReviewUri(document.uri);
-		} catch (e) {}
+		} catch {}
 
 		if (query) {
 			const matchedFile = this.findMatchedFileChangeForReviewDiffView(this._localFileChanges, document.uri);
@@ -425,31 +416,40 @@ export class ReviewCommentController
 			const matchedFile = gitFileChangeNodeFilter(this._localFileChanges).find(
 				fileChange => removeLeadingSlash(fileChange.fileName) === fileName,
 			);
-			const ranges = [];
 
 			if (matchedFile) {
-				// TODO Why was this here?
-				// if (matchedFile.status === GitChangeType.RENAME) {
-				// 	return [];
-				// }
-
-				const contentDiff = await this.getContentDiff(document.uri, removeLeadingSlash(matchedFile.fileName));
-				const diffHunks = matchedFile.diffHunks;
-
-				for (let i = 0; i < diffHunks.length; i++) {
-					const diffHunk = diffHunks[i];
-					const start = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber);
-					const end = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber + diffHunk.newLength - 1);
-					if (start > 0 && end > 0) {
-						ranges.push(new vscode.Range(start - 1, 0, end - 1, 0));
-					}
-				}
+				return await this.getWorkspaceFileCommentingRanges(document.uri, matchedFile);
 			}
 
-			return ranges;
+			return [];
+		}
+	}
+
+	// Maps each diff hunk of the matched file onto the current (possibly dirty) document via the
+	// working-tree diff, keeping only hunks that still exist.
+	private async getWorkspaceFileCommentingRanges(
+		documentUri: vscode.Uri,
+		matchedFile: GitFileChangeNode,
+	): Promise<vscode.Range[]> {
+		const ranges: vscode.Range[] = [];
+
+		// TODO Why was this here?
+		// if (matchedFile.status === GitChangeType.RENAME) {
+		// 	return [];
+		// }
+
+		const contentDiff = await this.getContentDiff(documentUri, removeLeadingSlash(matchedFile.fileName));
+		const diffHunks = matchedFile.diffHunks;
+
+		for (const diffHunk of diffHunks) {
+			const start = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber);
+			const end = mapOldPositionToNew(contentDiff, diffHunk.newLineNumber + diffHunk.newLength - 1);
+			if (start > 0 && end > 0) {
+				ranges.push(new vscode.Range(start - 1, 0, end - 1, 0));
+			}
 		}
 
-		return;
+		return ranges;
 	}
 
 	// #endregion
@@ -493,12 +493,10 @@ export class ReviewCommentController
 				return false;
 			}
 
-			if (fileChange.filePath.scheme !== URI_SCHEME_REVIEW) {
-				// local file
+			// local file
 
-				if (fileChange.commitId === query.commit) {
-					return true;
-				}
+			if (fileChange.filePath.scheme !== URI_SCHEME_REVIEW && fileChange.commitId === query.commit) {
+				return true;
 			}
 
 			try {
@@ -507,7 +505,7 @@ export class ReviewCommentController
 				if (q.commit === query.commit) {
 					return true;
 				}
-			} catch (e) {}
+			} catch {}
 
 			try {
 				const q = JSON.parse(fileChange.parentFilePath.query);
@@ -515,7 +513,7 @@ export class ReviewCommentController
 				if (q.commit === query.commit) {
 					return true;
 				}
-			} catch (e) {}
+			} catch {}
 
 			return false;
 		});
@@ -527,7 +525,7 @@ export class ReviewCommentController
 
 	private gitRelativeRootPath(path: string) {
 		// get path relative to git root directory. Handles windows path by converting it to unix path.
-		return nodePath.relative(this._repository.rootUri.path, path).replace(/\\/g, '/');
+		return nodePath.relative(this._repository.rootUri.path, path).replaceAll('\\', '/');
 	}
 
 	// #endregion
@@ -569,7 +567,7 @@ export class ReviewCommentController
 			input,
 			inDraft ?? false,
 			async _ => this._localFileChanges,
-			async (_, __) => undefined,
+			async (_, __) => {},
 		);
 	}
 

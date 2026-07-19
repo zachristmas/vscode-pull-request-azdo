@@ -10,7 +10,7 @@ export class CommentThreadCache {
 	private _data: { [key: string]: { original?: GHPRCommentThread[]; modified?: GHPRCommentThread[] } } = {};
 
 	public setDocumentThreads(fileName: string, isBase: boolean, threads: GHPRCommentThread[] | undefined) {
-		if (!this._data[fileName]) {
+		if (!Object.hasOwn(this._data, fileName)) {
 			this._data[fileName] = {};
 		}
 
@@ -31,7 +31,7 @@ export class CommentThreadCache {
 	}
 
 	public getAllThreadsForDocument(fileName: string): GHPRCommentThread[] | undefined {
-		return this._data[fileName] && (this._data[fileName].original || []).concat(this._data[fileName].modified || []);
+		return this._data[fileName] && [...(this._data[fileName].original || []), ...(this._data[fileName].modified || [])];
 	}
 
 	public maybeDisposeThreads(
@@ -41,16 +41,16 @@ export class CommentThreadCache {
 		for (const fileName in this._data) {
 			const threads = this._data[fileName];
 
-			const originalEditor = visibleEditors.find(editor => matchEditor(editor, fileName, true));
+			const hasOriginalEditor = visibleEditors.some(editor => matchEditor(editor, fileName, true));
 
-			if (!originalEditor && threads.original) {
+			if (!hasOriginalEditor && threads.original) {
 				threads.original.forEach(thread => thread.dispose!());
 				this._data[fileName].original = undefined;
 			}
 
-			const modifiedEditor = visibleEditors.find(editor => matchEditor(editor, fileName, false));
+			const hasModifiedEditor = visibleEditors.some(editor => matchEditor(editor, fileName, false));
 
-			if (!modifiedEditor && threads.modified) {
+			if (!hasModifiedEditor && threads.modified) {
 				threads.modified.forEach(thread => thread.dispose!());
 				this._data[fileName].modified = undefined;
 			}

@@ -3,9 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-'use strict';
-import { sep } from 'path';
-import moment from 'moment';
+import path from 'path';
+import moment, { duration } from 'moment';
 import { Disposable, Event } from 'vscode';
 
 export function uniqBy<T>(arr: T[] | readonly T[], fn: (el: T) => string): T[] {
@@ -14,7 +13,7 @@ export function uniqBy<T>(arr: T[] | readonly T[], fn: (el: T) => string): T[] {
 	return arr.filter(el => {
 		const key = fn(el);
 
-		if (seen[key]) {
+		if (Object.hasOwn(seen, key)) {
 			return false;
 		}
 
@@ -77,8 +76,8 @@ export function isDescendant(parent: string, descendant: string): boolean {
 		return true;
 	}
 
-	if (parent.charAt(parent.length - 1) !== sep) {
-		parent += sep;
+	if (parent.at(-1) !== path.sep) {
+		parent += path.sep;
 	}
 
 	// Windows is case insensitive
@@ -91,11 +90,14 @@ export function isDescendant(parent: string, descendant: string): boolean {
 }
 
 export function groupBy<T>(arr: T[], fn: (el: T) => string): { [key: string]: T[] } {
-	return arr.reduce((result, el) => {
+	// Null prototype like the original reduce seed: group keys are arbitrary strings ('__proto__' etc).
+	const result: { [key: string]: T[] } = Object.create(null);
+	for (const el of arr) {
 		const key = fn(el);
-		result[key] = [...(result[key] || []), el];
-		return result;
-	}, Object.create(null));
+		result[key] ??= [];
+		result[key].push(el);
+	}
+	return result;
 }
 
 interface HookError extends Error {
@@ -156,16 +158,12 @@ export function formatError(e: any): string {
 	} else if (isHookError(e) && e.errors) {
 		return e.errors
 			.map((error: any) => {
-				if (typeof error === 'string') {
-					return error;
-				} else {
-					return error.message;
-				}
+				return typeof error === 'string' ? error : error.message;
 			})
 			.join(', ');
 	}
 	if (furtherInfo) {
-		errorMessage = `${errorMessage}: ${furtherInfo}`;
+		errorMessage += `: ${furtherInfo}`;
 	}
 
 	return errorMessage;
@@ -193,33 +191,28 @@ const passthrough = (value: any, resolve: (value?: any) => void) => resolve(valu
  */
 export async function promiseFromEvent<T, U>(event: Event<T>, adapter: PromiseAdapter<T, U> = passthrough): Promise<U> {
 	let subscription: Disposable;
-	return new Promise<U>(
-		(resolve, reject) =>
-			(subscription = event((value: T) => {
-				try {
-					Promise.resolve(adapter(value, resolve, reject)).catch(reject);
-				} catch (error) {
-					reject(error instanceof Error ? error : new Error(String(error)));
-				}
-			})),
-	).then(
-		(result: U) => {
-			subscription.dispose();
-			return result;
-		},
-		error => {
-			subscription.dispose();
-			throw error;
-		},
-	);
+	try {
+		return await new Promise<U>(
+			(resolve, reject) =>
+				(subscription = event((value: T) => {
+					try {
+						Promise.resolve(adapter(value, resolve, reject)).catch(reject);
+					} catch (error) {
+						reject(error instanceof Error ? error : new Error(String(error)));
+					}
+				})),
+		);
+	} finally {
+		subscription!.dispose();
+	}
 }
 
 export function dateFromNow(date: Date | string): string {
-	const duration = moment.duration(moment().diff(date));
+	const timeDelta = duration(moment().diff(date));
 
-	if (duration.asMonths() < 1) {
+	if (timeDelta.asMonths() < 1) {
 		return moment(date).fromNow();
-	} else if (duration.asYears() < 1) {
+	} else if (timeDelta.asYears() < 1) {
 		return 'on ' + moment(date).format('MMM D');
 	} else {
 		return 'on ' + moment(date).format('MMM D, YYYY');
@@ -250,7 +243,7 @@ export class PathIterator implements IKeyIterator {
 		this._from = this._to;
 		let justSeps = true;
 		for (; this._to < this._value.length; this._to++) {
-			const ch = this._value.charCodeAt(this._to);
+			const ch = this._value.codePointAt(this._to);
 			if (ch === 47 /* CharCode.Slash */ || ch === 92 /* CharCode.Backslash */) {
 				if (justSeps) {
 					this._from++;
@@ -270,7 +263,7 @@ export class PathIterator implements IKeyIterator {
 		let thisPos = this._from;
 
 		while (aPos < aLen && thisPos < this._to) {
-			const cmp = a.charCodeAt(aPos) - this._value.charCodeAt(thisPos);
+			const cmp = a.codePointAt(aPos)! - this._value.codePointAt(thisPos)!;
 			if (cmp !== 0) {
 				return cmp;
 			}
@@ -288,7 +281,7 @@ export class PathIterator implements IKeyIterator {
 	}
 
 	value(): string {
-		return this._value.substring(this._from, this._to);
+		return this._value.slice(this._from, this._to);
 	}
 }
 
@@ -336,40 +329,53 @@ export class TernarySearchTree<E> {
 		this._root = undefined;
 	}
 
+	// Get-or-create descend helpers for set(): each steps into the child on its side,
+	// creating an empty node carrying the iterator's current segment when missing.
+	private descendLeft(node: TernarySearchTreeNode<E>, iter: IKeyIterator): TernarySearchTreeNode<E> {
+		if (!node.left) {
+			node.left = new TernarySearchTreeNode<E>();
+			node.left.segment = iter.value();
+		}
+		return node.left;
+	}
+
+	private descendRight(node: TernarySearchTreeNode<E>, iter: IKeyIterator): TernarySearchTreeNode<E> {
+		if (!node.right) {
+			node.right = new TernarySearchTreeNode<E>();
+			node.right.segment = iter.value();
+		}
+		return node.right;
+	}
+
+	private descendMid(node: TernarySearchTreeNode<E>, iter: IKeyIterator): TernarySearchTreeNode<E> {
+		iter.next();
+		if (!node.mid) {
+			node.mid = new TernarySearchTreeNode<E>();
+			node.mid.segment = iter.value();
+		}
+		return node.mid;
+	}
+
 	set(key: string, element: E): E | undefined {
 		const iter = this._iter.reset(key);
-		let node: TernarySearchTreeNode<E>;
 
 		if (!this._root) {
 			this._root = new TernarySearchTreeNode<E>();
 			this._root.segment = iter.value();
 		}
 
-		node = this._root;
+		let node: TernarySearchTreeNode<E> = this._root;
 		while (true) {
 			const val = iter.cmp(node.segment);
 			if (val > 0) {
 				// left
-				if (!node.left) {
-					node.left = new TernarySearchTreeNode<E>();
-					node.left.segment = iter.value();
-				}
-				node = node.left;
+				node = this.descendLeft(node, iter);
 			} else if (val < 0) {
 				// right
-				if (!node.right) {
-					node.right = new TernarySearchTreeNode<E>();
-					node.right.segment = iter.value();
-				}
-				node = node.right;
+				node = this.descendRight(node, iter);
 			} else if (iter.hasNext()) {
 				// mid
-				iter.next();
-				if (!node.mid) {
-					node.mid = new TernarySearchTreeNode<E>();
-					node.mid.segment = iter.value();
-				}
-				node = node.mid;
+				node = this.descendMid(node, iter);
 			} else {
 				break;
 			}
@@ -402,6 +408,22 @@ export class TernarySearchTree<E> {
 		return node ? node.value : undefined;
 	}
 
+	// Extracted from delete() so the direction switch (and its case breaks) is not nested
+	// inside the cleanup loop.
+	private clearChildReference(parent: TernarySearchTreeNode<E>, dir: -1 | 0 | 1): void {
+		switch (dir) {
+			case 1:
+				parent.left = undefined;
+				break;
+			case 0:
+				parent.mid = undefined;
+				break;
+			case -1:
+				parent.right = undefined;
+				break;
+		}
+	}
+
 	delete(key: string): void {
 		const iter = this._iter.reset(key);
 		const stack: [-1 | 0 | 1, TernarySearchTreeNode<E>][] = [];
@@ -430,17 +452,7 @@ export class TernarySearchTree<E> {
 				// clean up empty nodes
 				while (stack.length > 0 && node.isEmpty()) {
 					const [dir, parent] = stack.pop()!;
-					switch (dir) {
-						case 1:
-							parent.left = undefined;
-							break;
-						case 0:
-							parent.mid = undefined;
-							break;
-						case -1:
-							parent.right = undefined;
-							break;
-					}
+					this.clearChildReference(parent, dir);
 					node = parent;
 				}
 				break;
@@ -451,7 +463,7 @@ export class TernarySearchTree<E> {
 	findSubstr(key: string): E | undefined {
 		const iter = this._iter.reset(key);
 		let node = this._root;
-		let candidate: E | undefined = undefined;
+		let candidate: E | undefined;
 		while (node) {
 			const val = iter.cmp(node.segment);
 			if (val > 0) {
@@ -489,11 +501,7 @@ export class TernarySearchTree<E> {
 				node = node.mid;
 			} else {
 				// collect
-				if (!node.mid) {
-					return undefined;
-				} else {
-					return this._nodeIterator(node.mid);
-				}
+				return !node.mid ? undefined : this._nodeIterator(node.mid);
 			}
 		}
 		return undefined;
@@ -508,7 +516,9 @@ export class TernarySearchTree<E> {
 				// lazy till first invocation
 				data = [];
 				idx = 0;
-				this._forEach(node, value => data.push(value));
+				this._forEach(node, value => {
+					data.push(value);
+				});
 			}
 			if (idx >= data.length) {
 				return { done: true, value: undefined };
@@ -529,20 +539,22 @@ export class TernarySearchTree<E> {
 	}
 
 	private _forEach(node: TernarySearchTreeNode<E> | undefined, callback: (value: E, index: string) => any) {
-		if (node) {
-			// left
-			this._forEach(node.left, callback);
-
-			// node
-			if (node.value) {
-				// callback(node.value, this._iter.join(parts));
-				callback(node.value, node.key);
-			}
-			// mid
-			this._forEach(node.mid, callback);
-
-			// right
-			this._forEach(node.right, callback);
+		if (!node) {
+			return;
 		}
+
+		// left
+		this._forEach(node.left, callback);
+
+		// node
+		if (node.value) {
+			// callback(node.value, this._iter.join(parts));
+			callback(node.value, node.key);
+		}
+		// mid
+		this._forEach(node.mid, callback);
+
+		// right
+		this._forEach(node.right, callback);
 	}
 }
