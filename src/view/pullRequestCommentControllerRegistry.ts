@@ -23,10 +23,10 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 
 	constructor(public commentsController: vscode.CommentController) {
 		this.commentsController.commentingRangeProvider = this;
-		// Azure DevOps has no comment-reactions concept (this fork's toggleReaction implementations
-		// are entirely commented-out GitHub GraphQL logic) - reactionHandler is optional on
-		// CommentController, so leaving it unset removes the non-functional emoji-picker button
-		// entirely instead of shipping a broken one.
+		// Azure DevOps comments support a single Like (not GitHub-style emoji reactions). The like is
+		// presented as one thumbs-up CommentReaction (prComment.buildLikeReactions); this reactionHandler
+		// routes a click to the per-PR controller's toggleReaction, which calls create/deleteLike.
+		this.commentsController.reactionHandler = (comment, reaction) => this.toggleReaction(comment as GHPRComment, reaction);
 	}
 
 	async provideCommentingRanges(

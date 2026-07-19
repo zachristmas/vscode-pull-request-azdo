@@ -423,6 +423,10 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		if (message.command === 'pr.copy-vscode-deeplink') {
 			return this.copyVscodeDeepLink(message);
 		}
+		// Handled before the switch to keep it under the max-switch-cases lint limit (as with 'alert').
+		if (message.command === 'pr.search-identities') {
+			return this.searchIdentities(message);
+		}
 		switch (message.command) {
 			case 'pr.checkout':
 				return this.checkoutPullRequest(message);
@@ -506,6 +510,20 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				// Never drop a message silently: an unhandled command leaves the webview's awaited
 				// postMessage promise pending forever. Mirror the sidebar host's throwing default. (item 1e)
 				return this._throwError(message, `Unhandled message: ${message.command}`);
+		}
+	}
+
+	// @mention people-picker backing. Never rejects: on failure reply with [] so the composer's picker
+	// simply shows no suggestions instead of leaving the awaited request pending.
+	private async searchIdentities(message: IRequestMessage<{ query: string }>): Promise<void> {
+		try {
+			const users = await this._userManager.searchIdentities(message.args?.query ?? '');
+			return this._replyMessage(
+				message,
+				(users ?? []).map(u => ({ id: u.id, displayName: u.user.displayName, uniqueName: u.user.mailAddress })),
+			);
+		} catch {
+			return this._replyMessage(message, []);
 		}
 	}
 

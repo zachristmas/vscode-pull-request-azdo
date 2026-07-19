@@ -12,14 +12,17 @@ import gfm from 'remark-gfm';
 
 import { Dropdown } from './dropdown';
 import { commentIcon, editIcon } from './icon';
+import { MentionTextarea } from './mentionTextarea';
 import { nbsp, Spaced } from './space';
 import { Timestamp } from './timestamp';
 import { AuthorLink, Avatar } from './user';
 import { PullRequestVote } from '../../src/azdo/interface';
+import { resolveMentions } from '../../src/common/mentions';
 import { PullRequest, ReviewType } from '../common/cache';
 import PullRequestContext from '../common/context';
 import emitter from '../common/events';
 import { useStateProp } from '../common/hooks';
+import { buildMentionNameMap } from '../common/mentions';
 
 const { useCallback, useContext, useEffect, useRef, useState } = React;
 export type Props = Partial<Comment> & {
@@ -208,7 +211,7 @@ function EditComment({ id, body, onCancel, onSave }: EditCommentProps) {
 		<form ref={form} onSubmit={onSubmit}>
 			{/* item 5: focus the textarea when this composer swaps in (Edit clicked), so the caret lands
 			    where the user is about to type without a manual click. */}
-			<textarea name="markdown" autoFocus defaultValue={body} onKeyDown={onKeyDown} onInput={onInput} />
+			<MentionTextarea name="markdown" autoFocus defaultValue={body} onKeyDown={onKeyDown} onInput={onInput} />
 			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
@@ -247,7 +250,7 @@ const renderers = {
 
 export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, body }: Embodied) => {
 	// Hook must run unconditionally (rules-of-hooks); it was previously below the early return.
-	const { applyPatch } = useContext(PullRequestContext);
+	const { applyPatch, pr } = useContext(PullRequestContext);
 	if (!body && !bodyHTML) {
 		// UX-03: dashed-border muted placeholder rather than a bare line - it reads as a fillable slot
 		// (Edit lives in the hover/focus actions, canEdit permitting).
@@ -258,8 +261,11 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 		);
 	}
 
+	// Resolve ADO @<guid> mention tokens to @Display Name before rendering so no raw id leaks (names
+	// come from PR participants + mentions picked this session; unknown ids fall back to @user).
+	const resolvedBody = resolveMentions(body ?? '', buildMentionNameMap(pr));
 	// const renderedBody = <div dangerouslySetInnerHTML={{ __html: bodyHTML }} />;
-	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={body ?? ''} />;
+	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={resolvedBody} />;
 	const containsSuggestion = (body || bodyHTML || '').includes('```diff');
 	const applyPatchButton = containsSuggestion ? (
 		<button onClick={() => applyPatch(commentContent!, commentId!, threadId)}>Apply Patch</button>
@@ -317,7 +323,7 @@ export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {
 		<form ref={form} onSubmit={onSubmit}>
 			{/* item 5: focus the textarea when the ghost Reply field swaps in, so the user can type
 			    immediately without clicking into it. */}
-			<textarea name="markdown" autoFocus onKeyDown={onKeyDown} />
+			<MentionTextarea name="markdown" autoFocus onKeyDown={onKeyDown} />
 			<ComposerHint />
 			<div className="form-actions">
 				<button className="secondary" onClick={onCancel}>
@@ -391,7 +397,7 @@ export function AddComment({ pendingCommentText, hasWritePermission, isIssue, is
 
 	return (
 		<form id="comment-form" ref={form} className="comment-form main-comment-form" onSubmit={onSubmit}>
-			<textarea
+			<MentionTextarea
 				id="comment-textarea"
 				name="body"
 				ref={textareaRef}
@@ -462,7 +468,7 @@ export const AddCommentSimple = (pr: PullRequest) => {
 
 	return (
 		<span>
-			<textarea
+			<MentionTextarea
 				id="comment-textarea"
 				name="body"
 				placeholder="Leave a comment"

@@ -53,6 +53,7 @@ import {
 	PullRequestVote,
 } from './interface';
 import { BuildPolicyEvaluationContext } from './policyTypes';
+import { setCurrentUserId, setMentionNames } from './prComment';
 import {
 	convertAzdoPullRequestToRawPullRequest,
 	convertBranchRefToBranchName,
@@ -505,10 +506,61 @@ export class PullRequestModel implements IPullRequestModel {
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
 
+		// Keep the current-user id current so like reactions render authorHasReacted correctly on the
+		// comments built from these threads (see setCurrentUserId / buildLikeReactions).
+		setCurrentUserId(azdo?.authenticatedUser?.id);
+
 		const allThreads = await git?.getThreads(repoId, this.getPullRequestId(), undefined, iteration, baseIteration);
 		const threads = allThreads?.filter(t => !t.isDeleted);
 		await resolveAvatarsDeep(threads);
+
+		// Assemble the id -> display-name map used to resolve @<guid> mention tokens in native comment
+		// bodies, from everyone we know on this PR: author, reviewers, and every comment author.
+		const mentionNames = new Map<string, string>();
+		const addName = (id?: string, name?: string) => {
+			if (id && name) {
+				mentionNames.set(id.toLowerCase(), name);
+			}
+		};
+		addName(this.item.createdBy?.id, this.item.createdBy?.displayName);
+		this.item.reviewers?.forEach(r => addName(r.id, r.displayName));
+		threads?.forEach(t => t.comments?.forEach(c => addName(c.author?.id, c.author?.displayName)));
+		setMentionNames(mentionNames);
+
 		return threads;
+	}
+
+	/** The authenticated user's identity id, synchronously (populated once the repo/connection is ensured). */
+	public get currentUserId(): string | undefined {
+		return this.azdoRepository.azdo?.authenticatedUser?.id;
+	}
+
+	/**
+	 * Toggle the current user's Like on a comment. ADO has a single like per comment (not emoji
+	 * reactions): git.create/deleteLike add/remove the caller. Re-reads getLikes so the cached thread's
+	 * usersLiked (and therefore the like count) matches the ADO web UI exactly, then fires a change so
+	 * the diff-editor comment and the overview timeline refresh.
+	 */
+	async toggleCommentLike(threadId: number, commentId: number, add: boolean): Promise<void> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = (await azdoRepo.getRepositoryId()) || '';
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+		setCurrentUserId(azdo?.authenticatedUser?.id);
+
+		if (add) {
+			await git?.createLike(repoId, this.getPullRequestId(), threadId, commentId);
+		} else {
+			await git?.deleteLike(repoId, this.getPullRequestId(), threadId, commentId);
+		}
+
+		const likes = (await git?.getLikes(repoId, this.getPullRequestId(), threadId, commentId)) ?? [];
+		const thread = this._reviewThreadsCache.find(t => t.id === threadId);
+		const comment = thread?.thread.comments?.find(c => c.id === commentId);
+		if (thread && comment) {
+			comment.usersLiked = likes;
+			this._onDidChangeReviewThreads.fire({ added: [], changed: [thread], removed: [] });
+		}
 	}
 
 	async createCommentOnThread(threadId: number, message: string, parentCommentId?: number): Promise<Comment | undefined> {
@@ -924,6 +976,9 @@ export class PullRequestModel implements IPullRequestModel {
 				result: build?.result,
 				webUrl: (build?._links as any)?.web?.href,
 				isExpired: context?.isExpired,
+				// POL-06: a build was queued (context.buildId) but getBuild returned nothing - the .catch
+				// swallowed a failure, almost always a missing Build (read) permission on the pipeline.
+				detailsUnavailable: !!context?.buildId && !build,
 			};
 		});
 	}
