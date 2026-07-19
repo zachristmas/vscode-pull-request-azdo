@@ -2,10 +2,40 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { IdentityRef } from 'azure-devops-node-api/interfaces/common/VSSInterfaces';
 import { Comment, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
 import { getAvatarIconUri } from './avatarCache';
 import { CommentPermissions, IAccount } from './interface';
+import { Resource } from '../common/resources';
+
+// The current user's identity id, used to compute whether the viewer has liked a comment. Set once
+// (process-wide) from the authenticated Azdo identity; the current user is a singleton, so this module
+// holder avoids threading it through every GHPRComment construction path (createVSCodeCommentThread,
+// updateThread, the review/pr comment controllers). Held on a const object so it can be updated without
+// reassigning a top-level binding.
+const likeState: { currentUserId: string | undefined } = { currentUserId: undefined };
+export function setCurrentUserId(id: string | undefined): void {
+	likeState.currentUserId = id;
+}
+
+// Azure DevOps exposes a single Like per comment (Comment.usersLiked: IdentityRef[]), NOT GitHub-style
+// emoji reactions. Present it as exactly ONE thumbs-up CommentReaction: count = number of likers,
+// authorHasReacted = the current user is among them. Always returned (even at count 0) so the like
+// toggle is available on every comment. The toggle is handled by the comment controllers' reactionHandler
+// -> PullRequestModel.toggleCommentLike -> git.create/deleteLike.
+export function buildLikeReactions(usersLiked: IdentityRef[] | undefined): vscode.CommentReaction[] {
+	const likers = usersLiked ?? [];
+	const me = likeState.currentUserId;
+	return [
+		{
+			label: 'Like',
+			iconPath: Resource.icons.reactions.THUMBS_UP,
+			count: likers.length,
+			authorHasReacted: !!me && likers.some(u => u.id === me),
+		},
+	];
+}
 
 export interface GHPRCommentThread extends vscode.CommentThread {
 	threadId: number;
@@ -199,8 +229,7 @@ export class GHPRComment implements vscode.Comment {
 		};
 
 		this.parentCommentId = comment.parentCommentId;
-		// TODO Reactions in comment
-		// updateCommentReactions(this, comment.usersLiked);
+		this.reactions = buildLikeReactions(comment.usersLiked);
 
 		//this.label = comment.isDraft ? 'Pending' : undefined;
 

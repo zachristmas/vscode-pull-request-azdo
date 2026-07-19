@@ -64,9 +64,10 @@ export class ReviewCommentController
 			_reposManager.activePullRequest!.item.title ?? '',
 		);
 		this._commentController.commentingRangeProvider = this;
-		// Azure DevOps has no comment-reactions concept (this was GitHub GraphQL logic, entirely
-		// commented out below) - reactionHandler is optional on CommentController, so leaving it
-		// unset removes the non-functional emoji-picker button entirely instead of shipping a broken one.
+		// Azure DevOps comments support a single Like (not GitHub-style emoji reactions). The like is
+		// presented as one thumbs-up CommentReaction (prComment.buildLikeReactions); this reactionHandler
+		// routes a click to toggleReaction, which calls create/deleteLike.
+		this._commentController.reactionHandler = (comment, reaction) => this.toggleReaction(comment as GHPRComment, reaction);
 		this._localToDispose.push(this._commentController);
 		this._commentHandlerId = uuid();
 		this._commonCommentHandler = new CommonCommentHandler(_reposManager.activePullRequest!, _reposManager);
@@ -641,48 +642,15 @@ export class ReviewCommentController
 	// #endregion
 
 	// #region Reactions
-	async toggleReaction(_comment: GHPRComment, _reaction: vscode.CommentReaction): Promise<void> {
-		// try {
-		// 	if (!this._reposManager.activePullRequest) {
-		// 		throw new Error('Unable to find active pull request');
-		// 	}
-		// 	const matchedFile = this.findMatchedFileByUri(comment.parent!.uri);
-		// 	if (!matchedFile) {
-		// 		throw new Error('Unable to find matching file');
-		// 	}
-		// 	let reactionGroups: ReactionGroup[] = [];
-		// 	if (comment.reactions && !comment.reactions.find(ret => ret.label === reaction.label && !!ret.authorHasReacted)) {
-		// 		const result = await this._reposManager.activePullRequest.addCommentReaction(comment._rawComment.graphNodeId, reaction);
-		// 		reactionGroups = result.addReaction.subject.reactionGroups;
-		// 	} else {
-		// 		const result = await this._reposManager.activePullRequest.deleteCommentReaction(comment._rawComment.graphNodeId, reaction);
-		// 		reactionGroups = result.removeReaction.subject.reactionGroups;
-		// 	}
-		// 	// Update the cached comments of the file
-		// 	const matchingCommentIndex = matchedFile.comments.findIndex(c => c.id.toString() === comment.commentId);
-		// 	if (matchingCommentIndex > -1) {
-		// 		const editedComment = matchedFile.comments[matchingCommentIndex];
-		// 		editedComment.reactions = parseGraphQLReaction(reactionGroups);
-		// 		const vscodeCommentReactions = generateCommentReactions(editedComment.reactions);
-		// 		const fileName = matchedFile.fileName;
-		// 		const modifiedThreads = [
-		// 			...(this._prDocumentCommentThreads.getAllThreadsForDocument(fileName) || []),
-		// 			...(this._reviewDocumentCommentThreads.getAllThreadsForDocument(fileName) || []),
-		// 			...(this._workspaceFileChangeCommentThreads[fileName] || []),
-		// 			...(this._obsoleteFileChangeCommentThreads[fileName] || [])
-		// 		].filter(td => !!td.comments.find((cmt: GHPRComment) => cmt.commentId === comment.commentId));
-		// 		modifiedThreads.forEach(thread => {
-		// 			thread.comments = thread.comments.map((cmt: GHPRComment) => {
-		// 				if (cmt.commentId === comment.commentId) {
-		// 					cmt.reactions = vscodeCommentReactions;
-		// 				}
-		// 				return cmt;
-		// 			});
-		// 		});
-		// 	}
-		// } catch (e) {
-		// 	throw new Error(formatError(e));
-		// }
+	async toggleReaction(comment: GHPRComment, reaction: vscode.CommentReaction): Promise<void> {
+		const pr = this._reposManager.activePullRequest;
+		const threadId = comment.parent?.threadId;
+		const commentId = comment._rawComment.id;
+		if (!pr || typeof threadId !== 'number' || typeof commentId !== 'number') {
+			return;
+		}
+		// reaction.authorHasReacted reflects the pre-click state, so its negation is the desired state.
+		await pr.toggleCommentLike(threadId, commentId, !reaction.authorHasReacted);
 	}
 
 	// #endregion

@@ -117,8 +117,7 @@ Opening a deep link (`vscode://.../open-pr?...&path=/src/file.ts&line=42`) finds
 ## Known issues
 
 1. `@mentions` in comment text are not resolved to users, and typing a mention does not notify anyone yet.
-2. Comment reactions (likes) are not supported yet; the ADO web UI shows them, the extension does not.
-3. Some incompatibility with the GitHub Pull Requests extension when both are enabled: if either misbehaves, try disabling the other and reloading the window.
+2. Some incompatibility with the GitHub Pull Requests extension when both are enabled: if either misbehaves, try disabling the other and reloading the window.
 
 ## Credits
 

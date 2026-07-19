@@ -48,9 +48,8 @@ import {
 import { GHPRComment, GHPRCommentThread } from './prComment';
 import { Repository } from '../api/api';
 import { GitApiImpl } from '../api/api1';
-import { DiffSide, Reaction } from '../common/comment';
+import { DiffSide } from '../common/comment';
 import { DiffChangeType, DiffHunk, DiffLine, getGitChangeTypeFromVersionControlChangeType } from '../common/diffHunk';
-import { Resource } from '../common/resources';
 import { ThreadData } from '../view/treeNodes/pullRequestNode';
 
 export interface CommentReactionHandler {
@@ -521,74 +520,10 @@ export function getRelatedUsersFromPullrequest(
 	return related_users;
 }
 
-export function getReactionGroup(): { title: string; label: string; icon?: vscode.Uri }[] {
-	const ret = [
-		{
-			title: 'THUMBS_UP',
-			label: '👍',
-			icon: Resource.icons.reactions.THUMBS_UP,
-		},
-		{
-			title: 'THUMBS_DOWN',
-			label: '👎',
-			icon: Resource.icons.reactions.THUMBS_DOWN,
-		},
-		{
-			title: 'LAUGH',
-			label: '😄',
-			icon: Resource.icons.reactions.LAUGH,
-		},
-		{
-			title: 'HOORAY',
-			label: '🎉',
-			icon: Resource.icons.reactions.HOORAY,
-		},
-		{
-			title: 'CONFUSED',
-			label: '😕',
-			icon: Resource.icons.reactions.CONFUSED,
-		},
-		{
-			title: 'HEART',
-			label: '❤️',
-			icon: Resource.icons.reactions.HEART,
-		},
-		{
-			title: 'ROCKET',
-			label: '🚀',
-			icon: Resource.icons.reactions.ROCKET,
-		},
-		{
-			title: 'EYES',
-			label: '👀',
-			icon: Resource.icons.reactions.EYES,
-		},
-	];
-
-	return ret;
-}
-
-export function generateCommentReactions(reactions: Reaction[] | undefined) {
-	return getReactionGroup().map(reaction => {
-		if (!reactions) {
-			return { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
-		}
-
-		const matchedReaction = reactions.find(re => re.label === reaction.label);
-
-		return matchedReaction
-			? {
-					label: matchedReaction.label,
-					authorHasReacted: matchedReaction.viewerHasReacted,
-					count: matchedReaction.count,
-					iconPath: reaction.icon || '',
-			  }
-			: { label: reaction.label, authorHasReacted: false, count: 0, iconPath: reaction.icon || '' };
-	});
-}
-export function updateCommentReactions(comment: vscode.Comment, reactions: Reaction[] | undefined) {
-	comment.reactions = generateCommentReactions(reactions);
-}
+// Azure DevOps has a single Like per comment (not GitHub-style emoji reactions). The 8-emoji
+// getReactionGroup()/generateCommentReactions() that used to live here were dead GitHub leftovers;
+// the like affordance is built in prComment.ts (buildLikeReactions) from Comment.usersLiked, and the
+// toggle goes through PullRequestModel.toggleCommentLike -> git.create/deleteLike.
 
 export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repository | undefined {
 	for (const repository of gitAPI.repositories) {

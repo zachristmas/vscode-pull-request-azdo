@@ -331,16 +331,14 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 		return path.relative(this._folderReposManager.repository.rootUri.path, comparePath).replaceAll('\\', '/');
 	}
 
-	public async toggleReaction(_comment: GHPRComment, _reaction: vscode.CommentReaction): Promise<void> {
-		// if (comment.parent!.uri.scheme !== 'pr') {
-		// 	return;
-		// }
-		// if (comment.reactions && !comment.reactions.find(ret => ret.label === reaction.label && !!ret.authorHasReacted)) {
-		// 	// add reaction
-		// 	await this.pullRequestModel.addCommentReaction(comment._rawComment.graphNodeId, reaction);
-		// } else {
-		// 	await this.pullRequestModel.deleteCommentReaction(comment._rawComment.graphNodeId, reaction);
-		// }
+	public async toggleReaction(comment: GHPRComment, reaction: vscode.CommentReaction): Promise<void> {
+		const threadId = comment.parent?.threadId;
+		const commentId = comment._rawComment.id;
+		if (typeof threadId !== 'number' || typeof commentId !== 'number') {
+			return;
+		}
+		// reaction.authorHasReacted reflects the pre-click state, so its negation is the desired state.
+		await this.pullRequestModel.toggleCommentLike(threadId, commentId, !reaction.authorHasReacted);
 	}
 
 	private setContextKey(inDraftMode: boolean): void {
