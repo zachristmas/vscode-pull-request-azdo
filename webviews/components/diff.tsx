@@ -5,8 +5,8 @@
 
 import * as React from 'react';
 
-import { IComment } from '../../src/common/comment';
-import { DiffChangeType, DiffHunk, DiffLine } from '../../src/common/diffHunk';
+import type { IComment } from '../../src/common/comment';
+import type { DiffChangeType, DiffHunk, DiffLine } from '../../src/common/diffHunk';
 import PullRequestContext from '../common/context';
 
 const { useContext } = React;
@@ -46,7 +46,7 @@ function Diff({
 
 export default Diff;
 
-const Hunk = ({ hunk, maxLines = 4 }: { hunk: DiffHunk; maxLines?: number }) => (
+export const Hunk = ({ hunk, maxLines = 4 }: { hunk: DiffHunk; maxLines?: number }) => (
 	<>
 		{hunk.diffLines.slice(-maxLines).map(line => (
 			<div key={keyForDiffLine(line)} className={`diffLine ${getDiffChangeClass(line.type)}`}>
@@ -63,4 +63,8 @@ const keyForDiffLine = (diffLine: DiffLine) => `${diffLine.oldLineNumber}->${dif
 
 const LineNumber = ({ num }: { num: number }) => <span className="lineNumber">{num > 0 ? num : ' '}</span>;
 
-const getDiffChangeClass = (type: DiffChangeType) => DiffChangeType[type].toLowerCase();
+// Class name keyed by the DiffChangeType numeric value (0 Context, 1 Add, 2 Delete, 3 Control).
+// A local lookup rather than the DiffChangeType runtime enum, which would drag the extension-only
+// diffHunk module graph (and `vscode`) into the webview bundle.
+const DIFF_CHANGE_CLASS = ['context', 'add', 'delete', 'control'];
+const getDiffChangeClass = (type: DiffChangeType) => DIFF_CHANGE_CLASS[type] ?? 'context';

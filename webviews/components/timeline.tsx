@@ -10,6 +10,7 @@ import * as React from 'react';
 import { useContext, useRef, useState } from 'react';
 
 import { CommentView, ReplyToThread } from './comment';
+import { Hunk } from './diff';
 import { chevronIcon, commitIcon, mergeIcon } from './icon';
 import { nbsp, Spaced } from './space';
 // eslint-disable-next-line import-x/no-named-as-default
@@ -290,8 +291,12 @@ function renderThreadHeader(
 }
 
 const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestCommentThread; currentUser: Identity }) => {
-	const { replyThread, openDiff, changeThreadStatus } = useContext(PullRequestContext);
+	const { replyThread, openDiff, changeThreadStatus, pr } = useContext(PullRequestContext);
 	const [inEditMode, setEditMode] = useState(false);
+
+	// item 1: inline diff context. Host-computed excerpt keyed by thread id; file-level threads
+	// and threads outside the current diff have no entry and degrade to the plain card.
+	const hunkExcerpt = thread.id === undefined ? undefined : pr?.threadHunks?.[thread.id];
 
 	const status = thread.status ?? 0;
 	const isResolved = RESOLVED_STATUSES.has(status);
@@ -331,6 +336,11 @@ const CommentEventView = ({ thread, currentUser }: { thread: GitPullRequestComme
 			) : null}
 			{!contentHidden ? (
 				<>
+					{hunkExcerpt ? (
+						<div className="diff thread-diff-excerpt">
+							<Hunk hunk={hunkExcerpt} />
+						</div>
+					) : null}
 					{thread.comments?.map(c => (
 						<CommentView
 							key={c.id}

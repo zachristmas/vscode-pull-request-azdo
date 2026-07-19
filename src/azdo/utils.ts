@@ -636,6 +636,95 @@ export function getDiffSide(thread: GitPullRequestCommentThread): DiffSide | und
 	return undefined;
 }
 
+const DIFF_CHANGE_SIGN: { [type: number]: string } = {
+	[DiffChangeType.Add]: '+',
+	[DiffChangeType.Delete]: '-',
+};
+
+// Line numbers (on the given side) that the file's diff blocks mark as `changedType`. Used to
+// classify each excerpt line as changed vs unchanged context.
+function collectChangedLineNumbers(diffHunks: DiffHunk[], isRight: boolean, changedType: DiffChangeType): Set<number> {
+	const changedLines = new Set<number>();
+	for (const hunk of diffHunks) {
+		for (const dl of hunk.diffLines) {
+			const ln = isRight ? dl.newLineNumber : dl.oldLineNumber;
+			if (ln > 0 && dl.type === changedType) {
+				changedLines.add(ln);
+			}
+		}
+	}
+	return changedLines;
+}
+
+// Resolves the thread to (fileChange, side, anchor line), or undefined when it does not anchor to
+// a line in one of the changed files.
+function resolveThreadAnchor(
+	fileChanges: IRawFileChange[],
+	thread: GitPullRequestCommentThread,
+): { fileChange: IRawFileChange; isRight: boolean; anchorLine: number } | undefined {
+	const side = getDiffSide(thread);
+	const anchorLine = getPositionFromThread(thread);
+	const filePath = thread.threadContext?.filePath;
+	if (side === undefined || filePath === undefined || anchorLine === undefined || anchorLine < 1) {
+		return undefined;
+	}
+	const fileChange = fileChanges.find(fc => fc.filename === filePath || fc.previous_filename === filePath);
+	if (fileChange === undefined) {
+		return undefined;
+	}
+	return { fileChange, isRight: side === DiffSide.RIGHT, anchorLine };
+}
+
+/**
+ * Builds a short diff-hunk excerpt for a file-anchored thread: up to `maxLines` lines of real
+ * file content ending at (and including) the thread's anchor line, each classified as add /
+ * context from the file's diff blocks so the excerpt renders with the same coloring as the diff
+ * editor. Mirrors how the upstream GitHub extension shows `comment.diffHunks` on timeline
+ * threads, adapted to AzDO - whose diff API carries line numbers and change types but NOT line
+ * text, so the text is read from the blob via `getContentBySha`.
+ *
+ * Returns undefined for file-level threads (no anchor line), when the anchored file/side content
+ * is unavailable, or when the anchor line is out of range - callers degrade to no excerpt.
+ */
+export async function getThreadDiffHunkExcerpt(
+	fileChanges: IRawFileChange[],
+	thread: GitPullRequestCommentThread,
+	getContentBySha: (sha: string) => Promise<string | undefined>,
+	maxLines = 4,
+): Promise<DiffHunk | undefined> {
+	const anchor = resolveThreadAnchor(fileChanges, thread);
+	if (anchor === undefined) {
+		return undefined;
+	}
+	const { fileChange, isRight, anchorLine } = anchor;
+
+	const sha = isRight ? fileChange.file_sha : fileChange.previous_file_sha;
+	const content = sha === undefined ? undefined : await getContentBySha(sha);
+	if (content === undefined) {
+		return undefined;
+	}
+	const lines = content.split(/\r?\n/);
+	if (anchorLine > lines.length) {
+		return undefined;
+	}
+
+	const changedType = isRight ? DiffChangeType.Add : DiffChangeType.Delete;
+	const changedLines = collectChangedLineNumbers(fileChange.diffHunks ?? [], isRight, changedType);
+
+	const start = Math.max(1, anchorLine - (maxLines - 1));
+	const excerpt = new DiffHunk(start, anchorLine - start + 1, start, anchorLine - start + 1, 0);
+	for (let ln = start; ln <= anchorLine; ln++) {
+		const type = changedLines.has(ln) ? changedType : DiffChangeType.Context;
+		const sign = DIFF_CHANGE_SIGN[type] ?? ' ';
+		// Only the shown side's line-number column is populated; the other stays blank (-1), the
+		// same convention the Hunk renderer already uses for add/delete rows.
+		const oldLine = isRight ? -1 : ln;
+		const newLine = isRight ? ln : -1;
+		excerpt.diffLines.push(new DiffLine(type, oldLine, newLine, 0, `${sign}${lines[ln - 1] ?? ''}`));
+	}
+	return excerpt;
+}
+
 export function updateCommentReviewState(thread: GHPRCommentThread, newDraftMode: boolean) {
 	if (newDraftMode) {
 		return;

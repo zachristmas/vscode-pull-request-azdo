@@ -1209,6 +1209,40 @@ code {
 	background: var(--azdo-surface-header);
 }
 
+/* item 1: inline diff excerpt above the first comment - a few real code lines ending at the
+   commented line, so a thread is triageable without opening the file. Sits flush under the header
+   and above the comment body, with its own bottom rule separating it from the conversation. */
+.thread-container .diff.thread-diff-excerpt {
+	border-bottom: 1px solid var(--azdo-border-subtle);
+	font-size: 12px;
+	overflow-x: auto;
+}
+
+.thread-container .diff.thread-diff-excerpt .diffLine {
+	display: flex;
+	white-space: pre;
+}
+
+.thread-container .diff.thread-diff-excerpt .diffLine .lineNumber {
+	flex: 0 0 auto;
+	min-width: 44px;
+	padding: 0 var(--azdo-space-2);
+	text-align: right;
+	color: var(--azdo-muted);
+	user-select: none;
+}
+
+.thread-container .diff.thread-diff-excerpt .diffLine .diffTypeSign {
+	flex: 0 0 auto;
+	width: 1ch;
+	user-select: none;
+}
+
+.thread-container .diff.thread-diff-excerpt .diffLine .lineContent {
+	flex: 1 1 auto;
+	white-space: pre;
+}
+
 /* item 2: now a real <button> for keyboard access - strip the filled button chrome so it still reads
    as an inline path chip. */
 .thread-header .thread-file-chip {
