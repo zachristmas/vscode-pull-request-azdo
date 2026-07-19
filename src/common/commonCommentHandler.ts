@@ -22,7 +22,8 @@ export class CommonCommentHandler {
 	public async createOrReplyComment(
 		thread: GHPRCommentThread,
 		input: string,
-		inDraft: boolean,
+		// Callers forward their own optional inDraft, so undefined genuinely reaches this parameter.
+		inDraft: boolean | undefined,
 		getFileChanges: (isOutdated: boolean) => Promise<IFileChangeNodeWithUri[]>,
 		addCommentToCache: (thread: GHPRCommentThread, fileName: string) => Promise<void>,
 	): Promise<GitPullRequestCommentThread | undefined> {

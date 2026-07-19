@@ -150,17 +150,13 @@ export function* parseDiffHunk(diffHunkPatch: string): IterableIterator<DiffHunk
 
 				const lineCount = 1 + countCarriageReturns(line);
 
-				switch (type) {
-					case DiffChangeType.Context:
-						oldLine += lineCount;
-						newLine += lineCount;
-						break;
-					case DiffChangeType.Delete:
-						oldLine += lineCount;
-						break;
-					case DiffChangeType.Add:
-						newLine += lineCount;
-						break;
+				// type is Context, Delete or Add here: Context advances both counters,
+				// Delete only the old one, Add only the new one.
+				if (type !== DiffChangeType.Add) {
+					oldLine += lineCount;
+				}
+				if (type !== DiffChangeType.Delete) {
+					newLine += lineCount;
 				}
 			}
 		}

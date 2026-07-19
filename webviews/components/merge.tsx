@@ -602,12 +602,12 @@ export const MergeSimple = (pr: PullRequest) => {
 		updatePR({ state });
 	}
 
-	const availableOptions = (Object.keys(MERGE_METHODS) as MergeMethod[])
-		.filter(method => pr.mergeMethodsAvailability[method])
-		.reduce((methods: { [method: string]: string }, key) => {
-			methods[key] = MERGE_METHODS[key];
-			return methods;
-		}, {});
+	const enabledMethods = (Object.keys(MERGE_METHODS) as MergeMethod[]).filter(
+		method => pr.mergeMethodsAvailability[method],
+	);
+	const availableOptions: { [method: string]: string } = Object.fromEntries(
+		enabledMethods.map(key => [key, MERGE_METHODS[key]]),
+	);
 
 	return <Dropdown options={availableOptions} defaultOption={pr.defaultMergeMethod} submitAction={submitAction} />;
 };

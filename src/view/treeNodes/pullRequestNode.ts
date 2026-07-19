@@ -239,6 +239,30 @@ export class PRNode extends TreeNode {
 				sha = change.previousFileSHA;
 			}
 
+			const headFilePath = path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(fileName));
+			const parentFilePath = path.resolve(
+				this._folderReposManager.repository.rootUri.fsPath,
+				removeLeadingSlash(parentFileName),
+			);
+			const headUri = toPRUriAzdo(
+				vscode.Uri.file(headFilePath),
+				this.pullRequestModel,
+				change.baseCommit,
+				headCommit,
+				fileName,
+				false,
+				change.status,
+			);
+			const baseUri = toPRUriAzdo(
+				vscode.Uri.file(parentFilePath),
+				this.pullRequestModel,
+				change.baseCommit,
+				headCommit,
+				parentFileName,
+				true,
+				change.status,
+			);
+
 			if (change instanceof SlimFileChange) {
 				return new RemoteFileChangeNode(
 					this,
@@ -247,31 +271,8 @@ export class PRNode extends TreeNode {
 					fileName,
 					change.previousFileName,
 					change.blobUrl,
-					toPRUriAzdo(
-						vscode.Uri.file(
-							path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(fileName)),
-						),
-						this.pullRequestModel,
-						change.baseCommit,
-						headCommit,
-						fileName,
-						false,
-						change.status,
-					),
-					toPRUriAzdo(
-						vscode.Uri.file(
-							path.resolve(
-								this._folderReposManager.repository.rootUri.fsPath,
-								removeLeadingSlash(parentFileName),
-							),
-						),
-						this.pullRequestModel,
-						change.baseCommit,
-						headCommit,
-						parentFileName,
-						true,
-						change.status,
-					),
+					headUri,
+					baseUri,
 					sha,
 					change.previousFileSHA,
 				);
@@ -284,28 +285,8 @@ export class PRNode extends TreeNode {
 				fileName,
 				change.previousFileName,
 				change.blobUrl,
-				toPRUriAzdo(
-					vscode.Uri.file(
-						path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(fileName)),
-					),
-					this.pullRequestModel,
-					change.baseCommit,
-					headCommit,
-					fileName,
-					false,
-					change.status,
-				),
-				toPRUriAzdo(
-					vscode.Uri.file(
-						path.resolve(this._folderReposManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName)),
-					),
-					this.pullRequestModel,
-					change.baseCommit,
-					headCommit,
-					parentFileName,
-					true,
-					change.status,
-				),
+				headUri,
+				baseUri,
 				change.isPartial,
 				change.patch,
 				change.diffHunks,

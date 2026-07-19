@@ -1254,8 +1254,10 @@ export class PullRequestModel implements IPullRequestModel {
 			const fileName = change.status === GitChangeType.DELETE ? change.previousFileName! : change.fileName;
 			// Falls back to the head-side name for added files so the base URI stays resolvable (#109).
 			const parentFileName = change.previousFileName || fileName;
+			const headFilePath = path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName));
+			const parentFilePath = path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName));
 			headUri = toPRUriAzdo(
-				vscode.Uri.file(path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName))),
+				vscode.Uri.file(headFilePath),
 				pullRequestModel,
 				change.baseCommit,
 				headCommit,
@@ -1264,7 +1266,7 @@ export class PullRequestModel implements IPullRequestModel {
 				change.status,
 			);
 			baseUri = toPRUriAzdo(
-				vscode.Uri.file(path.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName))),
+				vscode.Uri.file(parentFilePath),
 				pullRequestModel,
 				change.baseCommit,
 				headCommit,

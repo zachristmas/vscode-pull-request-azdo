@@ -92,6 +92,7 @@ export class ReviewManager {
 
 		this.registerListeners();
 
+		// eslint-disable-next-line sonarjs/no-async-constructor -- fire-and-forget initial state refresh; two ordering-sensitive construction sites
 		this.updateState();
 		this.pollForStatusChange();
 	}
@@ -416,10 +417,7 @@ export class ReviewManager {
 				}
 			}
 
-			let fileName = change.fileName;
-			if (change.status === GitChangeType.DELETE) {
-				fileName = change.previousFileName!;
-			}
+			const fileName = change.status === GitChangeType.DELETE ? change.previousFileName! : change.fileName;
 
 			const filePath = nodePath.join(this._repository.rootUri.path, removeLeadingSlash(fileName)).replaceAll('\\', '/');
 			const uri = this._repository.rootUri.with({ path: filePath });
@@ -672,6 +670,7 @@ export class ReviewManager {
 						);
 
 						resolve(undefined);
+						return;
 					}
 
 					if (gitErrorCode(err) === GitErrorCodes.RemoteConnectionError) {
@@ -683,6 +682,7 @@ export class ReviewManager {
 						);
 
 						resolve(undefined);
+						return;
 					}
 
 					// we can't handle the error
@@ -693,6 +693,7 @@ export class ReviewManager {
 				const latestBranch = await this._repository.getBranch(branch.name!);
 				if (!latestBranch || !latestBranch.upstream) {
 					resolve(undefined);
+					return;
 				}
 
 				resolve(latestBranch);

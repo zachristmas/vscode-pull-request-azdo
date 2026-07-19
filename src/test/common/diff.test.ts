@@ -136,32 +136,18 @@ describe('diff hunk parsing', () => {
 
 		for (let i = 0; i < diffHunk.diffLines.length; i++) {
 			const diffLine = diffHunk.diffLines[i];
-			switch (diffLine.type) {
-				case DiffChangeType.Delete:
-					assert.equal(
-						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.oldLineNumber, true),
-						diffLine.positionInHunk,
-					);
-					break;
-				case DiffChangeType.Add:
-					assert.equal(
-						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.newLineNumber, false),
-						diffLine.positionInHunk,
-					);
-					break;
-				case DiffChangeType.Context:
-					assert.equal(
-						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.oldLineNumber, true),
-						diffLine.positionInHunk,
-					);
-					assert.equal(
-						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.newLineNumber, false),
-						diffLine.positionInHunk,
-					);
-					break;
-
-				default:
-					break;
+			// Delete and Context lines map on the old side; Add and Context lines map on the new side.
+			if (diffLine.type === DiffChangeType.Delete || diffLine.type === DiffChangeType.Context) {
+				assert.equal(
+					mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.oldLineNumber, true),
+					diffLine.positionInHunk,
+				);
+			}
+			if (diffLine.type === DiffChangeType.Add || diffLine.type === DiffChangeType.Context) {
+				assert.equal(
+					mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.newLineNumber, false),
+					diffLine.positionInHunk,
+				);
 			}
 		}
 	});

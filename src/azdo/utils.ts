@@ -10,6 +10,7 @@ import {
 	GitPullRequestCompletionOptions,
 	GitPullRequestMergeStrategy,
 	IdentityRefWithVote,
+	LineDiffBlock,
 	LineDiffBlockChangeType,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
@@ -331,6 +332,84 @@ export function loginComparator(a: IAccount, b: IAccount) {
 // 3 lines before and after the hunk
 const OVERFLOW = 3;
 
+// Extracted from getDiffHunkFromFileDiff so the per-block switch (and its case breaks) is not
+// nested inside the block loop. Returns the updated positionInHunk.
+function appendBlockDiffLines(
+	hunk: DiffHunk,
+	block: LineDiffBlock,
+	startPositionInHunk: number,
+	overflowStartLineNumber: number,
+	overflowEndLineNumber: number,
+): number {
+	const oldLineNumber = block.originalLineNumberStart!;
+	const newLineNumber = block.modifiedLineNumberStart!;
+	let positionInHunk = startPositionInHunk;
+
+	switch (block.changeType) {
+		case LineDiffBlockChangeType.Add: {
+			for (let i = 0; i < block.modifiedLinesCount!; i++) {
+				hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
+				positionInHunk++;
+			}
+
+			break;
+		}
+		case LineDiffBlockChangeType.Delete: {
+			for (let i = 0; i < block.originalLinesCount!; i++) {
+				hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
+				positionInHunk++;
+			}
+
+			break;
+		}
+		case LineDiffBlockChangeType.Edit: {
+			// Add no change lines for overflow BEFORE the actual change
+			for (let i = overflowStartLineNumber; i < newLineNumber; i++) {
+				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
+				positionInHunk++;
+			}
+
+			const overlap = Math.min(block.originalLinesCount!, block.modifiedLinesCount!);
+			for (let i = 0; i < overlap; i++) {
+				hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
+				positionInHunk++;
+			}
+
+			for (let i = 0; i < overlap; i++) {
+				hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
+				positionInHunk++;
+			}
+
+			for (let i = 0; i < Math.abs(block.originalLinesCount! - block.modifiedLinesCount!); i++) {
+				let type = DiffChangeType.Context;
+				let o = oldLineNumber + overlap + i;
+				let m = newLineNumber + overlap + i;
+				if (i + overlap >= block.originalLinesCount!) {
+					type = DiffChangeType.Add;
+					o = -1;
+				}
+				if (i + overlap >= block.modifiedLinesCount!) {
+					type = DiffChangeType.Delete;
+					m = -1;
+				}
+				hunk.diffLines.push(new DiffLine(type, o, m, positionInHunk));
+				positionInHunk++;
+			}
+
+			// Add no change lines for overflow AFTER the actual change
+			for (let i = newLineNumber + block.modifiedLinesCount!; i < overflowEndLineNumber; i++) {
+				hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
+				positionInHunk++;
+			}
+
+			break;
+		}
+		// No default
+	}
+
+	return positionInHunk;
+}
+
 export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 	const diff: DiffHunk[] = [];
 	let positionInHunk = 0;
@@ -368,67 +447,7 @@ export function getDiffHunkFromFileDiff(fileDiff: FileDiff): DiffHunk[] {
 		// 	positionInHunk++;
 		// }
 
-		switch (block.changeType) {
-			case LineDiffBlockChangeType.Add: {
-				for (let i = 0; i < block.modifiedLinesCount!; i++) {
-					hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
-					positionInHunk++;
-				}
-
-				break;
-			}
-			case LineDiffBlockChangeType.Delete: {
-				for (let i = 0; i < block.originalLinesCount!; i++) {
-					hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
-					positionInHunk++;
-				}
-
-				break;
-			}
-			case LineDiffBlockChangeType.Edit: {
-				// Add no change lines for overflow BEFORE the actual change
-				for (let i = overflowStartLineNumber; i < newLineNumber; i++) {
-					hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
-					positionInHunk++;
-				}
-
-				const overlap = Math.min(block.originalLinesCount!, block.modifiedLinesCount!);
-				for (let i = 0; i < overlap; i++) {
-					hunk.diffLines.push(new DiffLine(DiffChangeType.Delete, oldLineNumber + i, -1, positionInHunk));
-					positionInHunk++;
-				}
-
-				for (let i = 0; i < overlap; i++) {
-					hunk.diffLines.push(new DiffLine(DiffChangeType.Add, -1, newLineNumber + i, positionInHunk));
-					positionInHunk++;
-				}
-
-				for (let i = 0; i < Math.abs(block.originalLinesCount! - block.modifiedLinesCount!); i++) {
-					let type = DiffChangeType.Context;
-					let o = oldLineNumber + overlap + i;
-					let m = newLineNumber + overlap + i;
-					if (i + overlap >= block.originalLinesCount!) {
-						type = DiffChangeType.Add;
-						o = -1;
-					}
-					if (i + overlap >= block.modifiedLinesCount!) {
-						type = DiffChangeType.Delete;
-						m = -1;
-					}
-					hunk.diffLines.push(new DiffLine(type, o, m, positionInHunk));
-					positionInHunk++;
-				}
-
-				// Add no change lines for overflow AFTER the actual change
-				for (let i = newLineNumber + block.modifiedLinesCount!; i < overflowEndLineNumber; i++) {
-					hunk.diffLines.push(new DiffLine(DiffChangeType.Context, i, i, positionInHunk));
-					positionInHunk++;
-				}
-
-				break;
-			}
-			// No default
-		}
+		positionInHunk = appendBlockDiffLines(hunk, block, positionInHunk, overflowStartLineNumber, overflowEndLineNumber);
 
 		diff.push(hunk);
 	}
@@ -564,9 +583,9 @@ export function getRepositoryForFile(gitAPI: GitApiImpl, file: vscode.Uri): Repo
 // to the code across pushes; fall back to orig* only when there is no threadContext.
 export function getPositionFromThread(comment: GitPullRequestCommentThread) {
 	// General/system comment threads (verified live: e.g. vote-change system comments) come back with
-	// threadContext: null, not undefined - the `!== undefined` check let null through to an unguarded
-	// property access below.
-	if (comment.threadContext !== undefined && comment.threadContext !== null) {
+	// threadContext: null, not undefined - the API typings only admit undefined, so a loose != null
+	// check is needed to keep null from reaching the unguarded property access below.
+	if (comment.threadContext != null) {
 		return comment.threadContext.rightFileStart === undefined
 			? comment.threadContext.leftFileStart?.line
 			: comment.threadContext.rightFileStart.line;

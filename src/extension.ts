@@ -25,6 +25,7 @@ import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from './constants';
 import { handleDeepLinkUri } from './deepLinkHandler';
 import { registerBuiltinGitProvider, registerLiveShareGitProvider } from './gitProviders/api';
 import { MockGitProvider } from './gitProviders/mockGitProvider';
+import { MockRepository } from './gitProviders/mockRepository';
 import { FileTypeDecorationProvider } from './view/fileTypeDecorationProvider';
 import { getInMemPRContentProvider } from './view/inMemPRContentProvider';
 import { PullRequestChangesTreeDataProvider } from './view/prChangesTreeDataProvider';
@@ -90,7 +91,7 @@ async function init(
 	// Sort the repositories to match folders in a multiroot workspace (if possible).
 	const workspaceFolders = vscode.workspace.workspaceFolders;
 	if (workspaceFolders) {
-		repositories = repositories.sort((a, b) => {
+		repositories = repositories.toSorted((a, b) => {
 			let indexA = workspaceFolders.length;
 			let indexB = workspaceFolders.length;
 			for (let i = 0; i < workspaceFolders.length; i++) {
@@ -146,7 +147,7 @@ async function init(
 	extensionState.deepLinkProcessor = deepLinkProcessor;
 	const bufferedDeepLinkUris = [...pendingDeepLinkUris];
 	pendingDeepLinkUris.length = 0;
-	bufferedDeepLinkUris.forEach(deepLinkProcessor);
+	bufferedDeepLinkUris.forEach(uri => deepLinkProcessor(uri));
 	const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
 	await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 
@@ -244,7 +245,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	if (builtInGitProvider) {
 		context.subscriptions.push(builtInGitProvider);
 	} else {
-		const mockGitProvider = new MockGitProvider();
+		// Seed the remote here; doing it inside the MockGitProvider constructor made it an async constructor.
+		const mockRepository = new MockRepository();
+		void mockRepository.addRemote('origin', 'https://anksinha@dev.azure.com/anksinha/test/_git/test');
+		const mockGitProvider = new MockGitProvider(mockRepository);
 		context.subscriptions.push(apiImpl.registerGitProvider(mockGitProvider));
 	}
 

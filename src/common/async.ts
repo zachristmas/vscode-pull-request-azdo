@@ -28,7 +28,7 @@ export function throttle<T>(fn: () => Promise<T>): () => Promise<T> {
 		current = fn();
 
 		const clear = () => (current = undefined);
-		done(current).then(clear, clear);
+		done(current).then(clear).catch(clear);
 
 		return current;
 	};

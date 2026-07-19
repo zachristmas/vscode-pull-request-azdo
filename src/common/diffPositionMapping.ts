@@ -11,7 +11,7 @@ import { DiffChangeType, DiffHunk, DiffLine, parseDiffHunk } from './diffHunk';
  * no content, in which case it is 0. Normalize the position to be zero based.
  * @param line The line in a file from the diff header
  */
-export function getZeroBased(line: number): number {
+export function getZeroBased(line: number | undefined): number {
 	if (line === undefined || line === 0) {
 		return 0;
 	}
@@ -30,9 +30,9 @@ export function getZeroBased(line: number): number {
  */
 export function getAbsolutePosition(comment: IComment, fileDiffHunks: DiffHunk[], isBase: boolean): number {
 	let commentAbsolutePosition = -1;
-	// Ignore outdated comments
-	if (comment.position !== null) {
-		const diffLine = getDiffLineByPosition(fileDiffHunks, comment.position!);
+	// Ignore outdated comments (position is number | undefined, but null shows up at runtime too)
+	if (comment.position != null) {
+		const diffLine = getDiffLineByPosition(fileDiffHunks, comment.position);
 
 		if (diffLine) {
 			if (isBase && diffLine.type === DiffChangeType.Delete) {
@@ -164,7 +164,7 @@ export function mapOldPositionToNew(patch: string, line: number): number {
 export function mapCommentsToHead(diffHunks: DiffHunk[], localDiff: string, comments: IComment[]) {
 	for (const comment of comments) {
 		// Ignore outdated comments
-		if (comment.position === null || comment.position === undefined) {
+		if (comment.position == null) {
 			continue;
 		}
 

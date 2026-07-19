@@ -89,11 +89,12 @@ describe('PullRequestOverview', function () {
 
 			await PullRequestOverviewPanel.createOrShow(EXTENSION_PATH, pullRequestManager, prModel, workItem, userManager);
 
+			const distUri = vscode.Uri.file(path.resolve(EXTENSION_PATH, 'dist'));
 			assert.ok(
 				createWebviewPanel.calledWith(sinonMatch.string, 'Pull Request #1000', vscode.ViewColumn.One, {
 					enableScripts: true,
 					retainContextWhenHidden: true,
-					localResourceRoots: [vscode.Uri.file(path.resolve(EXTENSION_PATH, 'dist'))],
+					localResourceRoots: [distUri],
 				}),
 			);
 			assert.strictEqual(PullRequestOverviewPanel.panels.size, 1);

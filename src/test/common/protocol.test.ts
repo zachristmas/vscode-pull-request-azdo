@@ -155,10 +155,9 @@ describe('Protocol', () => {
 				expectedOwner: 'Microsoft',
 				expectedRepositoryName: 'vscode',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
 	// testRemote registers nested suites at run time; describe() conversion would newly run them.
-	// eslint-disable-next-line sonarjs/assertions-in-tests
 	it('should handle SSH remotes', () =>
 		[
 			{
@@ -189,10 +188,9 @@ describe('Protocol', () => {
 				expectedOwner: '',
 				expectedRepositoryName: 'project',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
 	// testRemote registers nested suites at run time; describe() conversion would newly run them.
-	// eslint-disable-next-line sonarjs/assertions-in-tests
 	it('should handle SCP-like remotes', () =>
 		[
 			{
@@ -230,10 +228,9 @@ describe('Protocol', () => {
 				expectedOwner: '',
 				expectedRepositoryName: 'project',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
 	// testRemote registers nested suites at run time; describe() conversion would newly run them.
-	// eslint-disable-next-line sonarjs/assertions-in-tests
 	it('should handle local remotes', () =>
 		[
 			{
@@ -250,7 +247,7 @@ describe('Protocol', () => {
 				expectedOwner: '',
 				expectedRepositoryName: '',
 			},
-		].forEach(testRemote));
+		].forEach(remote => testRemote(remote)));
 
 	describe('toString when generating github remotes', () =>
 		[

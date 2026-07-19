@@ -4,7 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 import { parse as parseConfig } from 'ssh-config';
 
-const SSH_URL_RE = /^(?:([^@:]+)@)?([^:/]+):?(.+)$/;
+// The lookahead pins the host to the exact length the old `([^:/]+):?(.+)` backtracking settled
+// on (maximal non-[:/] run, or that run minus one char when no separator follows), making the
+// split deterministic and linear instead of super-linear.
+const SSH_URL_RE = /^(?:([^@:]+)@)?([^:/]+(?=[:/]|[^:/]$)):?(.+)$/;
 const URL_SCHEME_RE = /^([a-z-]+):\/\//;
 
 export const sshParse = (url: string): Config | undefined => {
@@ -82,14 +85,13 @@ export type ConfigResolver = (config: Config) => Config;
 
 export function chainResolvers(...chain: (ConfigResolver | undefined)[]): ConfigResolver {
 	const resolvers = chain.filter(x => !!x) as ConfigResolver[];
-	return (config: Config) =>
-		resolvers.reduce(
-			(resolved, next) => ({
-				...resolved,
-				...next(resolved),
-			}),
-			config,
-		);
+	return (config: Config) => {
+		let resolved = config;
+		for (const next of resolvers) {
+			resolved = { ...resolved, ...next(resolved) };
+		}
+		return resolved;
+	};
 }
 
 export function resolverFromConfig(text: string): ConfigResolver {

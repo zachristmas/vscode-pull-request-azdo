@@ -79,6 +79,7 @@ export class RepositoriesManager implements vscode.Disposable {
 		private _telemetry: ITelemetry,
 	) {
 		this._subs = [];
+		// eslint-disable-next-line sonarjs/no-async-constructor -- fire-and-forget context-key seed; restructuring construction is out of scope
 		vscode.commands.executeCommand('setContext', ReposManagerStateContext, this._state);
 
 		this._subs.push(

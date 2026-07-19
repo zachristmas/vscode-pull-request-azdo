@@ -97,12 +97,7 @@ describe('utils', () => {
 				const promise = utils.promiseFromEvent(emitter.event, count);
 				assert.ok(hasListeners(emitter), 'should subscribe');
 				emitter.fire('hello');
-				await promise.then(
-					() => {
-						throw new Error('promise should have rejected');
-					},
-					e => assert.equal(e.message, 'the string is too damn long'),
-				);
+				await assert.rejects(promise, { message: 'the string is too damn long' });
 				assert.ok(!hasListeners(emitter), 'should unsubscribe');
 			});
 
@@ -113,12 +108,7 @@ describe('utils', () => {
 				});
 				assert.ok(hasListeners(emitter), 'should subscribe');
 				emitter.fire('hello');
-				await promise.then(
-					() => {
-						throw new Error('promise should have rejected');
-					},
-					e => assert.equal(e.message, 'kaboom'),
-				);
+				await assert.rejects(promise, { message: 'kaboom' });
 				assert.ok(!hasListeners(emitter), 'should unsubscribe');
 			});
 
@@ -129,12 +119,7 @@ describe('utils', () => {
 				});
 				assert.ok(hasListeners(emitter), 'should subscribe');
 				emitter.fire('hello');
-				await promise.then(
-					() => {
-						throw new Error('promise should have rejected');
-					},
-					e => assert.equal(e.message, 'kaboom'),
-				);
+				await assert.rejects(promise, { message: 'kaboom' });
 				assert.ok(!hasListeners(emitter), 'should unsubscribe');
 			});
 
@@ -159,10 +144,7 @@ describe('utils', () => {
 				const promise = utils.promiseFromEvent(emitter.event, door);
 				let hasResolved = false,
 					hasRejected = false;
-				promise.then(
-					() => (hasResolved = true),
-					() => (hasRejected = true),
-				);
+				promise.then(() => (hasResolved = true)).catch(() => (hasRejected = true));
 				emitter.fire('password');
 				emitter.fire('12345');
 				await tick();

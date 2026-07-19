@@ -197,6 +197,10 @@ export default tseslint.config(
 			'sonarjs/assertions-in-tests': 'error',
 			'sonarjs/constructor-for-side-effects': 'error',
 			'sonarjs/deprecation': 'error',
+			'sonarjs/different-types-comparison': 'error',
+			'sonarjs/no-async-constructor': 'error',
+			'sonarjs/prefer-regexp-exec': 'error',
+			'sonarjs/super-linear-regex': 'error',
 			'sonarjs/max-switch-cases': 'error',
 			'sonarjs/no-empty-test-file': 'error',
 			'sonarjs/no-empty-test-title': 'error',
@@ -227,6 +231,9 @@ export default tseslint.config(
 		plugins: { unicorn },
 		rules: {
 			...downgradeToWarn(unicorn.configs.recommended.rules),
+			// Name-based match hits vscode.EventEmitter (the required platform event API) and
+			// the webviews npm events shim; converting either to EventTarget is wrong here.
+			'unicorn/prefer-event-target': 'off',
 			// Demands ES2025 Iterator#toArray(): no types in the es2022 lib and no runtime
 			// support on the Node 20 extension host. The flagged [...map.values()] spreads
 			// are the correct idiom for this target.
@@ -264,8 +271,20 @@ export default tseslint.config(
 			'unicorn/consistent-compound-words': 'error',
 			'unicorn/consistent-function-scoping': 'error',
 			'unicorn/error-message': 'error',
+			'unicorn/max-nested-calls': 'error',
+			'unicorn/no-array-callback-reference': 'error',
+			'unicorn/no-array-reduce': 'error',
+			'unicorn/no-array-sort': 'error',
+			'unicorn/no-break-in-nested-loop': 'error',
 			'unicorn/no-computed-property-existence-check': 'error',
 			'unicorn/no-declarations-before-early-exit': 'error',
+			'unicorn/no-multiple-promise-resolver-calls': 'error',
+			'unicorn/no-this-outside-of-class': 'error',
+			'unicorn/no-top-level-side-effects': 'error',
+			'unicorn/prefer-add-event-listener': 'error',
+			'unicorn/prefer-iterator-helpers': 'error',
+			'unicorn/prefer-ternary': 'error',
+			'unicorn/prefer-then-catch': 'error',
 			'unicorn/no-empty-file': 'error',
 			'unicorn/no-immediate-mutation': 'error',
 			'unicorn/no-non-function-verb-prefix': 'error',

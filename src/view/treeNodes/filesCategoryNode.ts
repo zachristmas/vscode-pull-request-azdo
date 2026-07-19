@@ -22,12 +22,8 @@ export class FilesCategoryNode extends TreeNode implements vscode.TreeItem {
 		const dirNode = new DirectoryTreeNode(this, '');
 		this._fileChanges.forEach(f => dirNode.addFile(f));
 		dirNode.finalize();
-		if (dirNode.label === '') {
-			// nothing on the root changed, pull children to parent
-			this.directories = dirNode.children;
-		} else {
-			this.directories = [dirNode];
-		}
+		// when nothing on the root changed, pull children to parent
+		this.directories = dirNode.label === '' ? dirNode.children : [dirNode];
 	}
 
 	getTreeItem(): vscode.TreeItem {

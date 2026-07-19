@@ -168,7 +168,9 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 					.get<MergeMethod>('defaultMergeMethod');
 				const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 				const currentUser = this._folderRepositoryManager.getCurrentUser();
-				this._existingReviewers = (pullRequest.item.reviewers ?? []).map(convertIdentityRefWithVoteToReviewer);
+				this._existingReviewers = (pullRequest.item.reviewers ?? []).map(reviewer =>
+					convertIdentityRefWithVoteToReviewer(reviewer),
+				);
 
 				this._postMessage({
 					command: 'pr.initialize',
@@ -257,58 +259,58 @@ export class PullRequestViewProvider extends WebviewBase implements vscode.Webvi
 		}
 	}
 
-	private votePullRequest(message: IRequestMessage<number>): void {
-		this._item.submitVote(message.args).then(
-			review => {
-				this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-				//refresh the pr list as the vote changed
-				vscode.commands.executeCommand('azdopr.refreshList');
-			},
-			e => {
-				vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
-				this._throwError(message, formatError(e));
-			},
-		);
+	private async votePullRequest(message: IRequestMessage<number>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.submitVote(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Voting on pull request failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
+		//refresh the pr list as the vote changed
+		vscode.commands.executeCommand('azdopr.refreshList');
 	}
 
-	private approvePullRequest(message: IRequestMessage<string>): void {
-		this._item.submitVote(PullRequestVote.APPROVED).then(
-			review => {
-				this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-				//refresh the pr list as this one is approved
-				vscode.commands.executeCommand('azdopr.refreshList');
-			},
-			e => {
-				vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
+	private async approvePullRequest(message: IRequestMessage<string>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.submitVote(PullRequestVote.APPROVED);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
 
-				this._throwError(message, formatError(e));
-			},
-		);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
+		//refresh the pr list as this one is approved
+		vscode.commands.executeCommand('azdopr.refreshList');
 	}
 
-	private submitReview(message: IRequestMessage<string>): void {
-		this._item.createThread(message.args).then(
-			review => {
-				// TODO Do I need to update reviewer?
-				// this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Submitting review failed. ${formatError(e)}`);
-				this._throwError(message, formatError(e));
-			},
-		);
+	private async submitReview(message: IRequestMessage<string>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.createThread(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Submitting review failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		// TODO Do I need to update reviewer?
+		// this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
 	}
 
 	private async deleteBranch(message: IRequestMessage<any>) {

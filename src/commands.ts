@@ -203,32 +203,29 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(
-			'azdopr.openPullRequestInAzdo',
-			async (e: PullRequestArg) => {
-				if (!e) {
-					const activePullRequests: PullRequestModel[] = reposManager.folderManagers
-						.map(folderManager => folderManager.activePullRequest!)
-						.filter(activePR => !!activePR);
+		vscode.commands.registerCommand('azdopr.openPullRequestInAzdo', async (e: PullRequestArg) => {
+			if (!e) {
+				const activePullRequests: PullRequestModel[] = reposManager.folderManagers
+					.map(folderManager => folderManager.activePullRequest!)
+					.filter(activePR => !!activePR);
 
-					if (activePullRequests.length >= 1) {
-						const result = await chooseItem<PullRequestModel>(activePullRequests, itemValue => itemValue.url);
-						if (result) {
-							vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(result.url));
-						}
+				if (activePullRequests.length >= 1) {
+					const result = await chooseItem<PullRequestModel>(activePullRequests, itemValue => itemValue.url);
+					if (result) {
+						vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(result.url));
 					}
-				} else if (e instanceof PRNode || e instanceof DescriptionNode) {
-					vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.pullRequestModel.url));
-				} else {
-					vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.url));
 				}
+			} else if (e instanceof PRNode || e instanceof DescriptionNode) {
+				vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.pullRequestModel.url));
+			} else {
+				vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(e.url));
+			}
 
-				/* __GDPR__
+			/* __GDPR__
 			"pr.openInAzdo" : {}
 		*/
-				telemetry.sendTelemetryEvent('azdopr.openInAzdo');
-			},
-		),
+			telemetry.sendTelemetryEvent('azdopr.openInAzdo');
+		}),
 	);
 
 	const createPullRequestForActiveFolder = async (draft: boolean) => {
@@ -275,48 +272,42 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(
-			'azdopr.copyPullRequestUrl',
-			async (e?: PullRequestArg) => {
-				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
-				if (!pullRequestModel) {
-					return;
-				}
-				await vscode.env.clipboard.writeText(pullRequestModel.url);
-				vscode.window.showInformationMessage('Pull request URL copied to clipboard.');
+		vscode.commands.registerCommand('azdopr.copyPullRequestUrl', async (e?: PullRequestArg) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
+			if (!pullRequestModel) {
+				return;
+			}
+			await vscode.env.clipboard.writeText(pullRequestModel.url);
+			vscode.window.showInformationMessage('Pull request URL copied to clipboard.');
 
-				/* __GDPR__
+			/* __GDPR__
 			"azdopr.copyPullRequestUrl" : {}
 		*/
-				telemetry.sendTelemetryEvent('azdopr.copyPullRequestUrl');
-			},
-		),
+			telemetry.sendTelemetryEvent('azdopr.copyPullRequestUrl');
+		}),
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(
-			'azdopr.copyVscodeDeepLink',
-			async (e?: PullRequestArg) => {
-				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
-				if (!pullRequestModel) {
-					return;
-				}
-				const params = deepLinkParamsFromPullRequest(pullRequestModel);
-				if (!params) {
-					vscode.window.showErrorMessage(
-						'Unable to build a deep link: the organization or project of this pull request could not be determined.',
-					);
-					return;
-				}
-				await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
-				vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
+		vscode.commands.registerCommand('azdopr.copyVscodeDeepLink', async (e?: PullRequestArg) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
+			if (!pullRequestModel) {
+				return;
+			}
+			const params = deepLinkParamsFromPullRequest(pullRequestModel);
+			if (!params) {
+				vscode.window.showErrorMessage(
+					'Unable to build a deep link: the organization or project of this pull request could not be determined.',
+				);
+				return;
+			}
+			await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
+			vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
 
-				/* __GDPR__
+			/* __GDPR__
 			"azdopr.copyVscodeDeepLink" : {}
 		*/
-				telemetry.sendTelemetryEvent('azdopr.copyVscodeDeepLink');
-			},
-		),
+			telemetry.sendTelemetryEvent('azdopr.copyVscodeDeepLink');
+		}),
 	);
 
 	context.subscriptions.push(
@@ -897,7 +888,7 @@ export function registerCommands(
 			if (fileChange.comments && fileChange.comments.length) {
 				const sortedOutdatedComments = fileChange.comments
 					.filter(comment => getPositionFromThread(comment) === undefined)
-					.sort((a, b) => {
+					.toSorted((a, b) => {
 						return getPositionFromThread(a)! - getPositionFromThread(b)!;
 					});
 

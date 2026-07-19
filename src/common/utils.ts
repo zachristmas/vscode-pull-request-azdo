@@ -90,11 +90,14 @@ export function isDescendant(parent: string, descendant: string): boolean {
 }
 
 export function groupBy<T>(arr: T[], fn: (el: T) => string): { [key: string]: T[] } {
-	return arr.reduce((result, el) => {
+	// Null prototype like the original reduce seed: group keys are arbitrary strings ('__proto__' etc).
+	const result: { [key: string]: T[] } = Object.create(null);
+	for (const el of arr) {
 		const key = fn(el);
-		result[key] = [...(result[key] || []), el];
-		return result;
-	}, Object.create(null));
+		result[key] ??= [];
+		result[key].push(el);
+	}
+	return result;
 }
 
 interface HookError extends Error {
@@ -188,25 +191,20 @@ const passthrough = (value: any, resolve: (value?: any) => void) => resolve(valu
  */
 export async function promiseFromEvent<T, U>(event: Event<T>, adapter: PromiseAdapter<T, U> = passthrough): Promise<U> {
 	let subscription: Disposable;
-	return new Promise<U>(
-		(resolve, reject) =>
-			(subscription = event((value: T) => {
-				try {
-					Promise.resolve(adapter(value, resolve, reject)).catch(reject);
-				} catch (error) {
-					reject(error instanceof Error ? error : new Error(String(error)));
-				}
-			})),
-	).then(
-		(result: U) => {
-			subscription.dispose();
-			return result;
-		},
-		error => {
-			subscription.dispose();
-			throw error;
-		},
-	);
+	try {
+		return await new Promise<U>(
+			(resolve, reject) =>
+				(subscription = event((value: T) => {
+					try {
+						Promise.resolve(adapter(value, resolve, reject)).catch(reject);
+					} catch (error) {
+						reject(error instanceof Error ? error : new Error(String(error)));
+					}
+				})),
+		);
+	} finally {
+		subscription!.dispose();
+	}
 }
 
 export function dateFromNow(date: Date | string): string {
@@ -397,6 +395,22 @@ export class TernarySearchTree<E> {
 		return node ? node.value : undefined;
 	}
 
+	// Extracted from delete() so the direction switch (and its case breaks) is not nested
+	// inside the cleanup loop.
+	private clearChildReference(parent: TernarySearchTreeNode<E>, dir: -1 | 0 | 1): void {
+		switch (dir) {
+			case 1:
+				parent.left = undefined;
+				break;
+			case 0:
+				parent.mid = undefined;
+				break;
+			case -1:
+				parent.right = undefined;
+				break;
+		}
+	}
+
 	delete(key: string): void {
 		const iter = this._iter.reset(key);
 		const stack: [-1 | 0 | 1, TernarySearchTreeNode<E>][] = [];
@@ -425,17 +439,7 @@ export class TernarySearchTree<E> {
 				// clean up empty nodes
 				while (stack.length > 0 && node.isEmpty()) {
 					const [dir, parent] = stack.pop()!;
-					switch (dir) {
-						case 1:
-							parent.left = undefined;
-							break;
-						case 0:
-							parent.mid = undefined;
-							break;
-						case -1:
-							parent.right = undefined;
-							break;
-					}
+					this.clearChildReference(parent, dir);
 					node = parent;
 				}
 				break;

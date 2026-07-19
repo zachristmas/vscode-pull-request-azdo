@@ -8,6 +8,7 @@ const original = {
 };
 
 beforeEach(function () {
+	// eslint-disable-next-line unicorn/no-this-outside-of-class -- mocha hook context
 	const currentTest = this.currentTest as {
 		consoleOutputs?: string[];
 		consoleErrors?: string[];

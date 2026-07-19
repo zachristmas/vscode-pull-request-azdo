@@ -30,7 +30,8 @@ export class FileTypeDecorationProvider implements vscode.FileDecorationProvider
 
 		const prParams = fromPRUri(uri);
 
-		if (prParams && prParams.status !== undefined) {
+		// PRUriParams types status as required, but the JSON-parsed uri query may omit it at runtime.
+		if (prParams && prParams.status != null) {
 			return {
 				propagate: false,
 				badge: this.letter(prParams.status),

@@ -21,6 +21,7 @@ describe('AzdoRepository', function () {
 	let telemetry: MockTelemetry;
 	let fileReviewedStatusService: SinonStubbedInstance<FileReviewedStatusService>;
 
+	// eslint-disable-next-line unicorn/no-this-outside-of-class -- mocha suite context
 	this.timeout(1_000_000);
 
 	before(function () {

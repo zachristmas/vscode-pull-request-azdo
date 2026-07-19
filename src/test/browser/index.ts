@@ -2,6 +2,7 @@
 // This file is providing the test runner to use when running extension tests.
 import * as vscode from 'vscode';
 
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- installs the browser mocha global before mocha.setup(); must run at module load
 require('mocha/mocha');
 
 import { EXTENSION_ID } from '../../constants';
@@ -19,7 +20,7 @@ async function runAllExtensionTests(testsRoot: string, clb: (error: Error | null
 	});
 
 	try {
-		const importAll = (r: __WebpackModuleApi.RequireContext) => r.keys().forEach(r);
+		const importAll = (r: __WebpackModuleApi.RequireContext) => r.keys().forEach(key => r(key));
 		// require.context is a webpack-only extension; @types/node's require wins in this tsconfig.
 		importAll((require as NodeRequire & __WebpackModuleApi.RequireFunction).context('../', true, /\.test$/));
 	} catch (e) {

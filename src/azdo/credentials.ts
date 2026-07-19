@@ -136,7 +136,7 @@ export class CredentialStore implements vscode.Disposable {
 		}
 
 		// Prefer origin, then upstream, then anything that parses as an ADO remote
-		const ordered = [...remotes].sort((a, b) => rankRemoteForOrgInference(a) - rankRemoteForOrgInference(b));
+		const ordered = remotes.toSorted((a, b) => rankRemoteForOrgInference(a) - rankRemoteForOrgInference(b));
 
 		for (const remote of ordered) {
 			Logger.appendLine('Inferring org config from url: ' + remote.url, CredentialStore.ID);

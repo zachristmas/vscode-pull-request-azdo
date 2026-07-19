@@ -19,6 +19,8 @@ export function Root({ children }: { children: (pr: PullRequest) => JSX.Element 
 	const ctx = useContext(PullRequestContext);
 	const [pr, setPR] = useState<PullRequest>(ctx.pr);
 	useEffect(() => {
+		// PRContext is a plain class whose public API is this onchange property, not an EventTarget.
+		// eslint-disable-next-line unicorn/prefer-add-event-listener
 		ctx.onchange = setPR;
 		setPR(ctx.pr);
 	}, []);

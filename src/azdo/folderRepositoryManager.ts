@@ -173,7 +173,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	private computeAllGitHubRemotes(): Promise<Remote[]> {
 		const remotes = parseRepositoryRemotes(this.repository);
 		const potentialRemotes = remotes.filter(remote => remote.host);
-		return Promise.all(potentialRemotes.map(remote => this._githubManager.isAzdo(remote.gitProtocol.normalizeUri()!)))
+		return Promise.all(potentialRemotes.map(remote => this._githubManager.isAzdo(remote.gitProtocol.normalizeUri())))
 			.then(results => potentialRemotes.filter((_, index, __) => results[index]))
 			.catch(e => {
 				Logger.appendLine(`Resolving Azdo remotes failed: ${e}`, FolderRepositoryManager.ID);
@@ -279,6 +279,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 								prRelatedusers = getRelatedUsersFromPullrequest(lastPullRequest!.item!, threads, commits);
 								resolve();
+								return;
 							}
 
 							resolve();
@@ -301,6 +302,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 									const blameLines = blames.split('\n');
 
 									for (const line of blameLines) {
+										// eslint-disable-next-line sonarjs/super-linear-regex -- capture must span to the LAST date token; no equivalent linear rewrite exists, and input is local `git blame` output, not attacker-controlled
 										const matches = /^\w{11} \S*\s*\((.*)\s*\d{4}\-/.exec(line);
 
 										if (matches && matches.length === 2) {
@@ -345,10 +347,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 								secondMap[user.id!] = true;
 
-								let priority = 2;
-								if (fileRelatedUsersNames[user.id!] || (user.name && fileRelatedUsersNames[user.name])) {
-									priority = 1;
-								}
+								let priority =
+									fileRelatedUsersNames[user.id!] || (user.name && fileRelatedUsersNames[user.name]) ? 1 : 2;
 
 								if (Object.hasOwn(prRelatedUsersMap, user.id!)) {
 									priority = 0;
@@ -1004,7 +1004,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	}
 
 	findRepo(where: Predicate<AzdoRepository>): AzdoRepository | undefined {
-		return this._azdoRepositories.find(where);
+		return this._azdoRepositories.find(repo => where(repo));
 	}
 
 	get upstreamRef(): UpstreamRef | undefined {
@@ -1146,7 +1146,9 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 		allConfigs.forEach(config => {
 			const key = config.key;
-			const matches = /^branch\.(.*)\.(.*)$/.exec(key);
+			// `[^.]*` pins the config-key suffix to the last dot; greedy `(.*)` split there anyway,
+			// but the exclusive class removes the super-linear backtracking.
+			const matches = /^branch\.(.*)\.([^.]*)$/.exec(key);
 
 			if (matches && matches.length === 3) {
 				const branchName = matches[1];
@@ -1234,7 +1236,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 		newConfigs.forEach(config => {
 			const key = config.key;
-			let matches = /^branch\.(.*)\.(.*)$/.exec(key);
+			// See getBranchDeletionItems: `[^.]*` keeps the last-dot split while staying linear.
+			let matches = /^branch\.(.*)\.([^.]*)$/.exec(key);
 
 			if (matches && matches.length === 3) {
 				const branchName = matches[1];
@@ -1251,7 +1254,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 				}
 			}
 
-			matches = /^remote\.(.*)\.(.*)$/.exec(key);
+			matches = /^remote\.(.*)\.([^.]*)$/.exec(key);
 
 			if (matches && matches.length === 3) {
 				const remoteName = matches[1];

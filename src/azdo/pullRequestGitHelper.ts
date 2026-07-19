@@ -53,7 +53,7 @@ export const PullRequestGitHelper = {
 		await repository.checkout(localBranchName);
 		// set remote tracking branch for the local branch
 		await repository.setBranchUpstream(localBranchName, `refs/remotes/${remoteName}/${pullRequest.head.ref}`);
-		await this.unshallow(repository);
+		await PullRequestGitHelper.unshallow(repository);
 		PullRequestGitHelper.associateBranchWithPullRequest(repository, pullRequest, localBranchName);
 	},
 
@@ -96,7 +96,7 @@ export const PullRequestGitHelper = {
 			// create branch
 			await repository.createBranch(branchName, true, trackedBranch.commit);
 			await repository.setBranchUpstream(branchName, trackedBranchName);
-			await this.unshallow(repository);
+			await PullRequestGitHelper.unshallow(repository);
 		}
 
 		await PullRequestGitHelper.associateBranchWithPullRequest(repository, pullRequest, branchName);
@@ -235,7 +235,9 @@ export const PullRequestGitHelper = {
 			return;
 		}
 
-		const matches = /(.*)#(.*)#(.*)/g.exec(value);
+		// Anchors + `[^#]*` pin the split to the last two `#`s, which is where the old greedy
+		// `(.*)#(.*)#(.*)` landed anyway, without its super-linear backtracking.
+		const matches = /^(.*)#([^#]*)#([^#]*)$/.exec(value);
 		if (matches && matches.length === 4) {
 			const [, owner, repo, prNumber] = matches;
 			return {
@@ -255,7 +257,7 @@ export const PullRequestGitHelper = {
 		branchName: string,
 	): Promise<PullRequestMetadata | undefined> {
 		try {
-			const configKey = this.getMetadataKeyForBranch(branchName);
+			const configKey = PullRequestGitHelper.getMetadataKeyForBranch(branchName);
 			const configValue = await repository.getConfig(configKey);
 			return PullRequestGitHelper.parsePullRequestMetadata(configValue);
 		} catch {

@@ -33,9 +33,9 @@ export const Timeline = ({ threads, currentUser }: { threads: GitPullRequestComm
 		{/* UX-03: newest-first is deliberate (matches ADO web) and pairs with the composer sitting ABOVE
 		    the timeline (overview.tsx) - a new comment appears directly under the box. Do not "fix" the
 		    ordering to oldest-first without also moving the composer to the bottom. */}
-		{[...threads]
+		{threads
 			// valueOf() tolerates both real Date instances and the serialized strings the host sends
-			.sort(
+			.toSorted(
 				(a, b) =>
 					new Date(b.publishedDate?.valueOf() ?? NaN).getTime() -
 					new Date(a.publishedDate?.valueOf() ?? NaN).getTime(),

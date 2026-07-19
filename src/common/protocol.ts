@@ -48,6 +48,7 @@ export class Protocol {
 			}
 		} catch {
 			Logger.appendLine(`Failed to parse '${uriString}'`);
+			// eslint-disable-next-line sonarjs/no-async-constructor -- fire-and-forget user warning; Protocol is constructed during remote parsing everywhere
 			vscode.window.showWarningMessage(
 				`Unable to parse remote '${uriString}'. Please check that it is correctly formatted.`,
 			);
@@ -100,7 +101,9 @@ export class Protocol {
 
 	getHostName(authority: string) {
 		// <username>:<password>@<authority>:<port>
-		const matches = /^(?:.*:?@)?([^:]*)(?::.*)?$/.exec(authority);
+		// `(?:[^@]*@)*` consumes deterministically through the LAST `@`, exactly where the old
+		// greedy `(?:.*:?@)?` ended up, but without its super-linear backtracking.
+		const matches = /^(?:[^@]*@)*([^:@]*)(?::.*)?$/.exec(authority);
 
 		if (matches && matches.length >= 2) {
 			// normalize to fix #903.
@@ -146,10 +149,7 @@ export class Protocol {
 			return this.url;
 		}
 
-		let scheme = 'https';
-		if (this.url && (this.url.scheme === 'http' || this.url.scheme === 'https')) {
-			scheme = this.url.scheme;
-		}
+		const scheme = this.url && (this.url.scheme === 'http' || this.url.scheme === 'https') ? this.url.scheme : 'https';
 
 		try {
 			return vscode.Uri.parse(`${scheme}://${this.host.toLocaleLowerCase()}/${this.nameWithOwner.toLocaleLowerCase()}`);

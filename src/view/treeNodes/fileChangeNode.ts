@@ -174,8 +174,9 @@ export class FileChangeNode extends ViewedStateFileNode implements vscode.TreeIt
 			this.fileName,
 			reviewThreadsForNode.length > 0,
 		);
-		/* Some comments are attached to the file and have not reference/selection in the content. Need to be removed here. */
-		reviewThreadsForNode = reviewThreadsForNode.filter(thread => thread.line !== undefined);
+		/* Some comments are attached to the file and have not reference/selection in the content. Need to be removed here.
+		   IReviewThread types line as a required number, but file-level threads carry no line at runtime. */
+		reviewThreadsForNode = reviewThreadsForNode.filter(thread => thread.line != null);
 
 		if (reviewThreadsForNode.length) {
 			reviewThreadsForNode.sort((a, b) => a.line - b.line);

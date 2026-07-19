@@ -183,8 +183,10 @@ export function createPRUris(pr: AzdoPullRequestModel, folderManager: FolderRepo
 		fileChange.status === VersionControlChangeType.Delete ? fileChange.previous_filename! : fileChange.filename;
 	// Falls back to the head-side name for added files so the base URI stays resolvable (#109).
 	const parentFileName = fileChange.previous_filename || fileName;
+	const headFilePath = pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName));
+	const parentFilePath = pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName));
 	headUri = toPRUriAzdo(
-		Uri.file(pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(fileName))),
+		Uri.file(headFilePath),
 		pr,
 		pr.base.sha,
 		headCommit,
@@ -193,7 +195,7 @@ export function createPRUris(pr: AzdoPullRequestModel, folderManager: FolderRepo
 		getGitChangeTypeFromVersionControlChangeType(fileChange.status),
 	);
 	baseUri = toPRUriAzdo(
-		Uri.file(pathUtils.resolve(folderManager.repository.rootUri.fsPath, removeLeadingSlash(parentFileName))),
+		Uri.file(parentFilePath),
 		pr,
 		pr.base.sha,
 		headCommit,

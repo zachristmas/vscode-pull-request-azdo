@@ -270,7 +270,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				.get<MergeMethod>('defaultMergeMethod');
 			const defaultMergeMethod = getDefaultMergeMethod(mergeMethodsAvailability, preferredMergeMethod);
 
-			this._existingReviewers = requestedReviewers?.map(convertIdentityRefWithVoteToReviewer) ?? [];
+			this._existingReviewers = requestedReviewers?.map(reviewer => convertIdentityRefWithVoteToReviewer(reviewer)) ?? [];
 
 			Logger.debug('pr.initialize', PullRequestOverviewPanel.ID);
 			this._postMessage({
@@ -933,65 +933,65 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		}
 	}
 
-	private votePullRequest(message: IRequestMessage<number>): void {
-		this._item.submitVote(message.args).then(
-			review => {
-				this.updateReviewers(review);
-				this._replyMessage(message, {
-					review: review,
-					reviewers: this._existingReviewers,
-				});
-				//refresh the pr list as this one is approved
-				vscode.commands.executeCommand('azdopr.refreshList');
-			},
-			e => {
-				vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
+	private async votePullRequest(message: IRequestMessage<number>): Promise<void> {
+		let review;
+		try {
+			review = await this._item.submitVote(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Approving pull request failed. ${formatError(e)}`);
 
-				this._throwError(message, formatError(e));
-			},
-		);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this.updateReviewers(review);
+		this._replyMessage(message, {
+			review: review,
+			reviewers: this._existingReviewers,
+		});
+		//refresh the pr list as this one is approved
+		vscode.commands.executeCommand('azdopr.refreshList');
 	}
 
-	private createThread(message: IRequestMessage<string>): void {
-		this._item.createThread(message.args).then(
-			thread => {
-				this._replyMessage(message, {
-					thread: thread,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Creating thread failed. ${formatError(e)}`);
-				this._throwError(message, formatError(e));
-			},
-		);
+	private async createThread(message: IRequestMessage<string>): Promise<void> {
+		let thread;
+		try {
+			thread = await this._item.createThread(message.args);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Creating thread failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this._replyMessage(message, {
+			thread: thread,
+		});
 	}
 
-	private replyThread(message: IRequestMessage<{ text: string; threadId: number }>): void {
-		this._item.createCommentOnThread(message.args.threadId, message.args.text).then(
-			result => {
-				this._replyMessage(message, {
-					comment: result,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Commenting on thread failed. ${formatError(e)}`);
-				this._throwError(message, formatError(e));
-			},
-		);
+	private async replyThread(message: IRequestMessage<{ text: string; threadId: number }>): Promise<void> {
+		let result;
+		try {
+			result = await this._item.createCommentOnThread(message.args.threadId, message.args.text);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Commenting on thread failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this._replyMessage(message, {
+			comment: result,
+		});
 	}
 
-	private changeThreadStatus(message: IRequestMessage<{ status: number; threadId: number }>): void {
-		this._item.updateThreadStatus(message.args.threadId, message.args.status).then(
-			result => {
-				this._replyMessage(message, {
-					thread: result,
-				});
-			},
-			e => {
-				vscode.window.showErrorMessage(`Updating thread status failed. ${formatError(e)}`);
-				this._throwError(message, formatError(e));
-			},
-		);
+	private async changeThreadStatus(message: IRequestMessage<{ status: number; threadId: number }>): Promise<void> {
+		let result;
+		try {
+			result = await this._item.updateThreadStatus(message.args.threadId, message.args.status);
+		} catch (e) {
+			vscode.window.showErrorMessage(`Updating thread status failed. ${formatError(e)}`);
+			this._throwError(message, formatError(e));
+			return;
+		}
+		this._replyMessage(message, {
+			thread: result,
+		});
 	}
 
 	private editComment(message: IRequestMessage<{ comment: Comment; threadId: number; text: string }>) {

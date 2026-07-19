@@ -102,9 +102,10 @@ export class GitApiImpl implements API, IGit, vscode.Disposable {
 	}
 
 	private _updateReposContext() {
-		const reposCount = [...this._providers.values()].reduce((prev, current) => {
-			return prev + current.repositories.length;
-		}, 0);
+		let reposCount = 0;
+		for (const provider of this._providers.values()) {
+			reposCount += provider.repositories.length;
+		}
 		vscode.commands.executeCommand('setContext', 'azdoOpenRepositoryCount', reposCount);
 	}
 

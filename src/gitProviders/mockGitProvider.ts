@@ -31,10 +31,9 @@ export class MockGitProvider implements IGit, vscode.Disposable {
 
 	public constructor(repository?: Repository) {
 		this._disposables = [];
+		// Callers that need a seeded remote pass in a pre-configured repository; kicking off the
+		// async addRemote here made this an async constructor.
 		this._mockRepository = repository ?? new MockRepository();
-		if (!repository) {
-			this._mockRepository.addRemote('origin', 'https://anksinha@dev.azure.com/anksinha/test/_git/test');
-		}
 		this._onDidCloseRepository.fire(this._mockRepository);
 		this._onDidOpenRepository.fire(this._mockRepository);
 	}
