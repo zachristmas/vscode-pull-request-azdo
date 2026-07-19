@@ -142,20 +142,15 @@ export class PRNode extends TreeNode {
 				);
 			}
 
-			// The review manager will register a document comment's controller, so the node does not need to
-			if (!this.pullRequestModel.equals(this._folderReposManager.activePullRequest)) {
-				if (!this._commentController) {
-					await this.resolvePRCommentController();
-				}
-
-				// await this.refreshExistingPREditors(vscode.window.visibleTextEditors, true);
-				//await this.pullRequestModel.validateDraftMode();
-				// await this.refreshContextKey(vscode.window.activeTextEditor);
-			} else {
-				// await this.pullRequestModel.azdoRepository.ensureCommentsController();
-				// this.pullRequestModel.azdoRepository.commentsHandler!.clearCommentThreadCache(
-				// 	this.pullRequestModel.getPullRequestId(),
-				// );
+			// Files opened from the tree always diff on the pr_azdo scheme (toPRUriAzdo in
+			// resolveFileChanges), and only the PullRequestCommentController covers that scheme. The
+			// review manager's ReviewCommentController (registered on checkout) only owns the
+			// workspace-file (file:) and review_azdo editors, so a checked-out PR's tree-opened diff
+			// showed no comments. Register the pr_azdo controller regardless of checkout state - it
+			// filters to pr_azdo editors (getPREditors), so it never double-registers threads on the
+			// file:/review_azdo editors the ReviewCommentController owns.
+			if (!this._commentController) {
+				await this.resolvePRCommentController();
 			}
 
 			const result: TreeNode[] = [descriptionNode];
