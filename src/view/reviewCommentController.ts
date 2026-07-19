@@ -422,7 +422,10 @@ export class ReviewCommentController
 				return await this.getWorkspaceFileCommentingRanges(document.uri, matchedFile);
 			}
 
-			return [];
+			// Fall through to undefined (decline) rather than claim ([]) a workspace file that is not part
+			// of the checked-out PR's changes. This keeps the extension's commenting-range footprint to
+			// exactly its own schemes (review_azdo) plus the active PR's changed files, minimizing overlap
+			// with a coexisting comment extension (e.g. GitHub Pull Requests) on unrelated workspace docs.
 		}
 	}
 
