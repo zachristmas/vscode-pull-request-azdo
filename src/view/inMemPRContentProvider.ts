@@ -90,39 +90,32 @@ export async function provideDocumentContentForChangeModel(
 			return '';
 		}
 	} else {
+		let commit: string;
+		let originalFileName: string | undefined;
 		if (fileChange.status === GitChangeType.ADD) {
-			const originalFileName = fileChange.fileName;
-			const originalFilePath = vscode.Uri.joinPath(folderReposManager.repository.rootUri, originalFileName!);
-			const commit = params.headCommit;
-			const originalContent = await folderReposManager.repository.show(commit, originalFilePath.fsPath);
-			return originalContent;
+			commit = params.headCommit;
+			originalFileName = fileChange.fileName;
 		} else if (fileChange.status === GitChangeType.RENAME) {
-			let commit = params.baseCommit;
-			let originalFileName = fileChange.previousFileName;
-			if (!params.isBase) {
+			if (params.isBase) {
+				commit = params.baseCommit;
+				originalFileName = fileChange.previousFileName;
+			} else {
 				commit = params.headCommit;
 				originalFileName = fileChange.fileName;
 			}
-
-			const originalFilePath = vscode.Uri.joinPath(folderReposManager.repository.rootUri, originalFileName!);
-			const originalContent = await folderReposManager.repository.show(commit, originalFilePath.fsPath);
-			return originalContent;
 		} else {
-			const originalFileName =
-				fileChange.status === GitChangeType.DELETE ? fileChange.previousFileName : fileChange.fileName;
-			const originalFilePath = vscode.Uri.joinPath(folderReposManager.repository.rootUri, originalFileName!);
-			let commit = params.baseCommit;
-			if (!params.isBase) {
-				commit = params.headCommit;
-			}
-			const originalContent = await folderReposManager.repository.show(commit, originalFilePath.fsPath);
-			return originalContent;
-			// if (params.isBase) {
-			// 	return originalContent;
-			// } else {
-			// 	return getModifiedContentFromDiffHunkAzdo(originalContent, fileChange.diffHunks);
-			// }
+			commit = params.isBase ? params.baseCommit : params.headCommit;
+			originalFileName = fileChange.status === GitChangeType.DELETE ? fileChange.previousFileName : fileChange.fileName;
 		}
+
+		const originalFilePath = vscode.Uri.joinPath(folderReposManager.repository.rootUri, originalFileName!);
+		const originalContent = await folderReposManager.repository.show(commit, originalFilePath.fsPath);
+		return originalContent;
+		// if (params.isBase) {
+		// 	return originalContent;
+		// } else {
+		// 	return getModifiedContentFromDiffHunkAzdo(originalContent, fileChange.diffHunks);
+		// }
 	}
 
 	return '';

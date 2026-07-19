@@ -23,6 +23,14 @@ class AzdoOrgConfig {
 	constructor(public orgUrl: string, public projectName: string) {}
 }
 
+// Ordering used by inferOrgConfigFromGitRemote: origin first, then upstream, then the rest.
+const rankRemoteForOrgInference = (r: Remote): number => {
+	if (r.remoteName === 'origin') {
+		return 0;
+	}
+	return r.remoteName === 'upstream' ? 1 : 2;
+};
+
 export class Azdo {
 	private _authHandler: IRequestHandler;
 	public connection: azdev.WebApi;
@@ -128,15 +136,7 @@ export class CredentialStore implements vscode.Disposable {
 		}
 
 		// Prefer origin, then upstream, then anything that parses as an ADO remote
-		const ordered = [...remotes].sort((a, b) => {
-			const rank = (r: Remote) => {
-				if (r.remoteName === 'origin') {
-					return 0;
-				}
-				return r.remoteName === 'upstream' ? 1 : 2;
-			};
-			return rank(a) - rank(b);
-		});
+		const ordered = [...remotes].sort((a, b) => rankRemoteForOrgInference(a) - rankRemoteForOrgInference(b));
 
 		for (const remote of ordered) {
 			Logger.appendLine('Inferring org config from url: ' + remote.url, CredentialStore.ID);

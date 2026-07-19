@@ -13,14 +13,13 @@ import gfm from 'remark-gfm';
 import { Dropdown } from './dropdown';
 import { commentIcon, editIcon } from './icon';
 import { nbsp, Spaced } from './space';
-import Timestamp from './timestamp';
+import { Timestamp } from './timestamp';
 import { AuthorLink, Avatar } from './user';
 import { PullRequestVote } from '../../src/azdo/interface';
 import { PullRequest, ReviewType } from '../common/cache';
 import PullRequestContext from '../common/context';
 import emitter from '../common/events';
 import { useStateProp } from '../common/hooks';
- 
 
 const { useCallback, useContext, useEffect, useRef, useState } = React;
 export type Props = Partial<Comment> & {
@@ -93,11 +92,11 @@ export function CommentView(comment: Props) {
 }
 
 type CommentBoxProps = {
-	for: Partial<Comment>;
-	header?: React.ReactChild;
-	onMouseEnter?: any;
-	onMouseLeave?: any;
-	children?: any;
+	readonly for: Partial<Comment>;
+	readonly header?: React.ReactChild;
+	readonly onMouseEnter?: any;
+	readonly onMouseLeave?: any;
+	readonly children?: any;
 };
 
 function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children }: CommentBoxProps) {
@@ -140,10 +139,10 @@ type FormInputSet = {
 };
 
 type EditCommentProps = {
-	id: number;
-	body: string;
-	onCancel: () => void;
-	onSave: (body: string) => Promise<any>;
+	readonly id: number;
+	readonly body: string;
+	readonly onCancel: () => void;
+	readonly onSave: (body: string) => Promise<any>;
 };
 
 // UX-03: surface the composer affordances. The Cmd/Ctrl+Enter submit handler already exists on every
@@ -276,8 +275,8 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 };
 
 export type ReplyToThreadProps = {
-	onCancel: () => void;
-	onSave: (body: string) => Promise<any>;
+	readonly onCancel: () => void;
+	readonly onSave: (body: string) => Promise<any>;
 };
 
 export function ReplyToThread({ onCancel, onSave }: ReplyToThreadProps) {

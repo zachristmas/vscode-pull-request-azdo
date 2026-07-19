@@ -8,12 +8,13 @@ const ID = 'AvatarCache';
 // webviews fetch image URLs without credentials. We fetch avatars through the
 // authenticated connection and hand out data: URIs instead.
 
-let connection: WebApi | undefined;
+// Module singleton kept in an object so functions mutate a property, not a top-level binding.
+const state: { connection: WebApi | undefined } = { connection: undefined };
 const cache = new Map<string, string>();
 const pending = new Map<string, Promise<string | undefined>>();
 
 export function initAvatarCache(conn: WebApi): void {
-	connection = conn;
+	state.connection = conn;
 	cache.clear();
 	pending.clear();
 }
@@ -40,14 +41,14 @@ export async function fetchAvatarAsDataUri(url: string | undefined): Promise<str
 	if (hit) {
 		return hit;
 	}
-	if (!connection) {
+	if (!state.connection) {
 		return undefined;
 	}
 	let inflight = pending.get(url);
 	if (!inflight) {
 		inflight = (async () => {
 			try {
-				const res = await connection!.rest.client.get(url);
+				const res = await state.connection!.rest.client.get(url);
 				if (res.message.statusCode !== 200) {
 					Logger.debug(`Avatar fetch failed (${res.message.statusCode}): ${url}`, ID);
 					return;
@@ -100,8 +101,7 @@ export async function resolveAvatarsDeep(value: any, depth: number = 12, seen?: 
 		return;
 	}
 	const tasks: Promise<void>[] = [];
-	for (const key of Object.keys(value)) {
-		const v = value[key];
+	for (const [key, v] of Object.entries(value)) {
 		if (typeof v === 'string') {
 			const isAvatarKey = AVATAR_KEYS.has(key) || (key === 'href' && AVATAR_HREF_PATTERN.test(v));
 			if (isAvatarKey && /^https?:/i.test(v)) {

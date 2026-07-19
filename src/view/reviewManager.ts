@@ -704,7 +704,7 @@ export class ReviewManager {
 
 	private async getRemote(
 		potentialTargetRemotes: Remote[],
-		placeHolder: string,
+		placeholder: string,
 		defaultUpstream?: RemoteQuickPickItem,
 	): Promise<RemoteQuickPickItem | undefined> {
 		if (!potentialTargetRemotes.length) {
@@ -743,7 +743,7 @@ export class ReviewManager {
 
 		const selected: RemoteQuickPickItem | undefined = await vscode.window.showQuickPick<RemoteQuickPickItem>(picks, {
 			ignoreFocusOut: true,
-			placeHolder: placeHolder,
+			placeHolder: placeholder,
 		});
 
 		if (!selected) {
@@ -1005,19 +1005,18 @@ export class ReviewManager {
 						title = nameResult;
 				}
 
-				switch (pullRequestDescriptionMethod) {
-					case PullRequestDescriptionSourceEnum.Custom:
-						const descriptionResult = await vscode.window.showInputBox({
-							value: description.replaceAll(/\n+/g, ' '),
-							ignoreFocusOut: true,
-							prompt: `Enter PR description`,
-						});
+				if (pullRequestDescriptionMethod === PullRequestDescriptionSourceEnum.Custom) {
+					const descriptionResult = await vscode.window.showInputBox({
+						value: description.replaceAll(/\n+/g, ' '),
+						ignoreFocusOut: true,
+						prompt: `Enter PR description`,
+					});
 
-						description = descriptionResult || '';
+					description = descriptionResult || '';
 				}
 
 				// ADO's create API takes refs on one repository, not GitHub's owner:branch head/base pair.
-				const createParams: GitPullRequest = {
+				const creationParams: GitPullRequest = {
 					sourceRefName: `refs/heads/${branchName}`,
 					targetRefName: `refs/heads/${target}`,
 					title,
@@ -1025,7 +1024,7 @@ export class ReviewManager {
 					isDraft: draft,
 				};
 
-				const pullRequestModel = await this._folderRepoManager.createPullRequest(headRemote.remoteName, createParams);
+				const pullRequestModel = await this._folderRepoManager.createPullRequest(headRemote.remoteName, creationParams);
 
 				if (pullRequestModel) {
 					progress.report({ increment: 30, message: `Pull Request #${pullRequestModel.getPullRequestId()} Created` });

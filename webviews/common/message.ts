@@ -46,7 +46,7 @@ export class MessageHandler {
 			// UI) pending forever, and the 3s status/policy polls grow pendingReplies unboundedly in
 			// every retained tab during an outage.
 			const timeout = setTimeout(() => {
-				if (!this.pendingReplies[req]) {
+				if (!Object.hasOwn(this.pendingReplies, req)) {
 					return;
 				}
 

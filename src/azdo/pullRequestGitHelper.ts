@@ -8,7 +8,7 @@
  */
 
 import { IResolvedPullRequestModel, PullRequestModel } from './pullRequestModel';
-import { Branch, Repository } from '../api/api';
+import { Repository } from '../api/api';
 import Logger from '../common/logger';
 import { Protocol } from '../common/protocol';
 import { parseRepositoryRemotes, Remote } from '../common/remote';
@@ -70,10 +70,9 @@ export const PullRequestGitHelper = {
 
 		const branchName = pullRequest.head.ref;
 		const remoteName = remote.remoteName;
-		let branch: Branch;
 
 		try {
-			branch = await repository.getBranch(branchName);
+			const branch = await repository.getBranch(branchName);
 			Logger.debug(`Checkout ${branchName}`, PullRequestGitHelper.ID);
 			await repository.checkout(branchName);
 

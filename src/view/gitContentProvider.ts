@@ -40,7 +40,7 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
 		try {
 			content = await repository.show(commit, absolutePath);
 			if (!content) {
-				throw new Error();
+				throw new Error('Empty content returned from git show; falling back.');
 			}
 		} catch {
 			content = await this._fallback(uri);

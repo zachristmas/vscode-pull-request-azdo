@@ -122,7 +122,9 @@ class LiveShareRepositoryProxyHandler {
 	constructor() {}
 
 	get(obj: any, prop: any) {
-		if (prop in obj) {
+		// Reflect.has keeps the prototype chain lookup that the `in` operator performed here;
+		// Object.hasOwn would miss inherited members.
+		if (Reflect.has(obj, prop)) {
 			return obj[prop];
 		}
 

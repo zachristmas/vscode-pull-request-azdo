@@ -248,7 +248,6 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				policies,
 			] = result;
 			const canEditPr = pullRequest?.canEdit();
-			const requestedReviewers = pullRequestModel.item.reviewers;
 			if (!pullRequest) {
 				throw new Error(
 					`Fail to resolve Pull Request #${pullRequestModel.getPullRequestId()} in ${pullRequestModel.remote.owner}/${
@@ -256,6 +255,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					}`,
 				);
 			}
+			const requestedReviewers = pullRequestModel.item.reviewers;
 
 			this._item = pullRequest;
 			this._repositoryDefaultBranch = defaultBranch!;
@@ -361,6 +361,11 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		if (result !== this.MESSAGE_UNHANDLED) {
 			return;
 		}
+		// Handled before the switch to keep the switch under the max-switch-cases lint limit.
+		if (message.command === 'alert') {
+			vscode.window.showErrorMessage(message.args);
+			return;
+		}
 		switch (message.command) {
 			case 'pr.checkout':
 				return this.checkoutPullRequest(message);
@@ -440,9 +445,6 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return;
 			case 'pr.debug':
 				return this.webviewDebug(message);
-			case 'alert':
-				vscode.window.showErrorMessage(message.args);
-				return;
 			default:
 				// Never drop a message silently: an unhandled command leaves the webview's awaited
 				// postMessage promise pending forever. Mirror the sidebar host's throwing default. (item 1e)
@@ -720,7 +722,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	private async openDiff(message: IRequestMessage<{ thread: GitPullRequestCommentThread }>): Promise<void> {
 		try {
 			const thread = message.args.thread;
-			return PullRequestModel.openDiffFromComment(this._folderRepositoryManager, this._item, thread);
+			return await PullRequestModel.openDiffFromComment(this._folderRepositoryManager, this._item, thread);
 		} catch (e) {
 			Logger.appendLine(`Open diff view failed: ${formatError(e)}`, PullRequestOverviewPanel.ID);
 		}
@@ -1040,7 +1042,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	}
 	private editTitle(message: IRequestMessage<{ text: string }>) {
 		this._item
-			.updatePullRequest(message.args.text, undefined)
+			.updatePullRequest(message.args.text)
 			.then(result => {
 				this._replyMessage(message, { body: result.description, bodyHTML: result.description });
 			})

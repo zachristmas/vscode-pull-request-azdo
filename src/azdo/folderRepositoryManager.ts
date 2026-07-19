@@ -289,9 +289,10 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								try {
 									Logger.debug('git blame and parse users', FolderRepositoryManager.ID);
 									const fsPath = path.resolve(activeTextEditors[0].document.uri.fsPath);
+									const cachedBlames = this._gitBlameCache[fsPath];
 									let blames: string | undefined;
-									if (this._gitBlameCache[fsPath]) {
-										blames = this._gitBlameCache[fsPath];
+									if (cachedBlames) {
+										blames = cachedBlames;
 									} else {
 										blames = await this.repository.blame(fsPath);
 										this._gitBlameCache[fsPath] = blames;
@@ -315,20 +316,20 @@ export class FolderRepositoryManager implements vscode.Disposable {
 							resolve();
 						});
 
-						const getMentionableUsersPromise = new Promise<void>(async resolve => {
+						const mentionableUsersPromise = new Promise<void>(async resolve => {
 							Logger.debug('get mentionable users', FolderRepositoryManager.ID);
 							mentionableUsers = await this.getMentionableUsers();
 							resolve();
 						});
 
-						await Promise.all([prRelatedUsersPromise, fileRelatedUsersNamesPromise, getMentionableUsersPromise]);
+						await Promise.all([prRelatedUsersPromise, fileRelatedUsersNamesPromise, mentionableUsersPromise]);
 
 						cachedUsers = [];
 						const prRelatedUsersMap: { [key: string]: { login: string; name?: string; email?: string } } = {};
 						Logger.debug('prepare user suggestions', FolderRepositoryManager.ID);
 
 						prRelatedusers.forEach(user => {
-							if (!prRelatedUsersMap[user.login]) {
+							if (!Object.hasOwn(prRelatedUsersMap, user.login)) {
 								prRelatedUsersMap[user.login] = user;
 							}
 						});
@@ -338,7 +339,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 						for (const mentionableUserGroup in mentionableUsers) {
 							// eslint-disable-next-line no-loop-func
 							mentionableUsers[mentionableUserGroup].forEach(user => {
-								if (prRelatedUsersMap[user.id!] || secondMap[user.id!]) {
+								if (Object.hasOwn(prRelatedUsersMap, user.id!) || secondMap[user.id!]) {
 									return;
 								}
 
@@ -349,7 +350,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 									priority = 1;
 								}
 
-								if (prRelatedUsersMap[user.id!]) {
+								if (Object.hasOwn(prRelatedUsersMap, user.id!)) {
 									priority = 0;
 								}
 
@@ -533,7 +534,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 		if (!this._fetchMentionableUsersPromise) {
 			const cache: { [key: string]: IAccount[] } = {};
-			return (this._fetchMentionableUsersPromise = new Promise(resolve => {
+			this._fetchMentionableUsersPromise = new Promise(resolve => {
 				const promises = this._azdoRepositories.map(async repo => {
 					const data = await repo.getMentionableUsers();
 					cache[repo.remote.remoteName] = data;
@@ -544,7 +545,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 					this._fetchMentionableUsersPromise = undefined;
 					resolve(cache);
 				});
-			}));
+			});
+			return this._fetchMentionableUsersPromise;
 		}
 
 		return this._fetchMentionableUsersPromise;
@@ -562,7 +564,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 		if (!this._fetchAssignableUsersPromise) {
 			const cache: { [key: string]: IAccount[] } = {};
 			const allAssignableUsers: IAccount[] = [];
-			return (this._fetchAssignableUsersPromise = new Promise(resolve => {
+			this._fetchAssignableUsersPromise = new Promise(resolve => {
 				const promises = this._azdoRepositories.map(async repo => {
 					const data = await repo.getAssignableUsers();
 					data.sort(loginComparator);
@@ -576,7 +578,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 					resolve(cache);
 					this._onDidChangeAssignableUsers.fire(allAssignableUsers);
 				});
-			}));
+			});
+			return this._fetchAssignableUsersPromise;
 		}
 
 		return this._fetchAssignableUsersPromise;
@@ -737,7 +740,7 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	 *   Otherwise, we're in case 3.
 	 */
 	private async fetchPagedData<T>(
-		options: IPullRequestsPagingOptions = { fetchNextPage: false },
+		options: IPullRequestsPagingOptions,
 		queryId: string,
 		pagedDataType: PagedDataType = PagedDataType.PullRequest,
 		type: PRType = PRType.AllActive,
@@ -787,51 +790,50 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			const pageInformation = this._repositoryPageInformation.get(remoteId)!;
 
 			const fetchPage = async (_pageNumber: number): Promise<{ items: any[]; hasMorePages: boolean } | undefined> => {
-				switch (pagedDataType) {
-					case PagedDataType.PullRequest: {
-						switch (type) {
-							case PRType.AllActive: {
-								return { items: await azdoRepository.getAllActivePullRequests(), hasMorePages: false };
-							}
-							case PRType.CreatedByMe: {
-								return {
-									items: await azdoRepository.getPullRequests({
-										creatorId: this.getCurrentUser()?.id,
-										status: PullRequestStatus.Active,
-									}),
-									hasMorePages: false,
-								};
-							}
-							case PRType.AssignedToMe: {
-								return {
-									items: await azdoRepository.getPullRequests({
-										reviewerId: this.getCurrentUser()?.id,
-										status: PullRequestStatus.Active,
-									}),
-									hasMorePages: false,
-								};
-							}
-							case PRType.AllStatuses: {
-								// Every other category here hardcodes status: Active, so a completed or
-								// abandoned PR has no tree category to browse back to at all - the PR panel
-								// itself still refreshes to show the completed state if left open, but there
-								// was no way to reopen one once its panel was closed (found while verifying
-								// AC-08's post-completion cleanup prompt, which needs a completed PR to click
-								// into). PullRequestStatus.All is documented as "used in pull request search
-								// criteria to include all statuses" (GitInterfaces.d.ts:2853).
-								return {
-									items: await azdoRepository.getPullRequests({
-										status: PullRequestStatus.All,
-									}),
-									hasMorePages: false,
-								};
-							}
-							default: {
-								return { items: await azdoRepository.getPullRequests(prSearchCriteria!), hasMorePages: false };
-							}
+				if (pagedDataType === PagedDataType.PullRequest) {
+					switch (type) {
+						case PRType.AllActive: {
+							return { items: await azdoRepository.getAllActivePullRequests(), hasMorePages: false };
+						}
+						case PRType.CreatedByMe: {
+							return {
+								items: await azdoRepository.getPullRequests({
+									creatorId: this.getCurrentUser()?.id,
+									status: PullRequestStatus.Active,
+								}),
+								hasMorePages: false,
+							};
+						}
+						case PRType.AssignedToMe: {
+							return {
+								items: await azdoRepository.getPullRequests({
+									reviewerId: this.getCurrentUser()?.id,
+									status: PullRequestStatus.Active,
+								}),
+								hasMorePages: false,
+							};
+						}
+						case PRType.AllStatuses: {
+							// Every other category here hardcodes status: Active, so a completed or
+							// abandoned PR has no tree category to browse back to at all - the PR panel
+							// itself still refreshes to show the completed state if left open, but there
+							// was no way to reopen one once its panel was closed (found while verifying
+							// AC-08's post-completion cleanup prompt, which needs a completed PR to click
+							// into). PullRequestStatus.All is documented as "used in pull request search
+							// criteria to include all statuses" (GitInterfaces.d.ts:2853).
+							return {
+								items: await azdoRepository.getPullRequests({
+									status: PullRequestStatus.All,
+								}),
+								hasMorePages: false,
+							};
+						}
+						default: {
+							return { items: await azdoRepository.getPullRequests(prSearchCriteria!), hasMorePages: false };
 						}
 					}
 				}
+				return undefined;
 			};
 
 			if (options.fetchNextPage) {
@@ -886,11 +888,12 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 	async getPullRequests(
 		type: PRType,
-		options: IPullRequestsPagingOptions = { fetchNextPage: false },
+		options?: IPullRequestsPagingOptions,
 		query?: string,
 	): Promise<ItemsResponseResult<PullRequestModel>> {
+		const pagingOptions = options ?? { fetchNextPage: false };
 		const queryId = type.toString() + (query || '');
-		return this.fetchPagedData<PullRequestModel>(options, queryId, PagedDataType.PullRequest, type, query);
+		return this.fetchPagedData<PullRequestModel>(pagingOptions, queryId, PagedDataType.PullRequest, type, query);
 	}
 
 	async getPullRequestTemplates(): Promise<vscode.Uri[]> {
@@ -1307,8 +1310,8 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 			let firstStep = true;
 			quickPick.onDidAccept(async () => {
+				const picks = quickPick.selectedItems;
 				if (firstStep) {
-					const picks = quickPick.selectedItems;
 					if (picks.length) {
 						quickPick.busy = true;
 						try {
@@ -1339,7 +1342,6 @@ export class FolderRepositoryManager implements vscode.Disposable {
 					}
 				} else {
 					// delete remotes
-					const picks = quickPick.selectedItems;
 					if (picks.length) {
 						quickPick.busy = true;
 						await Promise.all(

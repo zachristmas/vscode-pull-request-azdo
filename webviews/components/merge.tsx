@@ -10,7 +10,7 @@ import * as React from 'react';
 
 import { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { Dropdown } from './dropdown';
-import { alertIcon, checkIcon, deleteIcon, pendingIcon } from './icon';
+import { alertIcon, checkIcon, crossIcon, pendingIcon } from './icon';
 import { nbsp } from './space';
 import { Avatar } from './user';
 import {
@@ -28,7 +28,7 @@ import { Reviewer } from '../components/reviewer';
 // UX-05: check/delete/dot are shared gray glyphs; wrapping them in a text-* class recolors them
 // (CSS fill: currentColor) so the status/policy icons match their summary line, not stay gray.
 const successIcon = <span className="text-success">{checkIcon}</span>;
-const dangerIcon = <span className="text-danger">{deleteIcon}</span>;
+const dangerIcon = <span className="text-danger">{crossIcon}</span>;
 const mutedIcon = <span className="text-muted">{pendingIcon}</span>;
 
 export const StatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: boolean }) => {
@@ -423,7 +423,8 @@ function buildDetailSuffix(policy: PullRequestPolicyEvaluation): string {
 	}
 	const resultText = buildResultText(policy.build.result);
 	const expiredText = policy.build.isExpired ? ', expired' : '';
-	return ` (Build ${policy.build.buildNumber ?? policy.build.buildId}${expiredText}${resultText ? `: ${resultText}` : ''})`;
+	const resultSuffix = resultText ? `: ${resultText}` : '';
+	return ` (Build ${policy.build.buildNumber ?? policy.build.buildId}${expiredText}${resultSuffix})`;
 }
 
 function buildResultText(result?: number): string {
@@ -441,7 +442,7 @@ function buildResultText(result?: number): string {
 	}
 }
 
-function PolicyStatusIcon({ status }: { status: PolicyEvaluationStatus }) {
+function PolicyStatusIcon({ status }: { readonly status: PolicyEvaluationStatus }) {
 	switch (status) {
 		case PolicyEvaluationStatus.Approved:
 			return successIcon;
@@ -500,8 +501,6 @@ function getMergeabilityDescription(
 			return `Completion is blocked by branch policy.${hasPolicySection ? ' See policies above.' : ''}`;
 		case PullRequestMergeability.Failure:
 			return mergeFailureMessage || 'This pull request could not be completed.';
-		case PullRequestMergeability.Queued:
-		case PullRequestMergeability.NotSet:
 		default:
 			return 'Checking if this branch can be merged...';
 	}
@@ -663,7 +662,15 @@ export const SetAutoComplete = (pr: PullRequest) => {
 	);
 };
 
-function ConfirmMerge({ pr, method, cancel }: { pr: PullRequest; method: MergeMethod; cancel: () => void }) {
+function ConfirmMerge({
+	pr,
+	method,
+	cancel,
+}: {
+	readonly pr: PullRequest;
+	readonly method: MergeMethod;
+	readonly cancel: () => void;
+}) {
 	return <ConfirmComplete pr={pr} method={method} mode="complete" cancel={cancel} />;
 }
 
@@ -675,10 +682,10 @@ function ConfirmComplete({
 	mode,
 	cancel,
 }: {
-	pr: PullRequest;
-	method: MergeMethod;
-	mode: 'complete' | 'autocomplete';
-	cancel: () => void;
+	readonly pr: PullRequest;
+	readonly method: MergeMethod;
+	readonly mode: 'complete' | 'autocomplete';
+	readonly cancel: () => void;
 }) {
 	const { complete, setAutoComplete } = useContext(PullRequestContext);
 	const [isBusy, setBusy] = useState(false);
@@ -800,8 +807,8 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 		!!status.state ? status.state.toString() : GitStatusState.NotSet.toString(),
 	);
 	const statusPhrases = [];
-	for (const statusType of Object.keys(statusTypes)) {
-		const numOfType = statusTypes[statusType].length;
+	for (const [statusType, statusesOfType] of Object.entries(statusTypes)) {
+		const numOfType = statusesOfType.length;
 		const statusAdjective = GitStatusState[Number(statusType)];
 
 		const status = numOfType > 1 ? `${numOfType} ${statusAdjective} checks` : `${numOfType} ${statusAdjective} check`;
@@ -812,7 +819,7 @@ function getSummaryLabel(statuses: PullRequestChecks['statuses']) {
 	return statusPhrases.join(' and ');
 }
 
-function StateIcon({ state }: { state: GitStatusState }) {
+function StateIcon({ state }: { readonly state: GitStatusState }) {
 	switch (state) {
 		case GitStatusState.Succeeded:
 			return successIcon;

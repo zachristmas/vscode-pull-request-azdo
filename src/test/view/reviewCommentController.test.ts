@@ -43,6 +43,20 @@ import { asReal } from '../mocks/stub';
 const protocol = new Protocol('https://github.com/github/test.git');
 const remote = new Remote('test', 'github/test', protocol);
 
+function createGHPRCommentThread(threadId: string, uri: vscode.Uri): GHPRCommentThread {
+	return {
+		threadId: Number.parseInt(threadId),
+		uri,
+		range: new vscode.Range(new vscode.Position(21, 0), new vscode.Position(21, 0)),
+		comments: [],
+		collapsibleState: vscode.CommentThreadCollapsibleState.Expanded,
+		label: 'Start discussion',
+		dispose: () => {},
+		rawThread: createMock<GitPullRequestCommentThread>(),
+		canReply: false,
+	};
+}
+
 class TestReviewCommentController extends ReviewCommentController {
 	/**
 	 *
@@ -95,7 +109,13 @@ describe('ReviewCommentController', function () {
 
 		provider = new PullRequestsTreeDataProvider(telemetry);
 		fileReviewedStatusService = sinon.createStubInstance(FileReviewedStatusService);
-		manager = new FolderRepositoryManager(repository, telemetry, gitImpl, credentialStore, asReal(fileReviewedStatusService));
+		manager = new FolderRepositoryManager(
+			repository,
+			telemetry,
+			gitImpl,
+			credentialStore,
+			asReal(fileReviewedStatusService),
+		);
 		sinon.stub(credentialStore, 'isAuthenticated').returns(false);
 		await manager.updateRepositories();
 
@@ -151,20 +171,6 @@ describe('ReviewCommentController', function () {
 			[],
 			'abcd',
 		);
-	}
-
-	function createGHPRCommentThread(threadId: string, uri: vscode.Uri): GHPRCommentThread {
-		return {
-			threadId: Number.parseInt(threadId),
-			uri,
-			range: new vscode.Range(new vscode.Position(21, 0), new vscode.Position(21, 0)),
-			comments: [],
-			collapsibleState: vscode.CommentThreadCollapsibleState.Expanded,
-			label: 'Start discussion',
-			dispose: () => {},
-			rawThread: createMock<GitPullRequestCommentThread>(),
-			canReply: false,
-		};
 	}
 
 	describe('createOrReplyComment', function () {

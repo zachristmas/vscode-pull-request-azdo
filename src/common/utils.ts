@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import path from 'path';
-import moment from 'moment';
+import moment, { duration } from 'moment';
 import { Disposable, Event } from 'vscode';
 
 export function uniqBy<T>(arr: T[] | readonly T[], fn: (el: T) => string): T[] {
@@ -13,7 +13,7 @@ export function uniqBy<T>(arr: T[] | readonly T[], fn: (el: T) => string): T[] {
 	return arr.filter(el => {
 		const key = fn(el);
 
-		if (seen[key]) {
+		if (Object.hasOwn(seen, key)) {
 			return false;
 		}
 
@@ -210,11 +210,11 @@ export async function promiseFromEvent<T, U>(event: Event<T>, adapter: PromiseAd
 }
 
 export function dateFromNow(date: Date | string): string {
-	const duration = moment.duration(moment().diff(date));
+	const timeDelta = duration(moment().diff(date));
 
-	if (duration.asMonths() < 1) {
+	if (timeDelta.asMonths() < 1) {
 		return moment(date).fromNow();
-	} else if (duration.asYears() < 1) {
+	} else if (timeDelta.asYears() < 1) {
 		return 'on ' + moment(date).format('MMM D');
 	} else {
 		return 'on ' + moment(date).format('MMM D, YYYY');
@@ -499,7 +499,9 @@ export class TernarySearchTree<E> {
 				// lazy till first invocation
 				data = [];
 				idx = 0;
-				this._forEach(node, value => data.push(value));
+				this._forEach(node, value => {
+					data.push(value);
+				});
 			}
 			if (idx >= data.length) {
 				return { done: true, value: undefined };

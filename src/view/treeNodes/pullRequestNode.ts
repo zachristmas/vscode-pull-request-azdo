@@ -14,7 +14,7 @@ import { FolderRepositoryManager } from '../../azdo/folderRepositoryManager';
 import { CommentPermissions, CommentWithPermissions, IFileChangeNode } from '../../azdo/interface';
 import { PullRequestModel } from '../../azdo/pullRequestModel';
 import { getPositionFromThread, removeLeadingSlash } from '../../azdo/utils';
-import { mapThreadsToBase } from '../../common/commentingRanges';
+import { mapThreadsToBase, mapThreadsToModified } from '../../common/commentingRanges';
 import { getZeroBased } from '../../common/diffPositionMapping';
 import { GitChangeType, SlimFileChange } from '../../common/file';
 import Logger from '../../common/logger';
@@ -50,7 +50,7 @@ export function getDocumentThreadDatas(
 
 	const threads: ThreadData[] = [];
 
-	const commentsPerBase = mapThreadsToBase(matchingComments, isBase);
+	const commentsPerBase = isBase ? mapThreadsToBase(matchingComments) : mapThreadsToModified(matchingComments);
 
 	for (const azdoThread of commentsPerBase) {
 		const commentAbsolutePosition = getPositionFromThread(azdoThread);

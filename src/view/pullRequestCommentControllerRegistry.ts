@@ -36,7 +36,7 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 		const uri = document.uri;
 		const params = fromPRUri(uri);
 
-		if (!params || !this._prCommentingRangeProviders[params.prNumber]) {
+		if (!params || !Object.hasOwn(this._prCommentingRangeProviders, params.prNumber)) {
 			return;
 		}
 
@@ -53,7 +53,7 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 
 		if (
 			!params ||
-			!this._prCommentHandlers[params.prNumber] ||
+			!Object.hasOwn(this._prCommentHandlers, params.prNumber) ||
 			!this._prCommentHandlers[params.prNumber].handler.toggleReaction
 		) {
 			return;
@@ -72,7 +72,7 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 		folderRepositoryManager: FolderRepositoryManager,
 		getFileChanges: () => Promise<IFileChangeNodeWithUri[]>,
 	): vscode.Disposable {
-		if (this._prCommentHandlers[prNumber]) {
+		if (Object.hasOwn(this._prCommentHandlers, prNumber)) {
 			this._prCommentHandlers[prNumber].refCount += 1;
 			return this._prCommentHandlers[prNumber];
 		}
@@ -87,7 +87,7 @@ export class PRCommentControllerRegistry implements vscode.CommentingRangeProvid
 			handler,
 			refCount: 1,
 			dispose: () => {
-				if (!this._prCommentHandlers[prNumber]) {
+				if (!Object.hasOwn(this._prCommentHandlers, prNumber)) {
 					return;
 				}
 

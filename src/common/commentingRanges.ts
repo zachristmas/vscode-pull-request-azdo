@@ -19,7 +19,6 @@ export function getCommentingRanges(diffHunks: DiffHunk[], isBase: boolean): vsc
 
 	for (const diffHunk of diffHunks) {
 		let startingLine: number | undefined;
-		let length: number;
 		if (isBase) {
 			let endingLine: number | undefined;
 			for (let j = 0; j < diffHunk.diffLines.length; j++) {
@@ -48,7 +47,7 @@ export function getCommentingRanges(diffHunks: DiffHunk[], isBase: boolean): vsc
 		} else {
 			if (diffHunk.newLineNumber) {
 				startingLine = getZeroBased(diffHunk.newLineNumber);
-				length = getZeroBased(diffHunk.newLength);
+				const length = getZeroBased(diffHunk.newLength);
 				ranges.push(new vscode.Range(startingLine, 0, startingLine + length, 0));
 			}
 		}
@@ -57,20 +56,22 @@ export function getCommentingRanges(diffHunks: DiffHunk[], isBase: boolean): vsc
 	return ranges;
 }
 
-export function mapThreadsToBase(threads: GitPullRequestCommentThread[], isBase: boolean): GitPullRequestCommentThread[] {
-	// ITER-01: prefer the tracked threadContext side; fall back to creation-time trackingCriteria only when
-	// the thread has no threadContext (mirrors getDiffSide/getPositionFromThread in azdo/utils.ts).
-	return isBase
-		? threads.filter(
-				c =>
-					(c.threadContext !== undefined
-						? c.threadContext?.leftFileStart
-						: c.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart) !== undefined,
-		  )
-		: threads.filter(
-				c =>
-					(c.threadContext !== undefined
-						? c.threadContext?.rightFileStart
-						: c.pullRequestThreadContext?.trackingCriteria?.origRightFileStart) !== undefined,
-		  );
+// ITER-01: prefer the tracked threadContext side; fall back to creation-time trackingCriteria only when
+// the thread has no threadContext (mirrors getDiffSide/getPositionFromThread in azdo/utils.ts).
+export function mapThreadsToBase(threads: GitPullRequestCommentThread[]): GitPullRequestCommentThread[] {
+	return threads.filter(
+		c =>
+			(c.threadContext !== undefined
+				? c.threadContext?.leftFileStart
+				: c.pullRequestThreadContext?.trackingCriteria?.origLeftFileStart) !== undefined,
+	);
+}
+
+export function mapThreadsToModified(threads: GitPullRequestCommentThread[]): GitPullRequestCommentThread[] {
+	return threads.filter(
+		c =>
+			(c.threadContext !== undefined
+				? c.threadContext?.rightFileStart
+				: c.pullRequestThreadContext?.trackingCriteria?.origRightFileStart) !== undefined,
+	);
 }

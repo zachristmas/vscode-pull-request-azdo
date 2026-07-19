@@ -18,14 +18,14 @@ export const chevronIcon = <Icon src={require('../../resources/icons/chevron.svg
 export const commentIcon = <Icon src={require('../../resources/icons/comment.svg')} />;
 export const commitIcon = <Icon src={require('../../resources/icons/commit_icon.svg')} />;
 export const copyIcon = <Icon src={require('../../resources/icons/copy.svg')} />;
-export const deleteIcon = <Icon src={require('../../resources/icons/delete.svg')} />;
+export const crossIcon = <Icon src={require('../../resources/icons/delete.svg')} />;
 export const mergeIcon = <Icon src={require('../../resources/icons/merge_icon.svg')} />;
 export const editIcon = <Icon src={require('../../resources/icons/edit.svg')} />;
 export const plusIcon = <Icon src={require('../../resources/icons/plus.svg')} />;
 export const pendingIcon = <Icon src={require('../../resources/icons/dot.svg')} />;
 export const diffIcon = <Icon src={require('../../resources/icons/diff.svg')} />;
 
-// VOTE-07: distinct per-vote glyphs/colors matching ADO web (checkIcon/deleteIcon/pendingIcon are
+// VOTE-07: distinct per-vote glyphs/colors matching ADO web (checkIcon/crossIcon/pendingIcon are
 // reused elsewhere for statuses/policies and stay gray on purpose).
 export const approveIcon = <Icon src={require('../../resources/icons/approve.svg')} />;
 export const approveSuggestionIcon = <Icon src={require('../../resources/icons/approve-suggestion.svg')} />;

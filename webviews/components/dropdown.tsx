@@ -8,11 +8,6 @@ import { v4 as uuid } from 'uuid';
 import { chevronIcon } from './icon';
 
 const { useState } = React;
-const enum KEYCODES {
-	esc = 27,
-	down = 40,
-	up = 38,
-}
 
 // Generic so callers can use a narrower key type (e.g. MergeMethod) for submitAction.
 export const Dropdown = <T extends string>({
@@ -50,14 +45,14 @@ export const Dropdown = <T extends string>({
 		// a keydown reaching this handler means something inside the dropdown has focus
 		const currentElement = document.activeElement!;
 
-		switch (e.keyCode) {
-			case KEYCODES.esc:
+		switch (e.key) {
+			case 'Escape':
 				setOptionsVisible(false);
 				const expandOptionsButton = document.querySelector<HTMLElement>(`#${CSS.escape(EXPAND_OPTIONS_BUTTON)}`);
 				expandOptionsButton?.focus();
 				break;
 
-			case KEYCODES.down:
+			case 'ArrowDown':
 				if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
 					const firstOptionId = `${dropdownId}option0`;
 					const firstOptionButton = document.querySelector<HTMLElement>(`#${CSS.escape(firstOptionId)}`);
@@ -76,7 +71,7 @@ export const Dropdown = <T extends string>({
 				}
 				break;
 
-			case KEYCODES.up:
+			case 'ArrowUp':
 				if (!currentElement.id || currentElement.id === EXPAND_OPTIONS_BUTTON) {
 					const lastIndex = Object.entries(options).length - 1;
 					const lastOptionId = `${dropdownId}option${lastIndex}`;
@@ -130,10 +125,10 @@ function Confirm<T extends string>({
 	selected,
 	submitAction,
 }: {
-	dropdownId: string;
-	options: { [key: string]: string };
-	selected: T;
-	submitAction: (selected: T) => Promise<void>;
+	readonly dropdownId: string;
+	readonly options: { [key: string]: string };
+	readonly selected: T;
+	readonly submitAction: (selected: T) => Promise<void>;
 }) {
 	const [isBusy, setBusy] = useState(false);
 

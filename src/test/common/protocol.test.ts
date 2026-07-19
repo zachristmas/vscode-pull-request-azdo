@@ -157,6 +157,8 @@ describe('Protocol', () => {
 			},
 		].forEach(testRemote));
 
+	// testRemote registers nested suites at run time; describe() conversion would newly run them.
+	// eslint-disable-next-line sonarjs/assertions-in-tests
 	it('should handle SSH remotes', () =>
 		[
 			{
@@ -189,6 +191,8 @@ describe('Protocol', () => {
 			},
 		].forEach(testRemote));
 
+	// testRemote registers nested suites at run time; describe() conversion would newly run them.
+	// eslint-disable-next-line sonarjs/assertions-in-tests
 	it('should handle SCP-like remotes', () =>
 		[
 			{
@@ -228,6 +232,8 @@ describe('Protocol', () => {
 			},
 		].forEach(testRemote));
 
+	// testRemote registers nested suites at run time; describe() conversion would newly run them.
+	// eslint-disable-next-line sonarjs/assertions-in-tests
 	it('should handle local remotes', () =>
 		[
 			{

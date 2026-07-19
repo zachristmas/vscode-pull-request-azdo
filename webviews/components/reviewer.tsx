@@ -5,7 +5,7 @@
 import * as React from 'react';
  
 import { useContext } from 'react';
-import { approveIcon, approveSuggestionIcon, deleteIcon, noVoteIcon, rejectedIcon, waitingForAuthorIcon } from './icon';
+import { approveIcon, approveSuggestionIcon, crossIcon, noVoteIcon, rejectedIcon, waitingForAuthorIcon } from './icon';
 import { VoteText } from './sidebar';
 import { nbsp } from './space';
 import { AuthorLink, Avatar } from './user';
@@ -38,7 +38,7 @@ export function Reviewer(reviewState: ReviewState & { canDelete: boolean }) {
 						aria-label={`Remove reviewer ${reviewer.name}`}
 						onClick={() => removeReviewer(reviewState.reviewer.id!)}
 					>
-						{deleteIcon}
+						{crossIcon}
 					</button>
 				</>
 			) : null}

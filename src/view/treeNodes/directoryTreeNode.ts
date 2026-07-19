@@ -8,9 +8,11 @@ import { GitFileChangeNode, InMemFileChangeNode, RemoteFileChangeNode } from './
 import { TreeNode, TreeNodeParent } from './treeNode';
 import { GitChangeType } from '../../common/file';
 
+type FileChangeTreeNode = RemoteFileChangeNode | InMemFileChangeNode | GitFileChangeNode;
+
 export class DirectoryTreeNode extends TreeNode implements vscode.TreeItem {
 	public collapsibleState: vscode.TreeItemCollapsibleState;
-	public children: (RemoteFileChangeNode | InMemFileChangeNode | GitFileChangeNode | DirectoryTreeNode)[] = [];
+	public children: (FileChangeTreeNode | DirectoryTreeNode)[] = [];
 	private pathToChild: Map<string, DirectoryTreeNode> = new Map();
 
 	constructor(public parent: TreeNodeParent, public label: string) {
@@ -48,7 +50,7 @@ export class DirectoryTreeNode extends TreeNode implements vscode.TreeItem {
 		if (this.children.length !== 1) {
 			return;
 		}
-		const child = this.children[0];
+		const child = this.children.at(0);
 		if (!(child instanceof DirectoryTreeNode)) {
 			return;
 		}
@@ -67,7 +69,7 @@ export class DirectoryTreeNode extends TreeNode implements vscode.TreeItem {
 		}
 
 		const dirs: DirectoryTreeNode[] = [];
-		const files: (RemoteFileChangeNode | InMemFileChangeNode | GitFileChangeNode)[] = [];
+		const files: FileChangeTreeNode[] = [];
 
 		// process directory
 		this.children.forEach(node => {
@@ -80,24 +82,32 @@ export class DirectoryTreeNode extends TreeNode implements vscode.TreeItem {
 			}
 		});
 
-		// sort
-		dirs.sort((a, b) => (a.label < b.label ? -1 : 1));
+		// sort (labels are unique within a directory, so the equality arm only guards consistency)
+		dirs.sort((a, b) => {
+			if (a.label === b.label) {
+				return 0;
+			}
+			return a.label < b.label ? -1 : 1;
+		});
 		files.sort((a, b) => (a.label! < b.label! ? -1 : 1));
 
 		this.children = [...dirs, ...files];
 	}
 
-	public addFile(file: GitFileChangeNode | RemoteFileChangeNode | InMemFileChangeNode): void {
+	public addFile(file: FileChangeTreeNode): void {
 		let paths = file.fileName.split('/');
 		if (file.status === GitChangeType.DELETE) {
-			paths = file instanceof GitFileChangeNode ? file.fileName.split('/') : (file as InMemFileChangeNode).previousFileName!.split('/');
+			paths =
+				file instanceof GitFileChangeNode
+					? file.fileName.split('/')
+					: (file as InMemFileChangeNode).previousFileName!.split('/');
 		}
 		file.description = '';
 
 		this.addPathRecc(paths, file);
 	}
 
-	private addPathRecc(paths: string[], file: GitFileChangeNode | RemoteFileChangeNode | InMemFileChangeNode): void {
+	private addPathRecc(paths: string[], file: FileChangeTreeNode): void {
 		if (paths.length <= 0) {
 			return;
 		}

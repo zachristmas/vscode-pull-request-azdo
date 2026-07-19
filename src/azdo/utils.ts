@@ -165,10 +165,10 @@ function buildRequiredReviewersDetail(settings: RequiredReviewersPolicySettings)
 }
 
 function buildMergeStrategyDetail(settings: MergeStrategyPolicySettings): string {
-	const allowed: string[] = [];
 	if (settings.useSquashMerge) {
 		return 'Allowed: Squash';
 	}
+	const allowed: string[] = [];
 	if (settings.allowNoFastForward) {
 		allowed.push('Merge commit');
 	}
@@ -273,7 +273,6 @@ export function matchesRefScope(
 				return !!entry.refName && targetRefName.startsWith(entry.refName);
 			case 'DefaultBranch':
 				return targetRefName === defaultBranchRefName;
-			case 'Exact':
 			default:
 				return !!entry.refName && entry.refName.toLowerCase() === targetRefName.toLowerCase();
 		}
@@ -460,9 +459,6 @@ export function getRelatedUsersFromPullrequest(
 			email: pr.createdBy?.uniqueName,
 			name: pr.createdBy?.displayName,
 		},
-	];
-
-	related_users.push(
 		...(pr.reviewers ?? []).map(r => {
 			return { name: r.displayName, login: r.uniqueName ?? r.id ?? '', email: r.uniqueName };
 		}),
@@ -475,7 +471,7 @@ export function getRelatedUsersFromPullrequest(
 			.map(r => {
 				return { name: r?.name, login: r?.email || '', email: r?.email };
 			}) || []),
-	);
+	];
 
 	return related_users;
 }

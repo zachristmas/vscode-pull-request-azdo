@@ -36,6 +36,9 @@ import { PRNode } from './view/treeNodes/pullRequestNode';
 const _onDidUpdatePR = new vscode.EventEmitter<PullRequest | void>();
 export const onDidUpdatePR: vscode.Event<PullRequest | void> = _onDidUpdatePR.event;
 
+/** The shapes a pull request command argument can arrive in (tree node, description node, or the model itself). */
+type PullRequestArg = PRNode | DescriptionNode | PullRequestModel;
+
 function ensurePR(folderRepoManager: FolderRepositoryManager, pr?: PRNode | PullRequestModel): PullRequestModel {
 	// If the command is called from the command palette, no arguments are passed.
 	if (!pr) {
@@ -53,7 +56,7 @@ function ensurePR(folderRepoManager: FolderRepositoryManager, pr?: PRNode | Pull
 async function chooseItem<T>(
 	activePullRequests: T[],
 	propertyGetter: (itemValue: T) => string,
-	placeHolder?: string,
+	placeholder?: string,
 ): Promise<T | undefined> {
 	if (activePullRequests.length === 1) {
 		return activePullRequests[0];
@@ -67,7 +70,7 @@ async function chooseItem<T>(
 			itemValue: currentItem,
 		};
 	});
-	const selection = await vscode.window.showQuickPick(items, { placeHolder });
+	const selection = await vscode.window.showQuickPick(items, { placeHolder: placeholder });
 	return selection?.itemValue;
 }
 
@@ -78,7 +81,7 @@ async function chooseItem<T>(
  */
 async function resolveTargetPullRequest(
 	reposManager: RepositoriesManager,
-	pr?: PRNode | DescriptionNode | PullRequestModel,
+	pr?: PullRequestArg,
 ): Promise<PullRequestModel | undefined> {
 	if (pr) {
 		return pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
@@ -202,7 +205,7 @@ export function registerCommands(
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			'azdopr.openPullRequestInAzdo',
-			async (e: PRNode | DescriptionNode | PullRequestModel) => {
+			async (e: PullRequestArg) => {
 				if (!e) {
 					const activePullRequests: PullRequestModel[] = reposManager.folderManagers
 						.map(folderManager => folderManager.activePullRequest!)
@@ -274,7 +277,7 @@ export function registerCommands(
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			'azdopr.copyPullRequestUrl',
-			async (e?: PRNode | DescriptionNode | PullRequestModel) => {
+			async (e?: PullRequestArg) => {
 				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
 				if (!pullRequestModel) {
 					return;
@@ -293,7 +296,7 @@ export function registerCommands(
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			'azdopr.copyVscodeDeepLink',
-			async (e?: PRNode | DescriptionNode | PullRequestModel) => {
+			async (e?: PullRequestArg) => {
 				const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
 				if (!pullRequestModel) {
 					return;
@@ -531,7 +534,7 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('azdopr.pick', async (pr: PRNode | DescriptionNode | PullRequestModel) => {
+		vscode.commands.registerCommand('azdopr.pick', async (pr: PullRequestArg) => {
 			let pullRequestModel: PullRequestModel;
 
 			pullRequestModel = pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;
@@ -559,7 +562,7 @@ export function registerCommands(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('azdopr.exit', async (pr: PRNode | DescriptionNode | PullRequestModel) => {
+		vscode.commands.registerCommand('azdopr.exit', async (pr: PullRequestArg) => {
 			let pullRequestModel: PullRequestModel;
 
 			pullRequestModel = pr instanceof PRNode || pr instanceof DescriptionNode ? pr.pullRequestModel : pr;

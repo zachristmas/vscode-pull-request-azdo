@@ -163,7 +163,7 @@ abstract class BaseBuilder<R> {
 	build(): R {
 		// Populate any missing fields.
 		for (const fieldName in this._template) {
-			if ((fieldName in this._underConstruction)) {
+			if (Object.hasOwn(this._underConstruction, fieldName)) {
 				continue;
 			}
 

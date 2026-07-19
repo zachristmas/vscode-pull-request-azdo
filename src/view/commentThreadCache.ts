@@ -10,7 +10,7 @@ export class CommentThreadCache {
 	private _data: { [key: string]: { original?: GHPRCommentThread[]; modified?: GHPRCommentThread[] } } = {};
 
 	public setDocumentThreads(fileName: string, isBase: boolean, threads: GHPRCommentThread[] | undefined) {
-		if (!this._data[fileName]) {
+		if (!Object.hasOwn(this._data, fileName)) {
 			this._data[fileName] = {};
 		}
 

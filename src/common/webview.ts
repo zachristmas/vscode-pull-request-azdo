@@ -19,11 +19,18 @@ export interface IReplyMessage {
 	res?: any;
 }
 
+// WebCrypto global: present on both the Node 20 extension host and the webworker host, but
+// @types/node@12 predates it, so declare the one method used.
+declare const crypto: { getRandomValues(array: Uint8Array): Uint8Array };
+
 export function getNonce() {
-	let text = '';
+	// CSP nonce: needs CSPRNG quality, not Math.random.
+	const bytes = new Uint8Array(32);
+	crypto.getRandomValues(bytes);
 	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	for (let i = 0; i < 32; i++) {
-		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	let text = '';
+	for (const byte of bytes) {
+		text += possible.charAt(byte % possible.length);
 	}
 	return text;
 }
@@ -80,13 +87,11 @@ export class WebviewBase {
 	}
 
 	protected async _onDidReceiveMessage(message: IRequestMessage<any>): Promise<any> {
-		switch (message.command) {
-			case 'ready':
-				this._onIsReady.fire();
-				return;
-			default:
-				return this.MESSAGE_UNHANDLED;
+		if (message.command === 'ready') {
+			this._onIsReady.fire();
+			return;
 		}
+		return this.MESSAGE_UNHANDLED;
 	}
 
 	protected async _postMessage(message: any) {

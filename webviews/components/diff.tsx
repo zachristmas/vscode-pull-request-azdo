@@ -17,10 +17,10 @@ function Diff({
 	path,
 	outdated = false,
 }: {
-	comment: IComment;
-	hunks: DiffHunk[];
-	outdated: boolean;
-	path: string;
+	readonly comment: IComment;
+	readonly hunks: DiffHunk[];
+	readonly outdated: boolean;
+	readonly path: string;
 }) {
 	const { openDiff } = useContext(PullRequestContext);
 	return (

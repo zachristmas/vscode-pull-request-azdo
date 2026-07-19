@@ -400,13 +400,11 @@ export class PullRequestModel implements IPullRequestModel {
 		};
 
 		const result = await git?.createThread(thread, repoId, this.getPullRequestId());
-		if (!result) {
-			return result;
+		if (result) {
+			const newThread: IReviewThread = this.convertThreadToIReviewThread(result);
+			this._reviewThreadsCache.push(newThread);
+			this._onDidChangeReviewThreads.fire({ added: [newThread], changed: [], removed: [] });
 		}
-
-		const newThread: IReviewThread = this.convertThreadToIReviewThread(result);
-		this._reviewThreadsCache.push(newThread);
-		this._onDidChangeReviewThreads.fire({ added: [newThread], changed: [], removed: [] });
 
 		return result;
 	}
@@ -444,13 +442,11 @@ export class PullRequestModel implements IPullRequestModel {
 		};
 
 		const result = await git?.updateThread(thread, repoId, this.getPullRequestId(), threadId);
-		if (!result) {
-			return result;
+		if (result) {
+			const newThread = this.convertThreadToIReviewThread(result);
+			this._reviewThreadsCache = [...this._reviewThreadsCache.filter(thread => thread.id !== threadId), newThread];
+			this._onDidChangeReviewThreads.fire({ added: [], changed: [newThread], removed: [] });
 		}
-
-		const newThread = this.convertThreadToIReviewThread(result);
-		this._reviewThreadsCache = [...this._reviewThreadsCache.filter(thread => thread.id !== threadId), newThread];
-		this._onDidChangeReviewThreads.fire({ added: [], changed: [newThread], removed: [] });
 
 		return result;
 	}
@@ -465,13 +461,11 @@ export class PullRequestModel implements IPullRequestModel {
 		const max = Math.max(...(iterations?.map(i => i.id!) ?? [0]));
 
 		const result = await this.getAllActiveThreads(max, 1);
-		if (!result) {
-			return result;
+		if (result) {
+			const reviewThreads = result.map(r => this.convertThreadToIReviewThread(r));
+			this.diffThreads(reviewThreads);
+			this._reviewThreadsCache = reviewThreads;
 		}
-
-		const reviewThreads = result?.map(r => this.convertThreadToIReviewThread(r));
-		this.diffThreads(reviewThreads);
-		this._reviewThreadsCache = reviewThreads;
 
 		return result;
 	}

@@ -181,21 +181,9 @@ export function parsePatch(patch: string): DiffHunk[] {
 	let diffHunkIter = diffHunkReader.next();
 	const diffHunks = [];
 
-	const right = [];
 	while (!diffHunkIter.done) {
 		const diffHunk = diffHunkIter.value;
 		diffHunks.push(diffHunk);
-
-		for (let j = 0; j < diffHunk.diffLines.length; j++) {
-			const diffLine = diffHunk.diffLines[j];
-			if (diffLine.type === DiffChangeType.Delete || diffLine.type === DiffChangeType.Control) {
-			} else if (diffLine.type === DiffChangeType.Add) {
-				right.push(diffLine.text);
-			} else {
-				const codeInFirstLine = diffLine.text;
-				right.push(codeInFirstLine);
-			}
-		}
 
 		diffHunkIter = diffHunkReader.next();
 	}
@@ -207,13 +195,11 @@ export function getModifiedContentFromDiffHunk(originalContent: string, patch: s
 	const left = originalContent.split(/\r?\n/);
 	const diffHunkReader = parseDiffHunk(patch);
 	let diffHunkIter = diffHunkReader.next();
-	const diffHunks = [];
 
 	const right = [];
 	let lastCommonLine = 0;
 	while (!diffHunkIter.done) {
 		const diffHunk = diffHunkIter.value;
-		diffHunks.push(diffHunk);
 
 		const oriStartLine = diffHunk.oldLineNumber;
 

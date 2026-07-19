@@ -7,24 +7,25 @@ import * as vscode from 'vscode';
 
 export type GlobalStateContext = { globalState: vscode.Memento };
 
-let defaultStorage: vscode.Memento | undefined;
+// Module singleton kept in an object so init() mutates a property, not a top-level binding.
+const state: { defaultStorage: vscode.Memento | undefined } = { defaultStorage: undefined };
 
 export const MISSING = {} as const;
 
 export function init(ctx: GlobalStateContext) {
-	defaultStorage = ctx.globalState;
+	state.defaultStorage = ctx.globalState;
 }
 
 export const fetch = (scope: string, key: string): unknown => {
-	if (!defaultStorage) {
+	if (!state.defaultStorage) {
 		throw new Error('Persistent store not initialized.');
 	}
-	return defaultStorage.get(scope + ':' + key, MISSING);
+	return state.defaultStorage.get(scope + ':' + key, MISSING);
 };
 
 export const store = (scope: string, key: string, value: any) => {
-	if (!defaultStorage) {
+	if (!state.defaultStorage) {
 		throw new Error('Persistent store not initialized.');
 	}
-	return defaultStorage.update(scope + ':' + key, value);
+	return state.defaultStorage.update(scope + ':' + key, value);
 };

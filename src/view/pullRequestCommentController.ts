@@ -116,7 +116,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 				return;
 			}
 			const { fileName, isBase } = params;
-			if (threadsByPath[fileName]) {
+			if (Object.hasOwn(threadsByPath, fileName)) {
 				const fileCache = this._commentThreadCache[this.getCommentThreadCacheKey(fileName, isBase)] ?? [];
 				const newThreads = threadsByPath[fileName]
 					.filter(
@@ -244,7 +244,7 @@ export class PullRequestCommentController implements CommentHandler, CommentReac
 			}
 
 			const key = this.getCommentThreadCacheKey(thread.path, thread.diffSide === DiffSide.LEFT);
-			if (this._commentThreadCache[key]) {
+			if (Object.hasOwn(this._commentThreadCache, key)) {
 				this._commentThreadCache[key].push(newThread);
 			} else {
 				this._commentThreadCache[key] = [newThread];

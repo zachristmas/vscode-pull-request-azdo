@@ -274,12 +274,12 @@ export class MockRepository implements Repository {
 		this._expectedPulls.splice(index, 1);
 	}
 
-	async push(remoteName?: string, branchName?: string, setUpstream?: boolean): Promise<void> {
+	async push(remoteName?: string, branchName?: string, shouldSetUpstream?: boolean): Promise<void> {
 		const index = this._expectedPushes.findIndex(
-			f => f.remoteName === remoteName && f.branchName === branchName && f.setUpstream === setUpstream,
+			f => f.remoteName === remoteName && f.branchName === branchName && f.setUpstream === shouldSetUpstream,
 		);
 		if (index === -1) {
-			throw new Error(`Unexpected push(${remoteName}, ${branchName}, ${setUpstream})`);
+			throw new Error(`Unexpected push(${remoteName}, ${branchName}, ${shouldSetUpstream})`);
 		}
 		this._expectedPushes.splice(index, 1);
 	}
@@ -312,7 +312,7 @@ export class MockRepository implements Repository {
 		this._expectedPulls.push({ unshallow });
 	}
 
-	expectPush(remoteName?: string, branchName?: string, setUpstream?: boolean) {
-		this._expectedPushes.push({ remoteName, branchName, setUpstream });
+	expectPush(remoteName?: string, branchName?: string, shouldSetUpstream?: boolean) {
+		this._expectedPushes.push({ remoteName, branchName, setUpstream: shouldSetUpstream });
 	}
 }

@@ -1,4 +1,3 @@
- 
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -35,18 +34,22 @@ import { ReviewsManager } from './view/reviewsManager';
 
 const aiKey: string = '00000000-0000-0000-0000-000000000000';
 
-// fetch.promise polyfill
-const PolyfillPromise = require('es6-promise').Promise;
 const fetch = require('node-fetch');
 
-fetch.Promise = PolyfillPromise;
+// The built-in Promise replaces the old es6-promise polyfill.
+fetch.Promise = Promise;
 
-let telemetry: TelemetryReporter;
+// Mutable module state lives in an object so functions mutate properties, not top-level bindings.
+// telemetry: created in activate(), read by deactivate().
+// deepLinkProcessor: deep links can arrive before init() has built the repositories manager
+// (activation is still running, or no repository is open yet). Buffer them and drain once the
+// processor is wired up.
+const extensionState: {
+	telemetry: TelemetryReporter | undefined;
+	deepLinkProcessor: ((uri: vscode.Uri) => void) | undefined;
+} = { telemetry: undefined, deepLinkProcessor: undefined };
 
-// Deep links can arrive before init() has built the repositories manager (activation is still
-// running, or no repository is open yet). Buffer them and drain once the processor is wired up.
 const pendingDeepLinkUris: vscode.Uri[] = [];
-let deepLinkProcessor: ((uri: vscode.Uri) => void) | undefined;
 
 async function init(
 	context: vscode.ExtensionContext,
@@ -55,6 +58,7 @@ async function init(
 	repositories: Repository[],
 	tree: PullRequestsTreeDataProvider,
 	liveshareApiPromise: Promise<LiveShare | undefined>,
+	telemetry: TelemetryReporter,
 ): Promise<void> {
 	context.subscriptions.push(Logger);
 	Logger.appendLine('Git repository found, initializing review manager and pr tree view.');
@@ -134,12 +138,15 @@ async function init(
 	tree.initialize(reposManager);
 	registerCommands(context, reposManager, reviewManagers, workItem, userManager, telemetry, credentialStore, tree);
 
-	deepLinkProcessor = uri => {
+	const deepLinkProcessor = (uri: vscode.Uri) => {
 		handleDeepLinkUri(uri, reposManager, context.extensionPath, workItem, userManager).catch(e => {
 			Logger.appendLine(`Handling vscode:// deep link failed: ${e}`);
 		});
 	};
-	pendingDeepLinkUris.splice(0).forEach(deepLinkProcessor);
+	extensionState.deepLinkProcessor = deepLinkProcessor;
+	const bufferedDeepLinkUris = [...pendingDeepLinkUris];
+	pendingDeepLinkUris.length = 0;
+	bufferedDeepLinkUris.forEach(deepLinkProcessor);
 	const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
 	await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 
@@ -203,7 +210,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	const apiImpl = new GitApiImpl();
 
 	const version = vscode.extensions.getExtension(EXTENSION_ID)!.packageJSON.version;
-	telemetry = new TelemetryReporter(EXTENSION_ID, version, aiKey);
+	const telemetry = new TelemetryReporter(EXTENSION_ID, version, aiKey);
+	extensionState.telemetry = telemetry;
 	context.subscriptions.push(telemetry);
 
 	PersistentState.init(context);
@@ -213,8 +221,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
 	context.subscriptions.push(
 		uriHandler.event(uri => {
-			if (deepLinkProcessor) {
-				deepLinkProcessor(uri);
+			if (extensionState.deepLinkProcessor) {
+				extensionState.deepLinkProcessor(uri);
 				return;
 			}
 			pendingDeepLinkUris.push(uri);
@@ -260,16 +268,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	);
 
 	if (apiImpl.repositories.length > 0) {
-		await init(context, apiImpl, credentialStore, apiImpl.repositories, prTree, liveshareApiPromise);
+		await init(context, apiImpl, credentialStore, apiImpl.repositories, prTree, liveshareApiPromise, telemetry);
 	} else {
-		onceEvent(apiImpl.onDidOpenRepository)(r => init(context, apiImpl, credentialStore, [r], prTree, liveshareApiPromise));
+		onceEvent(apiImpl.onDidOpenRepository)(r =>
+			init(context, apiImpl, credentialStore, [r], prTree, liveshareApiPromise, telemetry),
+		);
 	}
 
 	return apiImpl;
 }
 
 export async function deactivate() {
-	if (telemetry) {
-		telemetry.dispose();
+	if (extensionState.telemetry) {
+		extensionState.telemetry.dispose();
 	}
 }

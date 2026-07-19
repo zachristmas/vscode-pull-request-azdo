@@ -311,7 +311,7 @@ export class ReviewCommentController
 
 					const threadMap = this.threadMapFor(thread);
 
-					if (threadMap[removeLeadingSlash(path)]) {
+					if (Object.hasOwn(threadMap, removeLeadingSlash(path))) {
 						threadMap[removeLeadingSlash(path)].push(newThread);
 					} else {
 						threadMap[removeLeadingSlash(path)] = [newThread];

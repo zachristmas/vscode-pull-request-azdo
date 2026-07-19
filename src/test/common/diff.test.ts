@@ -1,7 +1,7 @@
 import { strict as assert } from 'assert';
 import { DiffChangeType, DiffHunk, DiffLine, parseDiffHunk } from '../../common/diffHunk';
 
-import { getDiffLineByPosition, mapCommentsToHead, mapHeadLineToDiffHunkPosition } from '../../common/diffPositionMapping';
+import { getDiffLineByPosition, mapCommentsToHead, mapLineInHeadToDiffHunkPosition } from '../../common/diffPositionMapping';
 
 const diff_hunk_0 = [
 	`@@ -1,5 +1,6 @@`,
@@ -129,7 +129,7 @@ describe('diff hunk parsing', () => {
 		}
 	});
 
-	it('mapHeadLineToDiffHunkPosition', () => {
+	it('mapLineInHeadToDiffHunkPosition', () => {
 		const diffHunkReader = parseDiffHunk(diff_hunk_0);
 		const diffHunkIter = diffHunkReader.next();
 		const diffHunk = diffHunkIter.value;
@@ -139,23 +139,23 @@ describe('diff hunk parsing', () => {
 			switch (diffLine.type) {
 				case DiffChangeType.Delete:
 					assert.equal(
-						mapHeadLineToDiffHunkPosition([diffHunk], '', diffLine.oldLineNumber, true),
+						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.oldLineNumber, true),
 						diffLine.positionInHunk,
 					);
 					break;
 				case DiffChangeType.Add:
 					assert.equal(
-						mapHeadLineToDiffHunkPosition([diffHunk], '', diffLine.newLineNumber, false),
+						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.newLineNumber, false),
 						diffLine.positionInHunk,
 					);
 					break;
 				case DiffChangeType.Context:
 					assert.equal(
-						mapHeadLineToDiffHunkPosition([diffHunk], '', diffLine.oldLineNumber, true),
+						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.oldLineNumber, true),
 						diffLine.positionInHunk,
 					);
 					assert.equal(
-						mapHeadLineToDiffHunkPosition([diffHunk], '', diffLine.newLineNumber, false),
+						mapLineInHeadToDiffHunkPosition([diffHunk], '', diffLine.newLineNumber, false),
 						diffLine.positionInHunk,
 					);
 					break;
@@ -173,7 +173,7 @@ describe('diff hunk parsing', () => {
 		assert.equal(diffHunk.diffLines.length, 1);
 	});
 
-	it('', () => {
+	it('parses a diff hunk when the line count for original content is omitted', () => {
 		const diffHunkReader = parseDiffHunk(`@@ -1 +1,5 @@
 # README
 +

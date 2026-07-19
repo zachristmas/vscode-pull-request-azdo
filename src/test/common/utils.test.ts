@@ -2,6 +2,22 @@ import { strict as assert } from 'assert';
 import { EventEmitter } from 'vscode';
 import * as utils from '../../common/utils';
 
+const hasListeners = (emitter: any) => !emitter._listeners!.isEmpty();
+
+const count: utils.PromiseAdapter<string, number> = (str, resolve, reject) =>
+	str.length <= 4 ? resolve(str.length) : reject(new Error('the string is too damn long'));
+
+const door: utils.PromiseAdapter<string, boolean> = (password, resolve, reject) => {
+	if (password === 'sesame') {
+		resolve(true);
+	} else if (password === 'mellon') {
+		reject(new Error('wrong fable'));
+	}
+	// otherwise the door is silent
+};
+
+const tick = () => new Promise(resolve => setImmediate(resolve));
+
 describe('utils', () => {
 	class HookError extends Error {
 		public errors: any[];
@@ -45,8 +61,6 @@ describe('utils', () => {
 	});
 
 	describe('promiseFromEvent', () => {
-		const hasListeners = (emitter: any) => !emitter._listeners!.isEmpty();
-
 		describe('without arguments', () => {
 			it('should return a promise for the next event', async () => {
 				const emitter = new EventEmitter<string>();
@@ -68,9 +82,6 @@ describe('utils', () => {
 		});
 
 		describe('with an adapter', () => {
-			const count: utils.PromiseAdapter<string, number> = (str, resolve, reject) =>
-				str.length <= 4 ? resolve(str.length) : reject(new Error('the string is too damn long'));
-
 			it("should return a promise that uses the adapter's value", async () => {
 				const emitter = new EventEmitter<string>();
 				const promise = utils.promiseFromEvent(emitter.event, count);
@@ -127,16 +138,6 @@ describe('utils', () => {
 				assert.ok(!hasListeners(emitter), 'should unsubscribe');
 			});
 
-			const door: utils.PromiseAdapter<string, boolean> = (password, resolve, reject) => {
-				if (password === 'sesame') {
-					resolve(true);
-				} else if (password === 'mellon') {
-					reject(new Error('wrong fable'));
-				}
-				// otherwise the door is silent
-			};
-
-			const tick = () => new Promise(resolve => setImmediate(resolve));
 			it('should stay subscribed until the adapter resolves', async () => {
 				const emitter = new EventEmitter<string>();
 				const promise = utils.promiseFromEvent(emitter.event, door);

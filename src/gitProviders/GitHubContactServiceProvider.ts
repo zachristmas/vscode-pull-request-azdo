@@ -46,41 +46,36 @@ export class GitHubContactServiceProvider implements ContactServiceProvider {
 		_parameters: object,
 		_cancellationToken?: vscode.CancellationToken,
 	): Promise<object> {
-		let result: object;
+		if (type !== 'initialize') {
+			throw new Error(`type:${type} not supported`);
+		}
 
-		switch (type) {
-			case 'initialize':
-				result = {
-					description: 'Pullrequest',
-					capabilities: {
-						supportsDispose: false,
-						supportsInviteLink: false,
-						supportsPresence: false,
-						supportsContactPresenceRequest: false,
-						supportsPublishPresence: false,
-					},
-				};
+		const result: object = {
+			description: 'Pullrequest',
+			capabilities: {
+				supportsDispose: false,
+				supportsInviteLink: false,
+				supportsPresence: false,
+				supportsContactPresenceRequest: false,
+				supportsPublishPresence: false,
+			},
+		};
 
-				// if we get initialized and users are available on the pr manager
-				const allAssignableUsers: Map<string, IAccount> = new Map();
-				for (const pullRequestManager of this.pullRequestManager.folderManagers) {
-					const batch = pullRequestManager.getAllAssignableUsers();
-					if (!batch) {
-						continue;
-					}
-					for (const user of batch) {
-						if (user.id && !allAssignableUsers.has(user.id)) {
-							allAssignableUsers.set(user.id, user);
-						}
-					}
+		// if we get initialized and users are available on the pr manager
+		const allAssignableUsers: Map<string, IAccount> = new Map();
+		for (const pullRequestManager of this.pullRequestManager.folderManagers) {
+			const batch = pullRequestManager.getAllAssignableUsers();
+			if (!batch) {
+				continue;
+			}
+			for (const user of batch) {
+				if (user.id && !allAssignableUsers.has(user.id)) {
+					allAssignableUsers.set(user.id, user);
 				}
-				if (allAssignableUsers.size > 0) {
-					this.notifySuggestedAccounts([...allAssignableUsers.values()]);
-				}
-
-				break;
-			default:
-				throw new Error(`type:${type} not supported`);
+			}
+		}
+		if (allAssignableUsers.size > 0) {
+			this.notifySuggestedAccounts([...allAssignableUsers.values()]);
 		}
 
 		return result;

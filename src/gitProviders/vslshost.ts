@@ -32,18 +32,17 @@ export class VSLSHost implements vscode.Disposable {
 		const type = args[0];
 		const workspaceFolderPath = args[1];
 		const workspaceFolderUri = vscode.Uri.parse(workspaceFolderPath);
-		const localWorkSpaceFolderUri = this._liveShareAPI.convertSharedUriToLocal(workspaceFolderUri);
-		const gitProvider = this._api.getGitProvider(localWorkSpaceFolderUri);
+		const localWorkspaceFolderUri = this._liveShareAPI.convertSharedUriToLocal(workspaceFolderUri);
+		const gitProvider = this._api.getGitProvider(localWorkspaceFolderUri);
 
 		if (!gitProvider) {
 			return;
 		}
 
 		const localRepository: any = gitProvider.repositories.find(
-			repository => repository.rootUri.toString() === localWorkSpaceFolderUri.toString(),
+			repository => repository.rootUri.toString() === localWorkspaceFolderUri.toString(),
 		);
 		if (localRepository) {
-			const commandArgs = args.slice(2);
 			if (type === VSLS_REPOSITORY_INITIALIZATION_NAME) {
 				this._disposables.push(
 					localRepository.state.onDidChange((_e: any) => {
@@ -62,6 +61,7 @@ export class VSLSHost implements vscode.Disposable {
 				};
 			}
 
+			const commandArgs = args.slice(2);
 			if (type === 'show') {
 				const path = commandArgs[1];
 				const vslsFileUri = workspaceFolderUri.with({ path: path });
@@ -71,7 +71,8 @@ export class VSLSHost implements vscode.Disposable {
 				return localRepository[type](...commandArgs);
 			}
 
-			if (localRepository[type]) {
+			const repositoryMember = localRepository[type];
+			if (repositoryMember) {
 				return localRepository[type](...commandArgs);
 			}
 		} else {

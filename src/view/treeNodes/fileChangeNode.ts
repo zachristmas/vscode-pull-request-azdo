@@ -19,16 +19,43 @@ import { DecorationProvider } from '../treeDecorationProvider';
 import { TreeNode, TreeNodeParent } from './treeNode';
 
 /**
+ * Shared viewed-state tracking for file change nodes. Extracted so RemoteFileChangeNode and
+ * FileChangeNode share one updateViewed implementation.
+ */
+abstract class ViewedStateFileNode extends TreeNode {
+	public abstract readonly pullRequest: PullRequestModel;
+	public abstract readonly status: GitChangeType;
+	public abstract readonly fileName: string;
+	public abstract resourceUri: vscode.Uri;
+	public contextValue?: string;
+	private _viewed: ViewedState | undefined;
+
+	updateViewed(viewed: ViewedState) {
+		if (this._viewed === viewed) {
+			return;
+		}
+
+		this._viewed = viewed;
+		this.contextValue = `filechange:${GitChangeType[this.status]}:${viewed === ViewedState.VIEWED ? 'viewed' : 'unviewed'}`;
+		FileViewedDecorationProvider.updateFileViewedState(
+			this.resourceUri,
+			this.pullRequest.getPullRequestId(),
+			this.fileName,
+			viewed,
+		);
+	}
+}
+
+/**
  * File change node whose content can not be resolved locally and we direct users to GitHub.
  */
-export class RemoteFileChangeNode extends TreeNode implements vscode.TreeItem {
+export class RemoteFileChangeNode extends ViewedStateFileNode implements vscode.TreeItem {
 	public description: string;
 	public iconPath?: string | vscode.Uri | vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri };
 	public command: vscode.Command;
 	public resourceUri: vscode.Uri;
 	public contextValue: string;
 	public childrenDisposables: vscode.Disposable[] = [];
-	private _viewed: ViewedState | undefined;
 
 	constructor(
 		public readonly parent: TreeNodeParent,
@@ -67,21 +94,6 @@ export class RemoteFileChangeNode extends TreeNode implements vscode.TreeItem {
 		);
 	}
 
-	updateViewed(viewed: ViewedState) {
-		if (this._viewed === viewed) {
-			return;
-		}
-
-		this._viewed = viewed;
-		this.contextValue = `filechange:${GitChangeType[this.status]}:${viewed === ViewedState.VIEWED ? 'viewed' : 'unviewed'}`;
-		FileViewedDecorationProvider.updateFileViewedState(
-			this.resourceUri,
-			this.pullRequest.getPullRequestId(),
-			this.fileName,
-			viewed,
-		);
-	}
-
 	getTreeItem(): vscode.TreeItem {
 		return this;
 	}
@@ -90,7 +102,7 @@ export class RemoteFileChangeNode extends TreeNode implements vscode.TreeItem {
 /**
  * File change node whose content is stored in memory and resolved when being revealed.
  */
-export class FileChangeNode extends TreeNode implements vscode.TreeItem {
+export class FileChangeNode extends ViewedStateFileNode implements vscode.TreeItem {
 	public description: string;
 	public iconPath?: string | vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri };
 	public resourceUri: vscode.Uri;
@@ -101,7 +113,6 @@ export class FileChangeNode extends TreeNode implements vscode.TreeItem {
 	public opts: vscode.TextDocumentShowOptions;
 
 	public childrenDisposables: vscode.Disposable[] = [];
-	private _viewed: ViewedState | undefined;
 
 	constructor(
 		public readonly parent: TreeNodeParent,
@@ -153,21 +164,6 @@ export class FileChangeNode extends TreeNode implements vscode.TreeItem {
 		);
 	}
 
-	updateViewed(viewed: ViewedState) {
-		if (this._viewed === viewed) {
-			return;
-		}
-
-		this._viewed = viewed;
-		this.contextValue = `filechange:${GitChangeType[this.status]}:${viewed === ViewedState.VIEWED ? 'viewed' : 'unviewed'}`;
-		FileViewedDecorationProvider.updateFileViewedState(
-			this.resourceUri,
-			this.pullRequest.getPullRequestId(),
-			this.fileName,
-			viewed,
-		);
-	}
-
 	updateShowOptions() {
 		const reviewThreads = this.pullRequest.reviewThreadsCache;
 		let reviewThreadsForNode = reviewThreads.filter(thread => !thread.isDeleted && thread.path === this.fileName);
@@ -210,13 +206,7 @@ export class FileChangeNode extends TreeNode implements vscode.TreeItem {
 		}
 
 		const pathSegments = filePath.path.split('/');
-		vscode.commands.executeCommand(
-			'vscode.diff',
-			parentURI,
-			headURI,
-			`${pathSegments.at(-1)} (Pull Request)`,
-			opts,
-		);
+		vscode.commands.executeCommand('vscode.diff', parentURI, headURI, `${pathSegments.at(-1)} (Pull Request)`, opts);
 	}
 }
 
