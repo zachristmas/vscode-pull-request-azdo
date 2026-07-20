@@ -1,6 +1,7 @@
 import path from 'path';
 import { Build } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 import { ResourceRef } from 'azure-devops-node-api/interfaces/common/VSSInterfaces';
+import { WebApiTagDefinition } from 'azure-devops-node-api/interfaces/CoreInterfaces';
 import {
 	Comment,
 	CommentThreadContext,
@@ -343,6 +344,33 @@ export class PullRequestModel implements IPullRequestModel {
 			repoId!,
 			this.getPullRequestId(),
 		);
+	}
+
+	// Add a label (ADO tag) to this PR. Returns the created tag definition and keeps item.labels in sync.
+	async createLabel(name: string): Promise<WebApiTagDefinition | undefined> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = await azdoRepo.getRepositoryId();
+		const project = await azdoRepo.getRepositoryProject();
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+
+		const label = await git?.createPullRequestLabel({ name }, repoId!, this.getPullRequestId(), project);
+		if (label) {
+			this.item.labels = [...(this.item.labels ?? []), label];
+		}
+		return label;
+	}
+
+	// Remove a label from this PR by tag id or name (ADO's deletePullRequestLabels accepts either).
+	async deleteLabel(labelIdOrName: string): Promise<void> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = await azdoRepo.getRepositoryId();
+		const project = await azdoRepo.getRepositoryProject();
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+
+		await git?.deletePullRequestLabels(repoId!, this.getPullRequestId(), labelIdOrName, project);
+		this.item.labels = (this.item.labels ?? []).filter(l => l.id !== labelIdOrName && l.name !== labelIdOrName);
 	}
 
 	public async getWorkItemRefs(): Promise<ResourceRef[] | undefined> {

@@ -227,6 +227,20 @@ export class PRContext {
 		}
 	};
 
+	public addLabel = async () => {
+		const label = await this.postMessage({ command: 'pr.add-label' });
+		if (label) {
+			this.updatePR({ labels: [...(this.pr.labels ?? []), label] });
+		}
+	};
+
+	public removeLabel = async (name: string) => {
+		const res = await this.postMessage({ command: 'pr.remove-label', args: { name } });
+		if (res?.success) {
+			this.updatePR({ labels: (this.pr.labels ?? []).filter(l => l.name !== name) });
+		}
+	};
+
 	public applyPatch = async (commentContent: string, commentId: number, threadId: number) => {
 		this.postMessage({
 			command: 'pr.apply-patch',

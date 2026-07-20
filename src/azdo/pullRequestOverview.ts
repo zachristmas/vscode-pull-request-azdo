@@ -327,7 +327,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					createdAt: pullRequest.item.creationDate,
 					body: pullRequest.item.description,
 					bodyHTML: pullRequest.item.description,
-					labels: pullRequest.item.labels,
+					labels: (pullRequest.item.labels ?? []).map(l => ({ name: l.name ?? '', color: '' })),
 					author: {
 						id: pullRequest.item.createdBy?.id,
 						name: pullRequest.item.createdBy?.displayName,
@@ -445,6 +445,12 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		}
 		if (message.command === 'pr.search-pullRequests') {
 			return this.searchPullRequests(message);
+		}
+		if (message.command === 'pr.add-label') {
+			return this.addLabelToPr(message);
+		}
+		if (message.command === 'pr.remove-label') {
+			return this.removeLabelFromPr(message);
 		}
 		switch (message.command) {
 			case 'pr.checkout':
@@ -626,6 +632,36 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		// getPullRequestBrief never rejects (it catches internally and returns undefined).
 		const briefs = await Promise.all([...ids].map(id => this._item.azdoRepository.getPullRequestBrief(id)));
 		return briefs.filter((b): b is { id: number; title: string; status: number; url: string } => !!b);
+	}
+
+	// Add a label (ADO tag) via an input box, then create it on the PR. Replies with the new label
+	// ({ name, color }) so the sidebar can append it, or undefined if the user cancelled.
+	private async addLabelToPr(message: IRequestMessage<any>): Promise<void> {
+		try {
+			const name = await vscode.window.showInputBox({
+				ignoreFocusOut: true,
+				prompt: 'Label (tag) to add to this pull request',
+				validateInput: value => (value.trim() ? null : 'Label cannot be empty'),
+			});
+			if (!name?.trim()) {
+				return this._replyMessage(message, undefined);
+			}
+			const label = await this._item.createLabel(name.trim());
+			return this._replyMessage(message, { name: label?.name ?? name.trim(), color: '' });
+		} catch (e) {
+			this._throwError(message, formatError(e));
+			vscode.window.showErrorMessage(`Adding label failed. Error: ${formatError(e)}`);
+		}
+	}
+
+	private async removeLabelFromPr(message: IRequestMessage<{ name: string }>): Promise<void> {
+		try {
+			await this._item.deleteLabel(message.args.name);
+			return this._replyMessage(message, { success: true, name: message.args.name });
+		} catch (e) {
+			this._throwError(message, formatError(e));
+			vscode.window.showErrorMessage(`Removing label failed. Error: ${formatError(e)}`);
+		}
 	}
 
 	private async addReviewerToPr(message: IRequestMessage<any>) {
