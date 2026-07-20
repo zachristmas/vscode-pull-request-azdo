@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0
+
+- Copy Shareable Link. New command ("AzDO Pull Requests: Copy Shareable Link to Pull Request", in the command palette and the pull-request tree context menu) copies an https link, built from the new `azdoPullRequests.shareLinkBaseUrl` setting (e.g. `https://pr.example.com`), of the form `<base>/<project>/<pr>`. Paired with a small redirect page, that link opens the PR in VS Code and falls back to the Azure DevOps web page, so it stays clickable in tools like Teams that reject `vscode://` links. Leave the setting empty to disable the command.
+- Fix: SSH remotes with a space in the repository name. Repository resolution compared against the raw, percent-encoded repo name from the generic remote parser, so SSH remotes (e.g. `vs-ssh.visualstudio.com/v3/org/ECS%20Stores/ECS%20Stores`) never matched a real repository and no pull requests loaded ("No repo by that name in project ..."). It now uses the decoded name, matching how HTTPS remotes already behaved.
+
 ## 2.1.2
 
 Sign-in no longer requires a project, and prompts for the organization when it cannot be determined.

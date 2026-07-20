@@ -17,7 +17,7 @@ import { AzdoUserManager } from './azdo/userManager';
 import { getPositionFromThread } from './azdo/utils';
 import { AzdoWorkItem } from './azdo/workItem';
 import { CommentReply, resolveCommentHandler } from './commentHandlerResolver';
-import { buildPullRequestDeepLink, deepLinkParamsFromPullRequest } from './common/deepLink';
+import { buildPullRequestDeepLink, buildShareableLink, deepLinkParamsFromPullRequest } from './common/deepLink';
 import { DiffChangeType } from './common/diffHunk';
 import { getZeroBased } from './common/diffPositionMapping';
 import { GitChangeType } from './common/file';
@@ -331,6 +331,40 @@ export function registerCommands(
 			"azdopr.copyVscodeDeepLink" : {}
 		*/
 			telemetry.sendTelemetryEvent('azdopr.copyVscodeDeepLink');
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.copyShareableLink', async (e?: PullRequestArg) => {
+			const pullRequestModel = await resolveTargetPullRequest(reposManager, e);
+			if (!pullRequestModel) {
+				return;
+			}
+			const baseUrl = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('shareLinkBaseUrl')?.trim();
+			if (!baseUrl) {
+				const choice = await vscode.window.showErrorMessage(
+					'Set "azdoPullRequests.shareLinkBaseUrl" to your redirect page (e.g. https://pr.example.com) to copy a shareable link.',
+					'Open Settings',
+				);
+				if (choice) {
+					vscode.commands.executeCommand('workbench.action.openSettings', 'azdoPullRequests.shareLinkBaseUrl');
+				}
+				return;
+			}
+			const params = deepLinkParamsFromPullRequest(pullRequestModel);
+			if (!params) {
+				vscode.window.showErrorMessage(
+					'Unable to build a shareable link: the organization or project of this pull request could not be determined.',
+				);
+				return;
+			}
+			await vscode.env.clipboard.writeText(buildShareableLink(baseUrl, params));
+			vscode.window.showInformationMessage('Shareable link copied to clipboard.');
+
+			/* __GDPR__
+			"azdopr.copyShareableLink" : {}
+		*/
+			telemetry.sendTelemetryEvent('azdopr.copyShareableLink');
 		}),
 	);
 
