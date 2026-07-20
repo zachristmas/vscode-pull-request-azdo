@@ -99,8 +99,13 @@ export class AzdoRepository implements vscode.Disposable {
 			return undefined;
 		}
 
-		const repoName = this.remote.repositoryName;
 		const parsedRemote = parseAzdoRemoteUrl(this.remote.url);
+		// Use the ADO-parsed repo name (percent-decoded, e.g. "ECS%20Stores" -> "ECS Stores"), not the
+		// generic Remote parser's raw value. An SSH remote (vs-ssh.visualstudio.com/v3/...) leaves the
+		// repo segment encoded, so the encoded name never matched a real repository and every lookup
+		// failed with "No repo by that name" (seen on Windows / SSH-remote setups). Fall back to the
+		// generic name for non-ADO or unparseable remotes.
+		const repoName = parsedRemote?.repositoryName ?? this.remote.repositoryName;
 		const remoteProjectName = parsedRemote?.projectName ?? this._hub?.projectName;
 		// Track whether every lookup got a clean answer from the server; only a clean
 		// "not found" is cached, a thrown lookup stays retryable.

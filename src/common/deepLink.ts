@@ -68,6 +68,28 @@ export function parsePullRequestDeepLink(uri: { path: string; query: string }): 
 	return { orgUrl, project, repo, prNumber, filePath, line };
 }
 
+// A path segment for the shareable link: percent-encoded, but spaces as '+' so the link survives
+// auto-linkifiers (e.g. Teams) without breaking on a literal space.
+function encodeShareSegment(value: string): string {
+	return encodeURIComponent(value).replaceAll('%20', '+');
+}
+
+// Build the https "shareable" link that a redirect page (baseUrl) turns back into the vscode:// deep
+// link, falling back to the Azure DevOps web URL for anyone without the extension. Short path form:
+// <base>/<project>[/<repo>]/<pr>. The repo segment is omitted when it matches the project.
+export function buildShareableLink(baseUrl: string, params: PullRequestDeepLinkParams): string {
+	let base = baseUrl;
+	while (base.endsWith('/')) {
+		base = base.slice(0, -1);
+	}
+	const parts = [encodeShareSegment(params.project)];
+	if (params.repo && params.repo !== params.project) {
+		parts.push(encodeShareSegment(params.repo));
+	}
+	parts.push(String(params.prNumber));
+	return `${base}/${parts.join('/')}`;
+}
+
 export function deepLinkParamsFromPullRequest(pr: PullRequestModel): PullRequestDeepLinkParams | undefined {
 	const orgUrl = pr.azdoRepository.azdo?.orgUrl;
 	const project = pr.item.repository?.project?.name ?? pr.azdoRepository.azdo?.projectName;
