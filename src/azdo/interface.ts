@@ -21,6 +21,7 @@ export enum PRType {
 	LocalPullRequest,
 	CreatedByMe,
 	AssignedToMe,
+	NeedsMyReview,
 	AllStatuses,
 }
 

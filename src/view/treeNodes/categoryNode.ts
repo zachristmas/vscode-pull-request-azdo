@@ -134,6 +134,9 @@ export class CategoryTreeNode extends TreeNode implements vscode.TreeItem {
 			case PRType.AssignedToMe:
 				this.label = 'Assigned To Me';
 				break;
+			case PRType.NeedsMyReview:
+				this.label = 'Waiting For My Review';
+				break;
 			case PRType.CreatedByMe:
 				this.label = 'Created By Me';
 				break;
