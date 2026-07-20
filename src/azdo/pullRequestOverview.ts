@@ -18,7 +18,7 @@ import {
 import * as vscode from 'vscode';
 import { onDidUpdatePR } from '../commands';
 import { buildShareableLink, deepLinkParamsFromPullRequest } from '../common/deepLink';
-import { DiffHunk } from '../common/diffHunk';
+import { DiffChangeType, DiffHunk } from '../common/diffHunk';
 import Logger from '../common/logger';
 import { formatError } from '../common/utils';
 import { getNonce, IRequestMessage, WebviewBase } from '../common/webview';
@@ -36,6 +36,40 @@ import {
 	getThreadDiffHunkExcerpt,
 } from './utils';
 import { AzdoWorkItem } from './workItem';
+
+type FileChangeStatus = 'A' | 'M' | 'D' | 'R' | '?';
+
+// Sent to the webview for the "Files changed" section. Structural shape only - the webview mirrors it
+// in cache.ts; postMessage payloads are untyped JSON across the boundary.
+interface FileChangeSummary {
+	fileName: string;
+	previousFileName?: string;
+	status: FileChangeStatus;
+	additions: number;
+	deletions: number;
+	hunks?: DiffHunk[];
+	truncated?: boolean;
+	binary?: boolean;
+}
+
+// ADO reports change type as a string (sometimes a combined one like "sourceRename, edit"); collapse it
+// to a single glyph. Delete/rename are checked before add/edit so combined types classify sensibly.
+function normalizeChangeStatus(status: string | number | undefined): FileChangeStatus {
+	const s = String(status ?? '').toLowerCase();
+	if (s.includes('delete')) {
+		return 'D';
+	}
+	if (s.includes('rename')) {
+		return 'R';
+	}
+	if (s.includes('add')) {
+		return 'A';
+	}
+	if (s.includes('edit') || s.includes('modif')) {
+		return 'M';
+	}
+	return '?';
+}
 
 export class PullRequestOverviewPanel extends WebviewBase {
 	public static readonly ID: string = 'PullRequestOverviewPanel';
@@ -375,6 +409,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					mergeFailureMessage: pullRequest.item.mergeFailureMessage,
 					mergeFailureType: pullRequest.item.mergeFailureType,
 					reviewers: this._existingReviewers,
+					fileChanges: this.buildFileChangeSummaries(fileChanges),
 					isDraft: pullRequest.isDraft,
 					mergeMethodsAvailability,
 					defaultMergeMethod,
@@ -403,6 +438,60 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			return await pullRequestModel.getFileChangesInfo();
 		} catch {
 			return;
+		}
+	}
+
+	// Files above this many diff lines are listed (with +/- counts) but not previewed inline; the row
+	// still opens the full diff in the native editor. Keeps the init payload and the DOM bounded.
+	private static readonly FILE_HUNK_LINE_CAP = 500;
+
+	// Compact per-file summary for the "Files changed" section. getFileChangesInfo already parsed the
+	// diff into diffHunks, so counts and inline previews are free (no extra fetch).
+	private buildFileChangeSummaries(fileChanges: IRawFileChange[] | undefined): FileChangeSummary[] {
+		if (!fileChanges) {
+			return [];
+		}
+		return fileChanges.map(change => {
+			const hunks = change.diffHunks ?? [];
+			let additions = 0;
+			let deletions = 0;
+			let lineCount = 0;
+			for (const hunk of hunks) {
+				for (const line of hunk.diffLines) {
+					lineCount++;
+					if (line.type === DiffChangeType.Add) {
+						additions++;
+					} else if (line.type === DiffChangeType.Delete) {
+						deletions++;
+					}
+				}
+			}
+			const hasPatch = hunks.length > 0;
+			const truncated = hasPatch && lineCount > PullRequestOverviewPanel.FILE_HUNK_LINE_CAP;
+			return {
+				fileName: change.filename,
+				previousFileName: change.previous_filename,
+				status: normalizeChangeStatus(change.status),
+				additions,
+				deletions,
+				// Omit hunks when there is nothing to preview (binary/empty) or the file is too large to
+				// inline; the row still opens the full diff in the native editor.
+				hunks: hasPatch && !truncated ? hunks : undefined,
+				truncated,
+				binary: !hasPatch,
+			};
+		});
+	}
+
+	private async openFileDiff(message: IRequestMessage<{ fileName: string }>): Promise<void> {
+		try {
+			// Same no-checkout diff path the vscode:// deep link uses, so a shared-link reviewer can open
+			// any file's diff without checking the branch out.
+			await PullRequestModel.openDiffForFile(this._folderRepositoryManager, this._item, message.args.fileName);
+			this._replyMessage(message, {});
+		} catch (e) {
+			this._throwError(message, formatError(e));
+			vscode.window.showErrorMessage(`Could not open the diff for ${message.args.fileName}. ${formatError(e)}`);
 		}
 	}
 
@@ -494,6 +583,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.applyPatch(message);
 			case 'pr.open-diff':
 				return this.openDiff(message);
+			case 'pr.open-file-diff':
+				return this.openFileDiff(message);
 			case 'pr.associate-workItem':
 				return this.associateWorkItemWithPR(message);
 			case 'pr.remove-workItem':

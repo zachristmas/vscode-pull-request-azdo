@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.0
+
+- Files changed. The pull request page now has a "Files changed (N)" section listing every changed file with its status and +/- line counts. Click a file to open its full diff in the editor - no branch checkout needed, so a shared PR link opens straight to a reviewable state. Each file expands to an inline preview of the diff; very large or binary files skip the preview and just offer "Open diff".
+
 ## 2.2.3
 
 - Fix: labels never appeared in the sidebar. Labels are not returned by the pull-request fetch, so they were never loaded; an added label persisted in Azure DevOps but vanished on the next refresh. They are now fetched explicitly and displayed.

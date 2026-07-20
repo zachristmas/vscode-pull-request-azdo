@@ -1489,3 +1489,149 @@ code {
 .comment-body li {
 	white-space: pre-wrap;
 }
+
+/* Files changed section */
+#changed-files {
+	margin: var(--azdo-space-2) 0;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.changed-files-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
+	background: var(--vscode-sideBarSectionHeader-background, transparent);
+	border: none;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-weight: 600;
+	text-align: left;
+}
+
+.changed-files-title:hover,
+.changed-files-title:focus {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.changed-files-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.changed-file {
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+.changed-file-header {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+	padding: var(--azdo-space-1) var(--azdo-space-3);
+}
+
+.changed-file-header:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.changed-file-toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+	flex: 1 1 auto;
+	min-width: 0;
+	background: none;
+	border: none;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	text-align: left;
+}
+
+.changed-file-toggle:disabled {
+	cursor: default;
+	opacity: 0.9;
+}
+
+.changed-file-toggle .file-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.file-status {
+	flex: 0 0 auto;
+	width: 1.2em;
+	text-align: center;
+	font-weight: 700;
+	border-radius: 3px;
+}
+
+.file-status.status-A {
+	color: var(--vscode-gitDecoration-addedResourceForeground, #587c0c);
+}
+
+.file-status.status-M {
+	color: var(--vscode-gitDecoration-modifiedResourceForeground, #895503);
+}
+
+.file-status.status-D {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, #ad0707);
+}
+
+.file-status.status-R {
+	color: var(--vscode-gitDecoration-renamedResourceForeground, #007100);
+}
+
+.file-stats {
+	flex: 0 0 auto;
+	display: inline-flex;
+	gap: var(--azdo-space-2);
+	font-variant-numeric: tabular-nums;
+}
+
+.file-stats .additions {
+	color: var(--vscode-gitDecoration-addedResourceForeground, #587c0c);
+}
+
+.file-stats .deletions {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, #ad0707);
+}
+
+.file-note {
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+}
+
+.link-button.open-file-diff {
+	flex: 0 0 auto;
+	background: none;
+	border: none;
+	color: var(--vscode-textLink-foreground);
+	cursor: pointer;
+	padding: 0;
+}
+
+.link-button.open-file-diff:hover {
+	text-decoration: underline;
+}
+
+.changed-file-preview {
+	padding: 0 var(--azdo-space-3) var(--azdo-space-2);
+	max-height: 480px;
+	overflow: auto;
+}
+
+.file-diff-preview {
+	margin-top: var(--azdo-space-1);
+}
+
+.file-diff-preview .diffLine {
+	white-space: pre;
+}
+
+.file-diff-preview .diffLineContent {
+	white-space: pre;
+}
