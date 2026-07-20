@@ -5,12 +5,14 @@
 
 import * as vscode from 'vscode';
 import { REMOTES_SETTING, ReposManagerState } from '../azdo/folderRepositoryManager';
+import { PullRequestModel } from '../azdo/pullRequestModel';
 import { RepositoriesManager } from '../azdo/repositoriesManager';
 import { ITelemetry } from '../common/telemetry';
 import { SETTINGS_NAMESPACE } from '../constants';
 import { FileViewedDecorationProvider } from './fileViewedDecorationProvider';
 import { DecorationProvider } from './treeDecorationProvider';
 import { CategoryTreeNode, PRCategoryActionNode, PRCategoryActionType } from './treeNodes/categoryNode';
+import { PRNode } from './treeNodes/pullRequestNode';
 import { BaseTreeNode, TreeNode } from './treeNodes/treeNode';
 import { WorkspaceFolderNode } from './treeNodes/workspaceFolderNode';
 
@@ -48,6 +50,12 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 			}),
 		);
 
+		this._disposables.push(
+			vscode.commands.registerCommand('azdopr.revealPullRequestInTree', (pr: PullRequestModel) =>
+				this.revealPullRequestInTree(pr),
+			),
+		);
+
 		this._view = vscode.window.createTreeView('azdopr:azdo', {
 			treeDataProvider: this,
 			showCollapseAll: true,
@@ -65,7 +73,6 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 					...(isLoggedIn ? ['Sign out of Azure Devops...'] : []),
 				]);
 
-				 
 				const { name, publisher } = require('../../package.json') as { name: string; publisher: string };
 				const extensionId = `${publisher}.${name}`;
 
@@ -96,6 +103,47 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 
 	async reveal(element: TreeNode, options?: { select?: boolean; focus?: boolean; expand?: boolean }): Promise<void> {
 		return this._view.reveal(element, options);
+	}
+
+	// Selects the pull request in the tree that matches the given model, so the node highlights when its
+	// overview tab is focused (parity with the GitHub PR extension). Best-effort: a collapsed view
+	// container, an unloaded tree, or a PR that is not in any listed category simply does nothing. Nodes
+	// carry stable ids, so reveal resolves them even though getChildren rebuilds instances each call.
+	async revealPullRequestInTree(pullRequestModel: PullRequestModel): Promise<void> {
+		// Nothing to select into if the view container is collapsed/hidden; also avoids the category
+		// list fetches below on every tab focus when the tree is not even on screen.
+		if (!this._view.visible) {
+			return;
+		}
+		try {
+			const categories = await this.getCategoryNodes();
+			for (const category of categories) {
+				const children = await category.getChildren();
+				const match = children.find(
+					(node): node is PRNode => node instanceof PRNode && node.pullRequestModel.equals(pullRequestModel),
+				);
+				if (match) {
+					await this._view.reveal(match, { select: true, focus: false, expand: true });
+					return;
+				}
+			}
+		} catch {
+			// Reveal is a convenience; never let it throw into a panel focus/open handler.
+		}
+	}
+
+	private async getCategoryNodes(): Promise<CategoryTreeNode[]> {
+		const roots = await this.getChildren();
+		const categories: CategoryTreeNode[] = [];
+		for (const node of roots) {
+			if (node instanceof CategoryTreeNode) {
+				categories.push(node);
+			} else if (node instanceof WorkspaceFolderNode) {
+				const children = await node.getChildren();
+				categories.push(...children.filter((child): child is CategoryTreeNode => child instanceof CategoryTreeNode));
+			}
+		}
+		return categories;
 	}
 
 	initialize(reposManager: RepositoriesManager) {
@@ -147,7 +195,9 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 
 	async getChildren(element?: TreeNode): Promise<TreeNode[]> {
 		if (!this._reposManager) {
-			return !vscode.workspace.workspaceFolders ? Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoOpenFolder)]) : Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoGitRepositories)]);
+			return !vscode.workspace.workspaceFolders
+				? Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoOpenFolder)])
+				: Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoGitRepositories)]);
 		}
 
 		if (this._reposManager.state === ReposManagerState.Initializing) {

@@ -19,6 +19,9 @@ export interface IQueryInfo {
 export class WorkspaceFolderNode extends TreeNode implements vscode.TreeItem {
 	public collapsibleState: vscode.TreeItemCollapsibleState;
 	public iconPath?: string | { light: vscode.Uri; dark: vscode.Uri };
+	// Stable id so TreeView.reveal can locate this node by id rather than by object reference
+	// (getChildren rebuilds these nodes, so reference matching would fail on reveal).
+	public id: string;
 
 	constructor(
 		parent: TreeNodeParent,
@@ -30,6 +33,7 @@ export class WorkspaceFolderNode extends TreeNode implements vscode.TreeItem {
 		this.parent = parent;
 		this.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
 		this.label = path.basename(uri.fsPath);
+		this.id = uri.toString();
 	}
 
 	getTreeItem(): vscode.TreeItem {

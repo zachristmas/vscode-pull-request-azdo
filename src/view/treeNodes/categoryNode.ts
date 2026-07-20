@@ -108,6 +108,9 @@ export class CategoryTreeNode extends TreeNode implements vscode.TreeItem {
 	public prs: PullRequestModel[];
 	public fetchNextPage: boolean = false;
 	public repositoryPageInformation: Map<string, PageInformation> = new Map<string, PageInformation>();
+	// Stable id (per folder + category) so TreeView.reveal can match this node by id even though
+	// getChildren rebuilds the category nodes on every call.
+	public id: string;
 
 	constructor(
 		public parent: TreeNodeParent,
@@ -146,6 +149,7 @@ export class CategoryTreeNode extends TreeNode implements vscode.TreeItem {
 			default:
 				break;
 		}
+		this.id = `${this._folderRepoManager.repository.rootUri.toString()}#category#${this._type}#${this.label ?? ''}`;
 	}
 
 	// Loads local (checked-out) pull request branches into this.prs. Returns needLogin.
