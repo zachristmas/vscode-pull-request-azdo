@@ -44,10 +44,6 @@ export interface FileChangeSummary {
 	status: FileChangeStatus;
 	additions: number;
 	deletions: number;
-	// Present only when the file is small enough to preview inline (not binary, under the host's line cap).
-	hunks?: DiffHunk[];
-	truncated?: boolean;
-	binary?: boolean;
 }
 
 export interface PullRequest {

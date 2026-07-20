@@ -435,7 +435,9 @@ body .comment-container .comment-body > div > p:last-child,
 body {
 	margin: auto;
 	width: 100%;
-	max-width: 925px;
+	/* Fluid up to a cap: the old 925px column left wide monitors mostly empty, but fully unbounded
+	   makes long comment/diff lines unreadable - 1600px is the middle ground, still centered. */
+	max-width: 1600px;
 	padding: 0 32px var(--azdo-space-6);
 	box-sizing: border-box;
 }
@@ -1490,31 +1492,52 @@ code {
 	white-space: pre-wrap;
 }
 
-/* Files changed section */
+/* Conversation / Files tabs */
+.pr-tabs {
+	display: flex;
+	gap: var(--azdo-space-1);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	margin-bottom: var(--azdo-space-4);
+}
+
+.pr-tab {
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
+	font-size: 13px;
+}
+
+.pr-tab:hover {
+	color: var(--vscode-textLink-activeForeground);
+}
+
+.pr-tab.selected {
+	border-bottom-color: var(--vscode-textLink-activeForeground, var(--vscode-focusBorder));
+	font-weight: 600;
+}
+
+/* Files changed tab */
 #changed-files {
-	margin: var(--azdo-space-2) 0;
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 4px;
 	overflow: hidden;
 }
 
-.changed-files-title {
+.changed-files-summary {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	width: 100%;
 	padding: var(--azdo-space-2) var(--azdo-space-3);
 	background: var(--vscode-sideBarSectionHeader-background, transparent);
-	border: none;
-	color: var(--vscode-foreground);
-	cursor: pointer;
 	font-weight: 600;
-	text-align: left;
 }
 
-.changed-files-title:hover,
-.changed-files-title:focus {
-	background: var(--vscode-list-hoverBackground);
+.changed-files-empty {
+	color: var(--vscode-descriptionForeground);
+	padding: var(--azdo-space-3);
 }
 
 .changed-files-list {
@@ -1522,40 +1545,28 @@ code {
 	flex-direction: column;
 }
 
-.changed-file {
-	border-top: 1px solid var(--vscode-panel-border);
-}
-
-.changed-file-header {
+.changed-file-row {
 	display: flex;
 	align-items: center;
 	gap: var(--azdo-space-2);
+	width: 100%;
 	padding: var(--azdo-space-1) var(--azdo-space-3);
-}
-
-.changed-file-header:hover {
-	background: var(--vscode-list-hoverBackground);
-}
-
-.changed-file-toggle {
-	display: flex;
-	align-items: center;
-	gap: var(--azdo-space-2);
-	flex: 1 1 auto;
-	min-width: 0;
 	background: none;
 	border: none;
+	border-top: 1px solid var(--vscode-panel-border);
 	color: var(--vscode-foreground);
 	cursor: pointer;
 	text-align: left;
 }
 
-.changed-file-toggle:disabled {
-	cursor: default;
-	opacity: 0.9;
+.changed-file-row:hover,
+.changed-file-row:focus {
+	background: var(--vscode-list-hoverBackground);
 }
 
-.changed-file-toggle .file-name {
+.changed-file-row .file-name {
+	flex: 1 1 auto;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1566,7 +1577,6 @@ code {
 	width: 1.2em;
 	text-align: center;
 	font-weight: 700;
-	border-radius: 3px;
 }
 
 .file-status.status-A {
@@ -1598,40 +1608,4 @@ code {
 
 .file-stats .deletions {
 	color: var(--vscode-gitDecoration-deletedResourceForeground, #ad0707);
-}
-
-.file-note {
-	color: var(--vscode-descriptionForeground);
-	font-style: italic;
-}
-
-.link-button.open-file-diff {
-	flex: 0 0 auto;
-	background: none;
-	border: none;
-	color: var(--vscode-textLink-foreground);
-	cursor: pointer;
-	padding: 0;
-}
-
-.link-button.open-file-diff:hover {
-	text-decoration: underline;
-}
-
-.changed-file-preview {
-	padding: 0 var(--azdo-space-3) var(--azdo-space-2);
-	max-height: 480px;
-	overflow: auto;
-}
-
-.file-diff-preview {
-	margin-top: var(--azdo-space-1);
-}
-
-.file-diff-preview .diffLine {
-	white-space: pre;
-}
-
-.file-diff-preview .diffLineContent {
-	white-space: pre;
 }

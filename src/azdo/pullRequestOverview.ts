@@ -9,6 +9,7 @@ import {
 	GitPullRequestMergeStrategy,
 	IdentityRefWithVote,
 	PullRequestStatus,
+	VersionControlChangeType,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import {
 	AccountRecentActivityWorkItemModel2,
@@ -39,36 +40,46 @@ import { AzdoWorkItem } from './workItem';
 
 type FileChangeStatus = 'A' | 'M' | 'D' | 'R' | '?';
 
-// Sent to the webview for the "Files changed" section. Structural shape only - the webview mirrors it
-// in cache.ts; postMessage payloads are untyped JSON across the boundary.
+// Sent to the webview for the "Files changed" tab. Structural shape only - the webview mirrors it in
+// cache.ts; postMessage payloads are untyped JSON across the boundary. No diff text: ADO's diff API
+// returns changed line numbers, not content, so clicking a file opens the full diff in the editor.
 interface FileChangeSummary {
 	fileName: string;
 	previousFileName?: string;
 	status: FileChangeStatus;
 	additions: number;
 	deletions: number;
-	hunks?: DiffHunk[];
-	truncated?: boolean;
-	binary?: boolean;
 }
 
-// ADO reports change type as a string (sometimes a combined one like "sourceRename, edit"); collapse it
-// to a single glyph. Delete/rename are checked before add/edit so combined types classify sensibly.
+// Delete/rename are listed before add/edit because the numeric bits can combine (e.g. Rename|Edit) and
+// the string form can too ("sourceRename, edit"); first match wins.
+const CHANGE_CODE_TO_STATUS: [number, FileChangeStatus][] = [
+	[VersionControlChangeType.Delete, 'D'],
+	[VersionControlChangeType.Rename, 'R'],
+	[VersionControlChangeType.Add, 'A'],
+	[VersionControlChangeType.Edit, 'M'],
+];
+const CHANGE_WORD_TO_STATUS: [string, FileChangeStatus][] = [
+	['delete', 'D'],
+	['rename', 'R'],
+	['add', 'A'],
+	['edit', 'M'],
+	['modif', 'M'],
+];
+
+// The azure-devops-node-api client deserializes changeType into the numeric VersionControlChangeType
+// enum (a bit flag: Add=1, Edit=2, Rename=8, Delete=16), so collapse that to a single glyph. A string
+// value (older/raw responses) is handled as a fallback.
 function normalizeChangeStatus(status: string | number | undefined): FileChangeStatus {
-	const s = String(status ?? '').toLowerCase();
-	if (s.includes('delete')) {
-		return 'D';
+	if (status === undefined) {
+		return '?';
 	}
-	if (s.includes('rename')) {
-		return 'R';
+	const numeric = typeof status === 'number' ? status : Number(status);
+	if (Number.isFinite(numeric) && numeric > 0) {
+		return CHANGE_CODE_TO_STATUS.find(([bit]) => (numeric & bit) !== 0)?.[1] ?? '?';
 	}
-	if (s.includes('add')) {
-		return 'A';
-	}
-	if (s.includes('edit') || s.includes('modif')) {
-		return 'M';
-	}
-	return '?';
+	const s = String(status).toLowerCase();
+	return CHANGE_WORD_TO_STATUS.find(([word]) => s.includes(word))?.[1] ?? '?';
 }
 
 export class PullRequestOverviewPanel extends WebviewBase {
@@ -441,24 +452,18 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		}
 	}
 
-	// Files above this many diff lines are listed (with +/- counts) but not previewed inline; the row
-	// still opens the full diff in the native editor. Keeps the init payload and the DOM bounded.
-	private static readonly FILE_HUNK_LINE_CAP = 500;
-
-	// Compact per-file summary for the "Files changed" section. getFileChangesInfo already parsed the
-	// diff into diffHunks, so counts and inline previews are free (no extra fetch).
+	// Compact per-file summary for the "Files changed" tab. getFileChangesInfo already parsed the diff
+	// into diffHunks, so the +/- counts are free (the line types are set even though ADO omits the text).
 	private buildFileChangeSummaries(fileChanges: IRawFileChange[] | undefined): FileChangeSummary[] {
 		if (!fileChanges) {
 			return [];
 		}
 		return fileChanges.map(change => {
-			const hunks = change.diffHunks ?? [];
 			let additions = 0;
 			let deletions = 0;
-			let lineCount = 0;
+			const hunks = change.diffHunks ?? [];
 			for (const hunk of hunks) {
 				for (const line of hunk.diffLines) {
-					lineCount++;
 					if (line.type === DiffChangeType.Add) {
 						additions++;
 					} else if (line.type === DiffChangeType.Delete) {
@@ -466,19 +471,12 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					}
 				}
 			}
-			const hasPatch = hunks.length > 0;
-			const truncated = hasPatch && lineCount > PullRequestOverviewPanel.FILE_HUNK_LINE_CAP;
 			return {
 				fileName: change.filename,
 				previousFileName: change.previous_filename,
 				status: normalizeChangeStatus(change.status),
 				additions,
 				deletions,
-				// Omit hunks when there is nothing to preview (binary/empty) or the file is too large to
-				// inline; the row still opens the full diff in the native editor.
-				hunks: hasPatch && !truncated ? hunks : undefined,
-				truncated,
-				binary: !hasPatch,
 			};
 		});
 	}
