@@ -157,47 +157,71 @@ export class CredentialStore implements vscode.Disposable {
 	}
 
 	public getOrgConfig(): AzdoOrgConfig | undefined {
-		let projectName = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PROJECT_SETTINGS);
-		let orgUrl = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(ORGURL_SETTINGS);
+		const projectName = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PROJECT_SETTINGS);
+		const orgUrl = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(ORGURL_SETTINGS);
 
-		if (!projectName || !orgUrl) {
-			const remotes = this._gitAPI.repositories.map(r => parseRepositoryRemotes(r));
-			const inferredConfigs = remotes
-				.map(r => this.inferOrgConfigFromGitRemote(r))
-				.filter((c): c is AzdoOrgConfig => !!c && !!c.orgUrl && !!c.projectName);
+		// orgUrl is all sign-in needs; the project is optional. Each repository derives its own project
+		// from its remote, and repo lookup falls back to an org-wide search when none is set - so a
+		// configured orgUrl is enough even with no project. Only infer from git when orgUrl is absent.
+		if (orgUrl) {
+			return new AzdoOrgConfig(orgUrl, projectName ?? '');
+		}
 
-			// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
-			if (new Set(inferredConfigs.map(a => a.orgUrl)).size !== 1) {
-				Logger.appendLine(
-					`Unable to infer org config from git. Repository Length: ${
-						this._gitAPI.repositories.length
-					}. Inferred Configs: ${JSON.stringify(inferredConfigs)}`,
-					CredentialStore.ID,
-				);
-				return undefined;
-			}
+		const remotes = this._gitAPI.repositories.map(r => parseRepositoryRemotes(r));
+		const inferredConfigs = remotes
+			.map(r => this.inferOrgConfigFromGitRemote(r))
+			.filter((c): c is AzdoOrgConfig => !!c && !!c.orgUrl);
 
+		// TODO: Need better way of handling multiple repositories. CredentialStore should be initialized within each FolderRepositoryManager and scoped to particular AzDORepository.
+		if (new Set(inferredConfigs.map(a => a.orgUrl)).size !== 1) {
 			Logger.appendLine(
-				`Selected orgUrl: ${inferredConfigs[0]?.orgUrl}, projectName: ${inferredConfigs[0]?.projectName}`,
+				`Unable to infer org config from git. Repository Length: ${
+					this._gitAPI.repositories.length
+				}. Inferred Configs: ${JSON.stringify(inferredConfigs)}`,
 				CredentialStore.ID,
 			);
-			return inferredConfigs[0];
-		}
-
-		if (!projectName) {
-			Logger.appendLine('Project name is not provided', CredentialStore.ID);
-			this._telemetry.sendTelemetryEvent('auth.failed');
 			return undefined;
 		}
 
+		// Prefer an inferred config that also carries a project; otherwise the project stays empty.
+		const chosen = inferredConfigs.find(c => !!c.projectName) ?? inferredConfigs[0];
+		Logger.appendLine(`Selected orgUrl: ${chosen.orgUrl}, projectName: ${chosen.projectName}`, CredentialStore.ID);
+		return new AzdoOrgConfig(chosen.orgUrl, chosen.projectName ?? '');
+	}
+
+	// When the org can't be determined (no orgUrl setting and no Azure DevOps git remote), ask for the
+	// organization URL directly instead of only pointing at Settings, and persist it (globally) so
+	// sign-in does not ask again. The project stays optional.
+	private async promptForOrgConfig(): Promise<AzdoOrgConfig | undefined> {
+		const entered = await vscode.window.showInputBox({
+			ignoreFocusOut: true,
+			title: 'Azure DevOps Organization URL',
+			prompt: 'Enter your Azure DevOps organization URL to sign in',
+			placeHolder: 'https://dev.azure.com/your-organization',
+			validateInput: value => {
+				const trimmed = value.trim();
+				if (!trimmed) {
+					return 'Organization URL is required';
+				}
+				return /^https?:\/\/\S+/i.test(trimmed)
+					? null
+					: 'Enter a full URL, e.g. https://dev.azure.com/your-organization';
+			},
+		});
+		const orgUrl = entered?.trim();
 		if (!orgUrl) {
-			Logger.appendLine('orgUrl is not provided', CredentialStore.ID);
-			this._telemetry.sendTelemetryEvent('auth.failed');
 			return undefined;
 		}
-
-		Logger.appendLine(`orgUrl is ${orgUrl}. Project name is ${projectName}`, CredentialStore.ID);
+		await vscode.workspace
+			.getConfiguration(SETTINGS_NAMESPACE)
+			.update(ORGURL_SETTINGS, orgUrl, vscode.ConfigurationTarget.Global);
+		const projectName = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>(PROJECT_SETTINGS) ?? '';
 		return new AzdoOrgConfig(orgUrl, projectName);
+	}
+
+	// Org config from settings or a git remote if possible, otherwise prompt the user for the org URL.
+	private async resolveOrgConfig(): Promise<AzdoOrgConfig | undefined> {
+		return this.getOrgConfig() ?? (await this.promptForOrgConfig());
 	}
 
 	// Missing-org-config error notification with a shortcut into the extension settings.
@@ -205,7 +229,7 @@ export class CredentialStore implements vscode.Disposable {
 		vscode.window
 			.showErrorMessage(
 				vscode.l10n.t(
-					'Azure DevOps sign-in failed: could not determine organization and project. Set "azdoPullRequests.orgUrl" and "azdoPullRequests.projectName" in settings, or make sure a git remote points at an Azure DevOps URL.',
+					'Azure DevOps sign-in failed: could not determine your organization. Set "azdoPullRequests.orgUrl" in settings, or open a folder whose git remote points at an Azure DevOps URL. (The project name is optional.)',
 				),
 				vscode.l10n.t('Open Settings'),
 			)
@@ -249,7 +273,9 @@ export class CredentialStore implements vscode.Disposable {
 		*/
 		this._telemetry.sendTelemetryEvent('auth.start');
 
-		const orgConfig = this.getOrgConfig();
+		// Falls back to asking for the org URL when it can't be read from settings or a git remote,
+		// rather than dead-ending at an error the user has to translate into a settings edit.
+		const orgConfig = await this.resolveOrgConfig();
 		if (!orgConfig) {
 			Logger.appendLine('Unable to get org config', CredentialStore.ID);
 			this._telemetry.sendTelemetryEvent('auth.failed');
