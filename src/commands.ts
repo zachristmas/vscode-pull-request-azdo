@@ -854,6 +854,8 @@ export function registerCommands(
 			}
 			const pullRequest = ensurePR(folderManager, pullRequestModel);
 			descriptionNode?.reveal(descriptionNode, { select: true, focus: true });
+			// Highlight the PR in the main PR list tree so the open tab and the tree agree.
+			vscode.commands.executeCommand('azdopr.revealPullRequestInTree', pullRequest);
 			// Create and show a new webview
 			PullRequestOverviewPanel.createOrShow(context.extensionPath, folderManager, pullRequest, workItem, azdoUserManager);
 

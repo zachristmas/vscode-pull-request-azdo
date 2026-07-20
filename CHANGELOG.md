@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.3
+
+- Fix: labels never appeared in the sidebar. Labels are not returned by the pull-request fetch, so they were never loaded; an added label persisted in Azure DevOps but vanished on the next refresh. They are now fetched explicitly and displayed.
+- Fix: adding or removing a reviewer reverted on the next panel refresh. The reviewer list was rebuilt from a stale copy of the pull request rather than the freshly fetched one, so a just-added reviewer disappeared and a just-removed reviewer reappeared. Note: if a branch policy lists you as an automatically-included reviewer, Azure DevOps re-adds you immediately after removal - that is the policy, not the extension.
+
 ## 2.2.2
 
 - A deep link to a repository that is not open in any window now offers an "Open on the web" button instead of dead-ending at an error. A shared pull-request link still reaches the PR (on the Azure DevOps web) when the recipient has not opened that repository in VS Code.

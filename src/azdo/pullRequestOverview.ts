@@ -167,6 +167,12 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		// shows current data instead of a stale snapshot (item 3).
 		this._panel.onDidChangeViewState(
 			() => {
+				// Keep the PR list tree in sync with the focused tab: selecting this PR mirrors the
+				// GitHub PR extension. Best-effort and low-frequency (only on tab focus).
+				if (this._panel.active && this._item) {
+					vscode.commands.executeCommand('azdopr.revealPullRequestInTree', this._item);
+				}
+
 				if (!(this._panel.visible && this._refreshWhenVisible)) {
 					return;
 				}
@@ -249,6 +255,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				// Thread hunk excerpts are progressive enhancement too: without file diffs the
 				// timeline still renders, just without inline diff context on thread cards.
 				this.getFileChangesOrUndefined(pullRequestModel),
+				// Labels are not part of the PR fetch, so pull them separately (progressive enhancement).
+				pullRequestModel.getLabels().catch(() => []),
 			]);
 			const [
 				pullRequest,
@@ -261,6 +269,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				workItems,
 				policies,
 				fileChanges,
+				labels,
 			] = result;
 			const canEditPr = pullRequest?.canEdit();
 			if (!pullRequest) {
@@ -270,7 +279,11 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					}`,
 				);
 			}
-			const requestedReviewers = pullRequestModel.item.reviewers;
+			// Read reviewers from the freshly-resolved `pullRequest` (result[0]), NOT the caller's
+			// `pullRequestModel` - the latter is the tree's model, fetched earlier, so its item.reviewers
+			// is stale. Reading it here reverted every add/remove on the next refresh: an added reviewer
+			// vanished and a removed one reappeared ("something adding it back").
+			const requestedReviewers = pullRequest.item.reviewers;
 
 			this._item = pullRequest;
 			this._repositoryDefaultBranch = defaultBranch!;
@@ -327,7 +340,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					createdAt: pullRequest.item.creationDate,
 					body: pullRequest.item.description,
 					bodyHTML: pullRequest.item.description,
-					labels: (pullRequest.item.labels ?? []).map(l => ({ name: l.name ?? '', color: '' })),
+					labels: (labels ?? []).map(l => ({ name: l.name ?? '', color: '' })),
 					author: {
 						id: pullRequest.item.createdBy?.id,
 						name: pullRequest.item.createdBy?.displayName,

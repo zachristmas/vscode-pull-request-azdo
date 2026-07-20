@@ -373,6 +373,21 @@ export class PullRequestModel implements IPullRequestModel {
 		this.item.labels = (this.item.labels ?? []).filter(l => l.id !== labelIdOrName && l.name !== labelIdOrName);
 	}
 
+	// Labels are NOT returned by getPullRequestById, so fetch them explicitly - otherwise item.labels is
+	// always empty and the sidebar never shows any label (added ones persist server-side but vanish on
+	// refresh). Keeps item.labels in sync so createLabel/deleteLabel optimistic updates agree.
+	async getLabels(): Promise<WebApiTagDefinition[]> {
+		const azdoRepo = await this.azdoRepository.ensure();
+		const repoId = await azdoRepo.getRepositoryId();
+		const project = await azdoRepo.getRepositoryProject();
+		const azdo = azdoRepo.azdo;
+		const git = await azdo?.connection.getGitApi();
+
+		const labels = (await git?.getPullRequestLabels(repoId!, this.getPullRequestId(), project)) ?? [];
+		this.item.labels = labels;
+		return labels;
+	}
+
 	public async getWorkItemRefs(): Promise<ResourceRef[] | undefined> {
 		const azdoRepo = await this.azdoRepository.ensure();
 		const repoId = await azdoRepo.getRepositoryId();
