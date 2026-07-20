@@ -102,9 +102,20 @@ export async function handleDeepLinkUri(
 
 	const target = findDeepLinkTarget(reposManager, params);
 	if (!target) {
-		vscode.window.showErrorMessage(
-			`No open workspace folder has a remote for '${params.repo}'. Open the folder containing ${params.repo} first, then follow the link again.`,
+		// VS Code opened but the repo isn't in any window, so the PR can't be shown here. Rather than
+		// dead-end, offer the Azure DevOps web page (the same fallback the redirect page shows).
+		const openWeb = 'Open on the web';
+		const base = trimTrailingSlashes(params.orgUrl.trim());
+		const webUrl = `${base}/${encodeURIComponent(params.project)}/_git/${encodeURIComponent(params.repo)}/pullrequest/${
+			params.prNumber
+		}`;
+		const choice = await vscode.window.showErrorMessage(
+			`'${params.repo}' is not active in VS Code, so its pull request can't be opened here. If you closed it in the Source Control view, reopen it (Command Palette: "Git: Reopen Closed Repositories"); otherwise open the folder containing ${params.repo}. Then follow the link again, or open it on the web.`,
+			openWeb,
 		);
+		if (choice === openWeb) {
+			await vscode.env.openExternal(vscode.Uri.parse(webUrl));
+		}
 		return;
 	}
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.2
+
+- A deep link to a repository that is not open in any window now offers an "Open on the web" button instead of dead-ending at an error. A shared pull-request link still reaches the PR (on the Azure DevOps web) when the recipient has not opened that repository in VS Code.
+
 ## 2.2.1
 
 - One "Copy link" button on the pull request header, replacing the two separate "Copy pull request URL" and "Copy VS Code deep link" buttons. It copies the shareable link (opens the PR in VS Code, falls back to the Azure DevOps web page) when `azdoPullRequests.shareLinkBaseUrl` is set, otherwise the plain web URL. Both specific variants remain available as command-palette commands.
