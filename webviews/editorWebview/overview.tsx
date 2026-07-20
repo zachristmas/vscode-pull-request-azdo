@@ -8,6 +8,7 @@ import { PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterface
 import * as React from 'react';
 import { PullRequest } from '../common/cache';
 
+import { ChangedFiles } from '../components/changedFiles';
 import { AddComment, CommentView } from '../components/comment';
 import { Header } from '../components/header';
 import StatusChecks from '../components/merge';
@@ -49,6 +50,7 @@ export const Overview = (pr: PullRequest) => {
 					/>
 				</div>
 				<StatusChecks pr={pr} isSimple={false} />
+				<ChangedFiles files={pr.fileChanges} />
 				<AddComment {...pr} isActive={isActive} />
 				<Timeline threads={pr.threads ?? []} currentUser={pr.currentUser} />
 			</div>

@@ -256,6 +256,8 @@ export class PRContext {
 
 	public openDiff = (thread: GitPullRequestCommentThread) => this.postMessage({ command: 'pr.open-diff', args: { thread } });
 
+	public openFileDiff = (fileName: string) => this.postMessage({ command: 'pr.open-file-diff', args: { fileName } });
+
 	setPR = (pr: PullRequest) => {
 		this.pr = pr;
 		setState(this.pr);
