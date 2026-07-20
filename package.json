@@ -11,7 +11,7 @@
 		"url": "https://github.com/zachristmas/vscode-pull-request-azdo/issues"
 	},
 	"enableProposedApi": false,
-	"version": "2.4.1",
+	"version": "2.5.0",
 	"packageManager": "pnpm@10.3.0",
 	"pnpm": {
 		"onlyBuiltDependencies": [
@@ -39,7 +39,8 @@
 	],
 	"activationEvents": [
 		"onStartupFinished",
-		"onUri"
+		"onUri",
+		"onWebviewPanel:PullRequestOverview"
 	],
 	"browser": "./dist/browser/extension",
 	"main": "./dist/extension",

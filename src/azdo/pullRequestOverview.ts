@@ -155,6 +155,38 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		}
 	}
 
+	// Re-hydrate a panel VS Code restored after a window reload (see the WebviewPanelSerializer in
+	// extension.ts). The panel shell comes back empty; bind it to the freshly-resolved PR and refresh.
+	public static revive(
+		panel: vscode.WebviewPanel,
+		extensionPath: string,
+		folderRepositoryManager: FolderRepositoryManager,
+		pr: PullRequestModel,
+		workItem: AzdoWorkItem,
+		azdoUserManager: AzdoUserManager,
+	): void {
+		const prNumber = pr.getPullRequestId();
+		const existing = this.panels.get(prNumber);
+		if (existing) {
+			// A live panel for this PR already exists; drop the restored shell and reveal the real one.
+			panel.dispose();
+			existing._panel.reveal();
+			return;
+		}
+		const revived = new PullRequestOverviewPanel(
+			extensionPath,
+			panel.viewColumn ?? vscode.ViewColumn.One,
+			panel.title,
+			folderRepositoryManager,
+			workItem,
+			azdoUserManager,
+			prNumber,
+			panel,
+		);
+		this.panels.set(prNumber, revived);
+		revived.update(folderRepositoryManager, pr);
+	}
+
 	// UX-04: refreshes only apply to a visible panel; a palette action (commands.ts) or list refresh that
 	// targets a hidden tab would otherwise be dropped, leaving it stale until the user manually refreshed.
 	// Remember the request and replay it the moment the tab becomes visible (see onDidChangeViewState).
@@ -182,6 +214,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		workItem: AzdoWorkItem,
 		azdoUserManager: AzdoUserManager,
 		prNumber: number,
+		existingPanel?: vscode.WebviewPanel,
 	) {
 		super();
 
@@ -191,15 +224,25 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		this._workItem = workItem;
 		this._userManager = azdoUserManager;
 
-		// Create and show a new webview panel
-		this._panel = vscode.window.createWebviewPanel(PullRequestOverviewPanel._viewType, title, column, {
+		const webviewOptions = {
 			// Enable javascript in the webview
 			enableScripts: true,
 			retainContextWhenHidden: true,
 
 			// And restrict the webview to only loading content from our extension's `dist` directory.
 			localResourceRoots: [vscode.Uri.file(path.join(this._extensionPath, 'dist'))],
-		});
+		};
+
+		if (existingPanel) {
+			// Restored by the serializer after a reload: reuse the shell VS Code handed back and re-apply
+			// our options (they are not carried across the reload).
+			this._panel = existingPanel;
+			this._panel.webview.options = webviewOptions;
+			this._panel.title = title;
+		} else {
+			// Create and show a new webview panel
+			this._panel = vscode.window.createWebviewPanel(PullRequestOverviewPanel._viewType, title, column, webviewOptions);
+		}
 
 		this._webview = this._panel.webview;
 		super.initialize();
@@ -421,6 +464,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					mergeFailureType: pullRequest.item.mergeFailureType,
 					reviewers: this._existingReviewers,
 					fileChanges: this.buildFileChangeSummaries(fileChanges),
+					// Identity persisted with the webview state so the panel can be re-resolved and
+					// re-opened after a window reload (see the WebviewPanelSerializer in extension.ts).
+					restore: deepLinkParamsFromPullRequest(pullRequest),
 					isDraft: pullRequest.isDraft,
 					mergeMethodsAvailability,
 					defaultMergeMethod,
