@@ -312,3 +312,20 @@ body img.avatar {
 	color: var(--vscode-descriptionForeground);
 	font-size: 0.9em;
 }
+
+/* PR label (ADO tag) chip in the sidebar Labels section, matching the required-reviewer badge look. */
+.label-chip {
+	display: inline-block;
+	box-sizing: border-box;
+	line-height: 14px;
+	font-size: 11px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	border-radius: var(--azdo-radius-sm);
+	padding: 1px 6px;
+}
+
+/* Related-PR row in the sidebar: the `!id` reference reads as a subtle prefix before the title. */
+.related-pr .related-pr-id {
+	color: var(--vscode-descriptionForeground);
+}

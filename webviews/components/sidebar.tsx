@@ -12,7 +12,7 @@ import { getClosedCommentDescription } from './header';
 import { checkIcon, crossIcon, plusIcon } from './icon';
 import { REVIEW_STATE_ICON, Reviewer, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
-import { ReviewState } from '../../src/azdo/interface';
+import { ILabel, ReviewState } from '../../src/azdo/interface';
 import { PullRequest, RelatedPullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
 
@@ -20,10 +20,11 @@ export default function Sidebar({
 	reviewers,
 	workItems,
 	relatedPRs,
+	labels,
 	hasWritePermission,
 	isActive,
 }: PullRequest & { isActive: boolean }) {
-	const { addRequiredReviewers, addOptionalReviewers, associateWorkItem, pr } = useContext(PullRequestContext);
+	const { addRequiredReviewers, addOptionalReviewers, associateWorkItem, addLabel, pr } = useContext(PullRequestContext);
 
 	// UX-02: on a finished PR keep the reviewer/work-item rows (they are the review record) but drop
 	// every mutation affordance - the vote panel, the add (+) buttons, and the hover-remove.
@@ -50,6 +51,28 @@ export default function Sidebar({
 				addReviewers={addOptionalReviewers}
 				hasWritePermission={canManage}
 			/>
+			<div id="labels" className="section">
+				<div className="section-header">
+					<div className="section-title">Labels</div>
+					{canManage ? (
+						<button
+							title="Add Label"
+							onClick={async () => {
+								await addLabel();
+							}}
+						>
+							{plusIcon}
+						</button>
+					) : null}
+				</div>
+				<div className="labels-body-container">
+					{labels && labels.length > 0 ? (
+						labels.map(label => <Label key={label.name} {...label} canDelete={canManage} />)
+					) : (
+						<div className="section-item none-label text-muted">None</div>
+					)}
+				</div>
+			</div>
 			<div id="work-item" className="section">
 				<div className="section-header">
 					<div className="section-title">Work Items</div>
@@ -85,6 +108,30 @@ export default function Sidebar({
 						))}
 					</div>
 				</div>
+			) : null}
+		</div>
+	);
+}
+
+function Label({ name, canDelete }: ILabel & { canDelete: boolean }) {
+	const { removeLabel } = useContext(PullRequestContext);
+	return (
+		<div className="section-item label">
+			<span className="label-chip">{name}</span>
+			{canDelete ? (
+				<>
+					{nbsp}
+					<button
+						type="button"
+						className="push-right remove-item"
+						title="Remove label"
+						aria-label={`Remove label ${name}`}
+						onClick={() => removeLabel(name)}
+					>
+						{crossIcon}
+					</button>
+					{nbsp}
+				</>
 			) : null}
 		</div>
 	);
