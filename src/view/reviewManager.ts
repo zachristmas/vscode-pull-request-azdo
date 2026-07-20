@@ -6,6 +6,17 @@
 import nodePath from 'path';
 import { GitPullRequest, GitPullRequestCommentThread } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
+import { PullRequestChangesTreeDataProvider } from './prChangesTreeDataProvider';
+import {
+	PullRequestDescriptionSource,
+	PullRequestDescriptionSourceEnum,
+	PullRequestDescriptionSourceQuickPick,
+	PullRequestTitleSource,
+	PullRequestTitleSourceEnum,
+	PullRequestTitleSourceQuickPick,
+	RemoteQuickPickItem,
+} from './quickpick';
+import { ReviewCommentController } from './reviewCommentController';
 import type { Branch, Repository } from '../api/api';
 import { GitErrorCodes } from '../api/api1';
 import { PullRequestViewProvider } from '../azdo/activityBarViewProvider';
@@ -21,19 +32,9 @@ import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { fromReviewUri, toReviewUri } from '../common/uri';
 import { formatError, gitErrorCode, groupBy } from '../common/utils';
+import { inferWorkItemIdsFromBranch, parseWorkItemIds } from '../common/workItemRefs';
 import { SETTINGS_NAMESPACE } from '../constants';
-import { PullRequestChangesTreeDataProvider } from './prChangesTreeDataProvider';
 
-import {
-	PullRequestDescriptionSource,
-	PullRequestDescriptionSourceEnum,
-	PullRequestDescriptionSourceQuickPick,
-	PullRequestTitleSource,
-	PullRequestTitleSourceEnum,
-	PullRequestTitleSourceQuickPick,
-	RemoteQuickPickItem,
-} from './quickpick';
-import { ReviewCommentController } from './reviewCommentController';
 import { GitFileChangeNode, gitFileChangeNodeFilter, RemoteFileChangeNode } from './treeNodes/fileChangeNode';
 
 const FOCUS_REVIEW_MODE = 'azdo:focusedReview';
@@ -914,6 +915,29 @@ export class ReviewManager {
 		return target;
 	}
 
+	// Which work items to link on the new PR, per the `pullRequestWorkItems` setting. `ask` (the default)
+	// shows the branch-inferred ids for confirmation so nothing links silently; `branchNumber` links the
+	// inferred ids without asking; `never` links none. Dismissing the prompt skips linking (it never
+	// cancels PR creation, which has already been committed to at this point in the flow).
+	private async getWorkItemIdsForCreate(branchName: string | undefined): Promise<number[]> {
+		const mode = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('pullRequestWorkItems', 'ask');
+		if (mode === 'never') {
+			return [];
+		}
+		const inferred = inferWorkItemIdsFromBranch(branchName);
+		if (mode === 'branchNumber') {
+			return inferred;
+		}
+		const input = await vscode.window.showInputBox({
+			value: inferred.join(', '),
+			ignoreFocusOut: true,
+			prompt: 'Work item ids to link to this pull request (comma-separated, leave empty to skip)',
+			validateInput: v =>
+				v.trim() === '' || /^\s*\d+(\s*,\s*\d+)*\s*$/.test(v) ? null : 'Enter work item ids separated by commas',
+		});
+		return parseWorkItemIds(input);
+	}
+
 	public async createPullRequest(draft = false): Promise<void> {
 		if (this._repository.state.HEAD === undefined) {
 			vscode.window.showErrorMessage('Cannot create a pull request: the current branch could not be determined.');
@@ -1019,6 +1043,8 @@ export class ReviewManager {
 					description = descriptionResult || '';
 				}
 
+				const workItemIds = await this.getWorkItemIdsForCreate(branchName);
+
 				// ADO's create API takes refs on one repository, not GitHub's owner:branch head/base pair.
 				const creationParams: GitPullRequest = {
 					sourceRefName: `refs/heads/${branchName}`,
@@ -1028,7 +1054,11 @@ export class ReviewManager {
 					isDraft: draft,
 				};
 
-				const pullRequestModel = await this._folderRepoManager.createPullRequest(headRemote.remoteName, creationParams);
+				const pullRequestModel = await this._folderRepoManager.createPullRequest(
+					headRemote.remoteName,
+					creationParams,
+					workItemIds,
+				);
 
 				await this.finishPullRequestCreation(pullRequestModel, branchName, progress);
 			},

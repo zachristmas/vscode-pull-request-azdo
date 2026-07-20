@@ -149,6 +149,13 @@ export class AzdoRepository implements vscode.Disposable {
 		return metadata?.id;
 	}
 
+	// The ADO project this repository belongs to. Needed to scope work-item and PR-ref lookups; passing
+	// it to getPullRequestWorkItemRefs also lets the server resolve links it would otherwise miss.
+	async getRepositoryProject(): Promise<string | undefined> {
+		const metadata = await this.getMetadata();
+		return metadata?.project?.name;
+	}
+
 	private unresolvedRepositoryMessage(): string {
 		return `unable to resolve Azure DevOps repository '${this.remote.repositoryName}' for remote '${this.remote.remoteName}' (${this.remote.url})`;
 	}

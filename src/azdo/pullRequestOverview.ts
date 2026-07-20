@@ -427,6 +427,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		if (message.command === 'pr.search-identities') {
 			return this.searchIdentities(message);
 		}
+		if (message.command === 'pr.search-workItems') {
+			return this.searchWorkItems(message);
+		}
 		switch (message.command) {
 			case 'pr.checkout':
 				return this.checkoutPullRequest(message);
@@ -522,6 +525,18 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				message,
 				(users ?? []).map(u => ({ id: u.id, displayName: u.user.displayName, uniqueName: u.user.mailAddress })),
 			);
+		} catch {
+			return this._replyMessage(message, []);
+		}
+	}
+
+	// `#`/`AB#` work-item picker backing. Never rejects: on failure reply with [] so the composer's
+	// picker simply shows no suggestions instead of leaving the awaited request pending.
+	private async searchWorkItems(message: IRequestMessage<{ query: string }>): Promise<void> {
+		try {
+			const project = await this._item.azdoRepository.getRepositoryProject();
+			const items = await this._workItem.searchWorkItems(message.args?.query ?? '', project);
+			return this._replyMessage(message, items);
 		} catch {
 			return this._replyMessage(message, []);
 		}

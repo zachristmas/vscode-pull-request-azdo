@@ -348,10 +348,11 @@ export class PullRequestModel implements IPullRequestModel {
 	public async getWorkItemRefs(): Promise<ResourceRef[] | undefined> {
 		const azdoRepo = await this.azdoRepository.ensure();
 		const repoId = await azdoRepo.getRepositoryId();
+		const project = await azdoRepo.getRepositoryProject();
 		const azdo = azdoRepo.azdo;
 		const git = await azdo?.connection.getGitApi();
 
-		const refs = await git?.getPullRequestWorkItemRefs(repoId!, this.getPullRequestId());
+		const refs = await git?.getPullRequestWorkItemRefs(repoId!, this.getPullRequestId(), project);
 		return refs;
 	}
 
