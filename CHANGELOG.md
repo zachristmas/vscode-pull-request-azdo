@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.1
+
+- Fix: repositories intermittently missing from the pull requests tree after a window reload (e.g. one of several nested repos in a workspace would disappear until a manual refresh). The extension waited for a post-open state change that often never fired on reload, so those repos never got tracked. It now registers each repo as soon as it opens and re-sweeps the full repo list shortly after activation, so missing repos appear on their own.
+
 ## 2.5.0
 
 - Open pull request tabs now survive a window reload. Previously a reopened window lost the PR tab; it is now restored automatically and reconnected to the live pull request (its identity is persisted with the tab and re-resolved when the extension reactivates). If the repository can no longer be found, the placeholder is closed cleanly instead of hanging.
