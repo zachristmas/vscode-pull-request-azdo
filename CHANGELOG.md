@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.2
+
+- More robust repository detection. The tree now reconciles against the live git repository list on every render, so clicking Refresh reliably picks up any repo the git extension opened late (no reload needed). Each repo is added independently, so one repo that fails to initialize can no longer drop the repos listed after it. Adds a longer post-activation sweep and logs the active version and repo counts to the "AzDO Pull Request" output channel for easier diagnosis.
+
 ## 2.5.1
 
 - Fix: repositories intermittently missing from the pull requests tree after a window reload (e.g. one of several nested repos in a workspace would disappear until a manual refresh). The extension waited for a post-open state change that often never fired on reload, so those repos never got tracked. It now registers each repo as soon as it opens and re-sweeps the full repo list shortly after activation, so missing repos appear on their own.
