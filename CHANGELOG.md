@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.0
+
+- Conversation / Files changed tabs. The pull request page now has two tabs: "Conversation" (description, policies, timeline) and "Files changed (N)". The files tab lists every changed file with its status (A/M/D/R) and +/- counts; click a file to open its full diff in the editor - no branch checkout needed, so a shared PR link opens straight to a reviewable state.
+- The pull request page is now full width instead of a centered 925px column, so wide monitors are not mostly empty margins.
+- Fix: file status showed as "?" for every file. The change type comes back as a numeric enum, which the previous check did not understand; it now reads the correct A/M/D/R status.
+- The inline diff preview from 2.3.0 was removed: Azure DevOps' diff API returns which lines changed but not their text, so the preview rendered as empty colored blocks. Opening the file shows the real diff (the editor fetches both versions).
+
 ## 2.3.0
 
 - Files changed. The pull request page now has a "Files changed (N)" section listing every changed file with its status and +/- line counts. Click a file to open its full diff in the editor - no branch checkout needed, so a shared PR link opens straight to a reviewable state. Each file expands to an inline preview of the diff; very large or binary files skip the preview and just offer "Open diff".
