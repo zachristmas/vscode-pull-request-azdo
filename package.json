@@ -11,7 +11,7 @@
 		"url": "https://github.com/zachristmas/vscode-pull-request-azdo/issues"
 	},
 	"enableProposedApi": false,
-	"version": "2.1.1",
+	"version": "2.1.2",
 	"packageManager": "pnpm@10.3.0",
 	"pnpm": {
 		"onlyBuiltDependencies": [
@@ -56,11 +56,13 @@
 			"properties": {
 				"azdoPullRequests.projectName": {
 					"type": "string",
-					"default": ""
+					"default": "",
+					"description": "Optional. The Azure DevOps project name. Sign-in does not require it; each repository derives its own project from its git remote. Set it only to override auto-detection."
 				},
 				"azdoPullRequests.orgUrl": {
 					"type": "string",
-					"default": ""
+					"default": "",
+					"description": "The Azure DevOps organization URL, e.g. https://dev.azure.com/your-organization. Only needed when it cannot be inferred from a git remote; if unset, the extension prompts for it at sign-in."
 				},
 				"azdoPullRequests.patToken": {
 					"type": "string",

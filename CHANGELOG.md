@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.2
+
+Sign-in no longer requires a project, and prompts for the organization when it cannot be determined.
+
+- The project name is no longer required to sign in. Only the organization URL is needed; each repository derives its own project from its git remote, and repository lookup falls back to an org-wide search. `azdoPullRequests.projectName` is now documented as optional.
+- When the organization cannot be determined from settings or a git remote, the extension now prompts for the organization URL (and saves it) instead of only showing an error that pointed at Settings.
+- Reworded the sign-in error to match (organization only; project optional).
+
 ## 2.1.1
 
 Fixes for the 2.1.0 features.
