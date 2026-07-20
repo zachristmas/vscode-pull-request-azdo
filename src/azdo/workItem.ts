@@ -68,22 +68,32 @@ export class AzdoWorkItem implements vscode.Disposable {
 
 	// Type-ahead search backing the `#`/`AB#` composer picker. A numeric query matches the id directly
 	// (and any title containing those digits); text searches titles. An empty query (just typed `#`)
-	// offers the project's most recently changed items. Never throws - returns [] so the picker degrades
-	// to "no suggestions" rather than leaving the awaited request pending.
-	public async searchWorkItems(query: string, project?: string, top = 10): Promise<WorkItemSuggestion[]> {
+	// offers the user's recent work items. Searches are org-wide, NOT scoped to the repo's project:
+	// work items usually live in a central backlog project, not the code repo's project, so a
+	// project-scoped query returned nothing. Never throws - returns [] so the picker degrades to
+	// "no suggestions" rather than leaving the awaited request pending.
+	public async searchWorkItems(query: string, top = 10): Promise<WorkItemSuggestion[]> {
 		try {
 			const trimmed = (query ?? '').trim();
-			const projectFilter = project ? ` AND [System.TeamProject] = '${escapeWiql(project)}'` : '';
-			let where: string;
-			if (/^\d+$/.test(trimmed)) {
-				where = `([System.Id] = ${Number(trimmed)} OR [System.Title] CONTAINS '${escapeWiql(
-					trimmed,
-				)}')${projectFilter}`;
-			} else if (trimmed.length > 0) {
-				where = `[System.Title] CONTAINS '${escapeWiql(trimmed)}'${projectFilter}`;
-			} else {
-				where = `[System.WorkItemType] <> ''${projectFilter}`;
+			if (trimmed.length === 0) {
+				// The user's recent work items across all projects - the same source the
+				// associate-work-item quick pick uses (getRecentActivityData), which carries id/title/
+				// type/state directly, so no extra fetch is needed.
+				const recent = await this.getRecentWorkItems();
+				return recent
+					.filter(r => r.id !== undefined)
+					.slice(0, top)
+					.map(r => ({
+						id: r.id!,
+						title: r.title ?? '',
+						workItemType: r.workItemType ?? '',
+						state: r.state ?? '',
+					}));
 			}
+
+			const where = /^\d+$/.test(trimmed)
+				? `([System.Id] = ${Number(trimmed)} OR [System.Title] CONTAINS '${escapeWiql(trimmed)}')`
+				: `[System.Title] CONTAINS '${escapeWiql(trimmed)}'`;
 			const wiql = `SELECT [System.Id] FROM WorkItems WHERE ${where} ORDER BY [System.ChangedDate] DESC`;
 
 			const result = await this._workTracking?.queryByWiql({ query: wiql }, undefined, false, top);

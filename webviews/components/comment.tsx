@@ -43,34 +43,38 @@ export function CommentView(comment: Props) {
 	const [inEditMode, setEditMode] = useState(!!currentDraft);
 
 	if (inEditMode) {
-		return React.cloneElement(comment.headerInEditMode ? <CommentBox for={comment} /> : <></>, {}, [
-			<EditComment
-				id={id}
-				body={currentDraft || bodyMd || ''}
-				onCancel={() => {
-					if (pr.pendingCommentDrafts) {
-						delete pr.pendingCommentDrafts[id];
-					}
-					setEditMode(false);
-				}}
-				onSave={async text => {
-					try {
-						const result = isPRDescription
-							? await setDescription(text)
-							: await editComment({ comment: comment, threadId, text });
-
-						setBodyHtml(result.bodyHTML);
-						setBodyMd(text);
-					} finally {
+		return React.cloneElement(
+			comment.headerInEditMode ? <CommentBox for={comment} isDescription={isPRDescription} /> : <></>,
+			{},
+			[
+				<EditComment
+					id={id}
+					body={currentDraft || bodyMd || ''}
+					onCancel={() => {
+						if (pr.pendingCommentDrafts) {
+							delete pr.pendingCommentDrafts[id];
+						}
 						setEditMode(false);
-					}
-				}}
-			/>,
-		]);
+					}}
+					onSave={async text => {
+						try {
+							const result = isPRDescription
+								? await setDescription(text)
+								: await editComment({ comment: comment, threadId, text });
+
+							setBodyHtml(result.bodyHTML);
+							setBodyMd(text);
+						} finally {
+							setEditMode(false);
+						}
+					}}
+				/>,
+			],
+		);
 	}
 
 	return (
-		<CommentBox for={comment}>
+		<CommentBox for={comment} isDescription={isPRDescription}>
 			{/* UX-03: always rendered, shown by CSS on hover AND :focus-within so keyboard users can
 			    reach quote/edit (the old showActionBar state was mouse-only). */}
 			<div className="action-bar comment-actions">
@@ -101,13 +105,19 @@ type CommentBoxProps = {
 	readonly onMouseEnter?: any;
 	readonly onMouseLeave?: any;
 	readonly children?: any;
+	// The PR description reuses this box but is not a comment: it reads "created" (not "commented")
+	// and carries a distinct class so it can be styled apart from the comment thread.
+	readonly isDescription?: boolean;
 };
 
-function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children }: CommentBoxProps) {
+function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children, isDescription }: CommentBoxProps) {
 	const { author, publishedDate, _links } = comment;
 	const htmlUrl = _links.self.href;
 	return (
-		<div className="comment-container comment review-comment" {...{ onMouseEnter, onMouseLeave }}>
+		<div
+			className={`comment-container comment review-comment${isDescription ? ' pr-description' : ''}`}
+			{...{ onMouseEnter, onMouseLeave }}
+		>
 			<div className="review-comment-container">
 				<div className="review-comment-header">
 					<Spaced>
@@ -115,7 +125,8 @@ function CommentBox({ for: comment, onMouseEnter, onMouseLeave, children }: Comm
 						<AuthorLink url={author!.profileUrl!} text={author!.displayName!} />
 						{publishedDate ? (
 							<>
-								commented{nbsp}
+								{isDescription ? 'created' : 'commented'}
+								{nbsp}
 								<Timestamp href={htmlUrl} date={publishedDate} />
 							</>
 						) : (

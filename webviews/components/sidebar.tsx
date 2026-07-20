@@ -174,11 +174,14 @@ function WorkItem(workItem: WorkItem & { canDelete: boolean }) {
 
 const WorkItemDetails = (workItem: WorkItem) => (
 	<div className="work-item-container">
-		<a href={workItem._links['html']['href']}>
+		<a
+			className="work-item-link"
+			href={workItem._links?.['html']?.['href']}
+			title={`Open work item ${workItem.id} in Azure DevOps`}
+		>
 			<div className="work-item-type">{workItem.fields?.['System.WorkItemType']}</div>
 			<div className="work-item-title">
 				{workItem.id}: {workItem.fields?.['System.Title']}
-				{}
 			</div>
 		</a>
 	</div>
