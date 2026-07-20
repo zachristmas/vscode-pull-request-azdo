@@ -28,8 +28,10 @@ export const Overview = (pr: PullRequest) => {
 			</div>
 			<Sidebar {...pr} isActive={isActive} />
 			<div id="main">
-				<StatusChecks pr={pr} isSimple={false} />
+				{/* The PR description belongs above the policy/merge box (as in the ADO web UI), and is
+				    labelled so it does not read as just another comment. */}
 				<div id="description">
+					<div className="description-label">Description</div>
 					<CommentView
 						isPRDescription
 						threadId={0}
@@ -46,6 +48,7 @@ export const Overview = (pr: PullRequest) => {
 						canEdit={pr.canEdit}
 					/>
 				</div>
+				<StatusChecks pr={pr} isSimple={false} />
 				<AddComment {...pr} isActive={isActive} />
 				<Timeline threads={pr.threads ?? []} currentUser={pr.currentUser} />
 			</div>

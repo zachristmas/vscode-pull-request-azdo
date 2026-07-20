@@ -556,8 +556,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	// picker simply shows no suggestions instead of leaving the awaited request pending.
 	private async searchWorkItems(message: IRequestMessage<{ query: string }>): Promise<void> {
 		try {
-			const project = await this._item.azdoRepository.getRepositoryProject();
-			const items = await this._workItem.searchWorkItems(message.args?.query ?? '', project);
+			const items = await this._workItem.searchWorkItems(message.args?.query ?? '');
 			return this._replyMessage(message, items);
 		} catch {
 			return this._replyMessage(message, []);

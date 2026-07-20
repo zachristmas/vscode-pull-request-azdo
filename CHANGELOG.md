@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.1
+
+Fixes for the 2.1.0 features.
+
+- Work item `#` / `AB#` autocomplete now returns results. It was scoped to the code repo's Azure DevOps project, but work items usually live in a central backlog project, so the picker matched nothing. It now searches org-wide: the user's recent work items on an empty query, and an id/title search otherwise.
+- The PR description now renders above the policy/merge box (matching the Azure DevOps web UI), is labelled "Description", and reads "created" instead of "commented", so it no longer looks like the first comment in the thread.
+- Work item rows in the sidebar are now shown as links (they open the item in Azure DevOps); previously they rendered as plain text with no visible affordance.
+
 ## 2.1.0
 
 Parity work with Microsoft's GitHub Pull Requests extension, adapted to Azure DevOps: type-ahead references, PR-to-PR links, label editing, and a "waiting on my review" list.
