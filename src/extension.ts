@@ -202,32 +202,58 @@ async function init(
 	const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
 	await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 
+	// A git repo only becomes a PR-tree node once it has a FolderRepositoryManager. With several nested
+	// git repos in one workspace, the git extension opens them in an order that raced the old
+	// onDidOpenRepository handler - it waited for a post-open `repo.state.onDidChange` that frequently
+	// never fired on reload (the repo opened already settled), so repos like "ECS API" silently dropped
+	// out of the tree after every reload. ensureManagerForRepo is idempotent (dedupes by root uri) and
+	// the ReviewManager it creates drives the repo's initial load, so we can create eagerly and just
+	// reconcile against the full git.repositories list whenever it might have changed.
+	const ensureManagerForRepo = (repo: Repository): boolean => {
+		const rootUri = repo.rootUri.toString();
+		if (reposManager.folderManagers.some(manager => manager.repository.rootUri.toString() === rootUri)) {
+			return false;
+		}
+		const folderManager = new FolderRepositoryManager(repo, telemetry, git, credentialStore, fileReviewedStatusService);
+		reposManager.insertFolderManager(folderManager);
+		reviewManagers.push(new ReviewManager(context, folderManager.repository, folderManager, telemetry, changesTree));
+		// Remotes/PRs may load after the repo opens; refresh the tree when this manager finishes loading
+		// so the node appears (and fills in) without another reload.
+		context.subscriptions.push(folderManager.onDidChangeRepositories(() => tree.refresh()));
+		return true;
+	};
+
+	const reconcileRepositories = () => {
+		let added = false;
+		for (const repo of git.repositories) {
+			if (ensureManagerForRepo(repo)) {
+				added = true;
+			}
+		}
+		if (added) {
+			tree.refresh();
+		}
+	};
+
 	git.onDidChangeState(() => {
+		reconcileRepositories();
 		reviewManagers.forEach(reviewManager => reviewManager.updateState());
 	});
 
 	git.onDidOpenRepository(repo => {
-		const disposable = repo.state.onDidChange(() => {
-			const newFolderManager = new FolderRepositoryManager(
-				repo,
-				telemetry,
-				git,
-				credentialStore,
-				fileReviewedStatusService,
-			);
-			reposManager.insertFolderManager(newFolderManager);
-			const newReviewManager = new ReviewManager(
-				context,
-				newFolderManager.repository,
-				newFolderManager,
-				telemetry,
-				changesTree,
-			);
-			reviewManagers.push(newReviewManager);
+		if (ensureManagerForRepo(repo)) {
 			tree.refresh();
-			disposable.dispose();
-		});
+		}
 	});
+
+	// Sweep the full repo list now and a few times shortly after activation: the git extension opens
+	// nested repos slightly after we initialize, and this catches the stragglers automatically (the
+	// reload race) instead of the user having to reload again. All idempotent.
+	reconcileRepositories();
+	for (const delay of [1500, 5000, 15_000]) {
+		const handle = setTimeout(() => reconcileRepositories(), delay);
+		context.subscriptions.push(new vscode.Disposable(() => clearTimeout(handle)));
+	}
 
 	git.onDidCloseRepository(repo => {
 		reposManager.removeRepo(repo);
