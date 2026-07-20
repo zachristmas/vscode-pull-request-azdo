@@ -848,6 +848,20 @@ export class FolderRepositoryManager implements vscode.Disposable {
 								hasMorePages: false,
 							};
 						}
+						case PRType.NeedsMyReview: {
+							// Same reviewer query as AssignedToMe, then narrowed to PRs still awaiting my
+							// vote: drop any I have already voted on (vote !== NO_VOTE).
+							const me = this.getCurrentUser()?.id;
+							const assigned = await azdoRepository.getPullRequests({
+								reviewerId: me,
+								status: PullRequestStatus.Active,
+							});
+							const items = assigned.filter(pr => {
+								const myReview = pr.item.reviewers?.find(r => r.id === me);
+								return !!myReview && (myReview.vote ?? 0) === 0;
+							});
+							return { items, hasMorePages: false };
+						}
 						case PRType.AllStatuses: {
 							// Every other category here hardcodes status: Active, so a completed or
 							// abandoned PR has no tree category to browse back to at all - the PR panel

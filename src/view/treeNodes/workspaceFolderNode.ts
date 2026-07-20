@@ -45,6 +45,7 @@ export class WorkspaceFolderNode extends TreeNode implements vscode.TreeItem {
 			new CategoryTreeNode(parent, folderManager, telemetry, PRType.LocalPullRequest),
 			new CategoryTreeNode(parent, folderManager, telemetry, PRType.CreatedByMe),
 			new CategoryTreeNode(parent, folderManager, telemetry, PRType.AssignedToMe),
+			new CategoryTreeNode(parent, folderManager, telemetry, PRType.NeedsMyReview),
 			new CategoryTreeNode(parent, folderManager, telemetry, PRType.AllActive),
 			new CategoryTreeNode(parent, folderManager, telemetry, PRType.AllStatuses),
 		];
