@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.1
+
+- One "Copy link" button on the pull request header, replacing the two separate "Copy pull request URL" and "Copy VS Code deep link" buttons. It copies the shareable link (opens the PR in VS Code, falls back to the Azure DevOps web page) when `azdoPullRequests.shareLinkBaseUrl` is set, otherwise the plain web URL. Both specific variants remain available as command-palette commands.
+- `azdoPullRequests.shareLinkBaseUrl` now defaults to `https://pr.zachary.christmas`; clear it to copy the plain Azure DevOps web URL instead.
+
 ## 2.2.0
 
 - Copy Shareable Link. New command ("AzDO Pull Requests: Copy Shareable Link to Pull Request", in the command palette and the pull-request tree context menu) copies an https link, built from the new `azdoPullRequests.shareLinkBaseUrl` setting (e.g. `https://pr.example.com`), of the form `<base>/<project>/<pr>`. Paired with a small redirect page, that link opens the PR in VS Code and falls back to the Azure DevOps web page, so it stays clickable in tools like Teams that reject `vscode://` links. Leave the setting empty to disable the command.

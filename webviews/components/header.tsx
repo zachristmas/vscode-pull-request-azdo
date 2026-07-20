@@ -12,7 +12,7 @@ import * as React from 'react';
 
 import { useContext, useState } from 'react';
 
-import { checkIcon, copyIcon, editIcon, linkIcon } from './icon';
+import { checkIcon, editIcon, linkIcon } from './icon';
 import { Spaced } from './space';
 // eslint-disable-next-line import-x/no-named-as-default
 import Timestamp from './timestamp';
@@ -77,7 +77,7 @@ function Title({
 }: Partial<PullRequest> & { isActive?: boolean }) {
 	const [inEditMode, setEditMode] = useState(false);
 	const [currentTitle, setCurrentTitle] = useStateProp(title);
-	const { setTitle, refresh, copyPrLink, copyVscodeDeepLink, convertToDraft, updatePR } = useContext(PullRequestContext);
+	const { setTitle, refresh, copyLink, convertToDraft, updatePR } = useContext(PullRequestContext);
 	const canConvertToDraft = !isIssue && !isDraft && state === PullRequestStatus.Active;
 	const editableTitle = inEditMode ? (
 		<form
@@ -139,16 +139,8 @@ function Title({
 							<button
 								className="title-action"
 								title="Copy a link to this pull request"
-								aria-label="Copy pull request link"
-								onClick={copyPrLink}
-							>
-								{copyIcon}
-							</button>
-							<button
-								className="title-action"
-								title="Copy a vscode:// link that opens this pull request in VS Code"
-								aria-label="Copy VS Code link"
-								onClick={copyVscodeDeepLink}
+								aria-label="Copy link to pull request"
+								onClick={copyLink}
 							>
 								{linkIcon}
 							</button>

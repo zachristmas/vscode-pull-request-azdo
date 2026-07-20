@@ -11,7 +11,7 @@
 		"url": "https://github.com/zachristmas/vscode-pull-request-azdo/issues"
 	},
 	"enableProposedApi": false,
-	"version": "2.2.0",
+	"version": "2.2.1",
 	"packageManager": "pnpm@10.3.0",
 	"pnpm": {
 		"onlyBuiltDependencies": [
@@ -66,8 +66,8 @@
 				},
 				"azdoPullRequests.shareLinkBaseUrl": {
 					"type": "string",
-					"default": "",
-					"description": "Base URL of an https redirect page used by 'Copy Shareable Link' (e.g. https://pr.example.com). The command builds <base>/<project>/<pr>, a link that opens the PR in VS Code and falls back to the Azure DevOps web page. Leave empty to disable the command."
+					"default": "https://pr.zachary.christmas",
+					"description": "Base URL of the https redirect page used for shareable pull-request links (the 'Copy link' button and the 'Copy Shareable Link' command). The link, <base>/<project>/<pr>, opens the PR in VS Code and falls back to the Azure DevOps web page. Clear this to copy the plain Azure DevOps web URL instead."
 				},
 				"azdoPullRequests.patToken": {
 					"type": "string",
