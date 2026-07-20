@@ -11,6 +11,7 @@ import {
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { PolicyConfiguration } from 'azure-devops-node-api/interfaces/PolicyInterfaces';
 import * as vscode from 'vscode';
+import { AzdoWorkItem } from './workItem';
 import type { Repository, UpstreamRef } from '../api/api';
 import { GitApiImpl, GitErrorCodes, RefType } from '../api/api1';
 import { AzdoManager } from '../authentication/azdoServer';
@@ -1049,7 +1050,24 @@ export class FolderRepositoryManager implements vscode.Disposable {
 	 * Create a pull request on the AzDO repository behind the given remote and associate the local
 	 * source branch with it (so review mode picks it up on the next state update).
 	 */
-	async createPullRequest(remoteName: string, params: GitPullRequest): Promise<PullRequestModel | undefined> {
+	// Best-effort: the PR already exists by the time this runs, so a failed link must never fail creation.
+	// associateWorkItemWithPR swallows its own per-item errors (warning toast); this guards ensure()/auth.
+	private async associateWorkItemsOnCreate(pr: PullRequestModel, workItemIds: number[]): Promise<void> {
+		try {
+			const workItem = await new AzdoWorkItem(this._credentialStore, this._telemetry).ensure();
+			for (const id of workItemIds) {
+				await workItem.associateWorkItemWithPR(id, pr);
+			}
+		} catch (e) {
+			Logger.appendLine(`FolderRepositoryManager> Linking work items to the new PR failed: ${formatError(e)}`);
+		}
+	}
+
+	async createPullRequest(
+		remoteName: string,
+		params: GitPullRequest,
+		workItemIds: number[] = [],
+	): Promise<PullRequestModel | undefined> {
 		try {
 			const repo = this._azdoRepositories.find(r => r.remote.remoteName === remoteName);
 			if (!repo) {
@@ -1074,6 +1092,10 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			const branchName = convertBranchRefToBranchName(params.sourceRefName ?? '');
 			if (branchName) {
 				await PullRequestGitHelper.associateBranchWithPullRequest(this._repository, pullRequestModel, branchName);
+			}
+
+			if (workItemIds.length > 0) {
+				await this.associateWorkItemsOnCreate(pullRequestModel, workItemIds);
 			}
 
 			/* __GDPR__

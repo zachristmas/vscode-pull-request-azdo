@@ -117,6 +117,21 @@
 					"default": "template",
 					"description": "The description used when creating pull requests."
 				},
+				"azdoPullRequests.pullRequestWorkItems": {
+					"type": "string",
+					"enum": [
+						"never",
+						"branchNumber",
+						"ask"
+					],
+					"enumDescriptions": [
+						"Do not link any work items when creating a pull request",
+						"Link work items whose ids are inferable from the source branch name (e.g. 1234-fix, AB#1234), without asking",
+						"Ask which work item ids to link (pre-filled with any inferable from the branch name)"
+					],
+					"default": "ask",
+					"description": "Which work items to link when creating a pull request."
+				},
 				"azdoPullRequests.logLevel": {
 					"type": "string",
 					"enum": [

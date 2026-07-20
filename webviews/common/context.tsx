@@ -35,6 +35,10 @@ export class PRContext {
 	public searchIdentities = (query: string): Promise<{ id: string; displayName: string; uniqueName?: string }[]> =>
 		this.postMessage({ command: 'pr.search-identities', args: { query } });
 
+	// Resolve `#`/`AB#` work-item picker queries to ADO work items (host-backed).
+	public searchWorkItems = (query: string): Promise<{ id: number; title: string; workItemType: string; state: string }[]> =>
+		this.postMessage({ command: 'pr.search-workItems', args: { query } });
+
 	public checkout = () => this.postMessage({ command: 'pr.checkout' });
 
 	public copyPrLink = () => this.postMessage({ command: 'pr.copy-prlink' });
