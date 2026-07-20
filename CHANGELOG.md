@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.0
+
+Parity work with Microsoft's GitHub Pull Requests extension, adapted to Azure DevOps: type-ahead references, PR-to-PR links, label editing, and a "waiting on my review" list.
+
+- Work item autocomplete. Type `#` or `AB#` in a comment or the PR description to search work items by id or title and insert a reference. Linked `#<id>` references render as links with a type/state/title tooltip. (Linking and unlinking work items already existed; this adds the type-ahead and the linkified references.)
+- Attach work items at PR creation. New setting `azdoPullRequests.pullRequestWorkItems` (`ask`, `branchNumber`, or `never`; default `ask`). Ids are inferred from the source branch name and, in `ask` mode, pre-filled in a prompt for confirmation so nothing links silently.
+- Pull request references. Type `!` followed by a PR number to search and insert a `!<id>` reference; `!<id>` in comment or description text renders as a link that opens that PR.
+- Related pull requests. The description page now lists PRs that share a linked work item with the current one (read-only; Azure DevOps has no native related-PR link).
+- Labels. Add and remove PR labels (Azure DevOps tags) from a new sidebar Labels section.
+- "Waiting For My Review". A new tree category listing active PRs where you are a reviewer and have not yet voted.
+
 ## 2.0.0
 
 First stable release: the extension is out of preview. Ships the full 1.6.x line as a stable build, and adds comment reactions, `@mention` resolution, and resolved coexistence with Microsoft's GitHub Pull Requests extension.

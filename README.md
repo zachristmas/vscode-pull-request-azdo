@@ -15,9 +15,12 @@ Works with git repositories on Azure DevOps Services (dev.azure.com). TFVC is no
 - See exactly **which branch policies block completion**: minimum reviewers, comment resolution, required reviewers, work item linking, and build validation, with build click-through and re-queue
 - **Set or cancel auto-complete** with merge strategy, merge commit message, delete-source-branch, and work item transition options; strategy choices respect the branch's "Limit merge types" policy
 - Comment on code with **thread statuses** (Active, Resolved, Won't fix, Closed, Pending) that stay anchored to the right lines across new pushes
-- **Create pull requests** and drafts from the current branch, with the target branch prefilled from the repository default
+- **Create pull requests** and drafts from the current branch, with the target branch prefilled from the repository default and work items linked from the branch name
 - Manage the whole lifecycle: publish drafts, convert back to draft, complete, and clean up branches afterward
-- Link, view, and remove **work items** on a PR
+- Reference **work items** with `#` / `AB#` autocomplete in comments and the description, link/view/remove them on a PR, and open them from linkified `#id` references in comment text
+- Reference other **pull requests** with `!` autocomplete, and see related PRs that share a work item with the current one
+- Add and remove **labels** (Azure DevOps tags) on a PR from the sidebar
+- Find PRs **waiting on your review** in a dedicated list: active PRs where you are a reviewer and have not voted yet
 - **Share a PR**: copy its web URL, a link to a file's diff, or a `vscode://` deep link that opens the PR (and a specific file and line) in a teammate's VS Code
 
 ## See why a PR can't complete
