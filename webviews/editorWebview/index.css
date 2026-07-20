@@ -1511,7 +1511,10 @@ code {
 }
 
 .pr-tab:hover {
-	color: var(--vscode-textLink-activeForeground);
+	/* Override the global button hover (which is the theme's green button background) with a subtle
+	   neutral hover, and keep normal foreground so the label stays readable. */
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+	color: var(--vscode-foreground);
 }
 
 .pr-tab.selected {
