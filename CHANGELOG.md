@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0
+
+First stable release: the extension is out of preview. Ships the full 1.6.x line as a stable build, and adds comment reactions, `@mention` resolution, and resolved coexistence with Microsoft's GitHub Pull Requests extension.
+
+- Out of preview. Dropped the `preview` flag; this is the first release published as a stable (non-preview) build.
+- Azure DevOps comment likes. The single thumbs-up reaction shown in the ADO web UI now renders on comments and can be toggled from VS Code.
+- `@mention` resolution. Mentions in comment text resolve to users and notify them.
+- Resolved coexistence with the GitHub Pull Requests extension. This extension scopes its commenting ranges and thread routing to its own document schemes plus the checked-out PR's changed files, and drops a stale `onFileSystem:newIssue` activation event. There is no view/command/scheme clash; the only residual is VS Code's single shared comment gutter when the same file is under an open PR on both platforms, which is inherent to VS Code and handled by it. The former "Known issue" is removed.
+- Review threads now appear on tree-opened (`pr_azdo`) diffs for a checked-out PR, not only on the working-tree copy of the file.
+- PR header actions are always visible and roomier on the description page.
+- Inline diff-hunk excerpt on description-page thread cards.
+- Build-validation policy rows note when they need Build (read) permission to show details.
+- Dev: fixed a circular-import init crash (`utils.ts`/`diffHunk.ts`) that had kept the Electron test suite from actually running in CI since the 1.6 line; bounded the (still non-blocking) CI test step.
+
 ## 1.6.0
 
 Deep links in both directions, the restored create-PR flow, and thread-card context/navigation on the description page.
