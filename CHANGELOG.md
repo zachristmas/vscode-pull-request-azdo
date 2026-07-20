@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.1
+
+- Fix: hovering a tab turned its label unreadable (blue text on the theme's green button-hover background). Tabs now use a neutral hover with normal-contrast text.
+
 ## 2.4.0
 
 - Conversation / Files changed tabs. The pull request page now has two tabs: "Conversation" (description, policies, timeline) and "Files changed (N)". The files tab lists every changed file with its status (A/M/D/R) and +/- counts; click a file to open its full diff in the editor - no branch checkout needed, so a shared PR link opens straight to a reviewable state.
