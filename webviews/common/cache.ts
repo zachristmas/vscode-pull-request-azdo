@@ -27,6 +27,15 @@ export enum ReviewType {
 	RequestChanges = 'requestChanges',
 }
 
+// A pull request related to this one because they share a linked work item. Derived and read-only;
+// Azure DevOps has no native "related PR" link.
+export interface RelatedPullRequest {
+	id: number;
+	title: string;
+	status: PullRequestStatus;
+	url: string;
+}
+
 export interface PullRequest {
 	number: number;
 	title: string;
@@ -76,6 +85,8 @@ export interface PullRequest {
 	commits: GitCommitRef[];
 	currentUser: Identity;
 	workItems: WorkItem[];
+	// PRs sharing a linked work item with this one (derived from work-item artifact links, read-only).
+	relatedPRs: RelatedPullRequest[];
 
 	// POL-01: undefined = not fetched (simple view pre-POL-05, fetch error); [] = "No branch policies apply".
 	policies?: PullRequestPolicyEvaluation[];

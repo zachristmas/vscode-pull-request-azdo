@@ -349,6 +349,29 @@ export class AzdoRepository implements vscode.Disposable {
 		return azdo._hub?.authenticatedUser;
 	}
 
+	// Lightweight PR lookup for related-PR rows and the `!` picker: raw title/status/web-url, without
+	// building a full PullRequestModel (no branch-ref resolution). Returns undefined on any failure.
+	async getPullRequestBrief(id: number): Promise<{ id: number; title: string; status: number; url: string } | undefined> {
+		try {
+			const azdo = await this.ensure();
+			const gitApi = await azdo._hub?.connection.getGitApi();
+			const pr = await gitApi?.getPullRequestById(id);
+			if (!pr) {
+				return undefined;
+			}
+			const prId = pr.pullRequestId ?? id;
+			const webUrl = pr.repository?.webUrl;
+			return {
+				id: prId,
+				title: pr.title ?? `Pull Request #${prId}`,
+				status: pr.status ?? 0,
+				url: webUrl ? `${webUrl}/pullrequest/${prId}` : '',
+			};
+		} catch {
+			return undefined;
+		}
+	}
+
 	async getPullRequest(id: number): Promise<PullRequestModel | undefined> {
 		try {
 			Logger.debug(`Fetch pull request ${id} - enter`, AzdoRepository.ID);

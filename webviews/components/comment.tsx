@@ -23,7 +23,7 @@ import PullRequestContext from '../common/context';
 import emitter from '../common/events';
 import { useStateProp } from '../common/hooks';
 import { buildMentionNameMap } from '../common/mentions';
-import { linkifyWorkItems } from '../common/references';
+import { linkifyPullRequests, linkifyWorkItems } from '../common/references';
 
 const { useCallback, useContext, useEffect, useRef, useState } = React;
 export type Props = Partial<Comment> & {
@@ -264,7 +264,11 @@ export const CommentBody = ({ commentContent, commentId, threadId, bodyHTML, bod
 
 	// Resolve ADO @<guid> mention tokens to @Display Name before rendering so no raw id leaks (names
 	// come from PR participants + mentions picked this session; unknown ids fall back to @user).
-	const resolvedBody = linkifyWorkItems(resolveMentions(body ?? '', buildMentionNameMap(pr)), pr.workItems);
+	// The repo web url is the current PR url minus its /pullrequest/<id> suffix; used to build `!<id>` links.
+	const repoWebUrl = pr.url?.replace(/\/pullrequest\/\d+$/i, '');
+	const withMentions = resolveMentions(body ?? '', buildMentionNameMap(pr));
+	const withWorkItems = linkifyWorkItems(withMentions, pr.workItems);
+	const resolvedBody = linkifyPullRequests(withWorkItems, pr.relatedPRs, repoWebUrl);
 	// const renderedBody = <div dangerouslySetInnerHTML={{ __html: bodyHTML }} />;
 	const renderedBody = <ReactMarkdown renderers={renderers} plugins={[gfm]} children={resolvedBody} />;
 	const containsSuggestion = (body || bodyHTML || '').includes('```diff');

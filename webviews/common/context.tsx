@@ -39,6 +39,10 @@ export class PRContext {
 	public searchWorkItems = (query: string): Promise<{ id: number; title: string; workItemType: string; state: string }[]> =>
 		this.postMessage({ command: 'pr.search-workItems', args: { query } });
 
+	// Resolve `!` pull-request picker queries to ADO pull requests (host-backed).
+	public searchPullRequests = (query: string): Promise<{ id: number; title: string; status: number }[]> =>
+		this.postMessage({ command: 'pr.search-pullRequests', args: { query } });
+
 	public checkout = () => this.postMessage({ command: 'pr.checkout' });
 
 	public copyPrLink = () => this.postMessage({ command: 'pr.copy-prlink' });

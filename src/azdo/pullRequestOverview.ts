@@ -10,7 +10,11 @@ import {
 	IdentityRefWithVote,
 	PullRequestStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import { AccountRecentActivityWorkItemModel2, WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
+import {
+	AccountRecentActivityWorkItemModel2,
+	WorkItem,
+	WorkItemRelation,
+} from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as vscode from 'vscode';
 import { onDidUpdatePR } from '../commands';
 import { buildPullRequestDeepLink, deepLinkParamsFromPullRequest } from '../common/deepLink';
@@ -57,6 +61,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 	protected _scrollPosition = { x: 0, y: 0 };
 	private _workItem: AzdoWorkItem;
 	private _userManager: AzdoUserManager;
+	// Active PRs for the `!` picker, fetched once per panel load (cleared at the top of updatePullRequest).
+	private _activePrListCache?: Promise<PullRequestModel[]>;
 
 	public static async createOrShow(
 		extensionPath: string,
@@ -222,6 +228,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 
 	public async updatePullRequest(pullRequestModel: PullRequestModel): Promise<void> {
 		try {
+			// Drop the `!`-picker cache so a refreshed panel re-fetches the active PR list.
+			this._activePrListCache = undefined;
 			const result = await Promise.all([
 				this._folderRepositoryManager.resolvePullRequest(
 					pullRequestModel.remote.owner,
@@ -305,6 +313,10 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				);
 			}
 
+			// Related PRs share a linked work item with this one. Progressive enhancement - a failure
+			// here must not sink the panel, so default to [].
+			const relatedPRs = await this.getRelatedPullRequests(workItems, pullRequest.getPullRequestId()).catch(() => []);
+
 			Logger.debug('pr.initialize', PullRequestOverviewPanel.ID);
 			this._postMessage({
 				command: 'pr.initialize',
@@ -356,6 +368,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					isIssue: false,
 					currentUser: currentUser,
 					workItems: workItems,
+					relatedPRs: relatedPRs,
 					policies,
 					autoCompleteSetBy: pullRequest.item.autoCompleteSetBy
 						? convertRESTUserToAccount(pullRequest.item.autoCompleteSetBy)
@@ -429,6 +442,9 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		}
 		if (message.command === 'pr.search-workItems') {
 			return this.searchWorkItems(message);
+		}
+		if (message.command === 'pr.search-pullRequests') {
+			return this.searchPullRequests(message);
 		}
 		switch (message.command) {
 			case 'pr.checkout':
@@ -540,6 +556,76 @@ export class PullRequestOverviewPanel extends WebviewBase {
 		} catch {
 			return this._replyMessage(message, []);
 		}
+	}
+
+	// `!` pull-request picker backing. Filters the (per-panel-cached) active PR list by id substring, and
+	// direct-fetches a fully-typed id that is not active (e.g. a completed PR). Never rejects.
+	private async searchPullRequests(message: IRequestMessage<{ query: string }>): Promise<void> {
+		try {
+			const query = (message.args?.query ?? '').trim();
+			if (!this._activePrListCache) {
+				this._activePrListCache = this._item.azdoRepository.getAllActivePullRequests().catch(() => []);
+			}
+			const active = await this._activePrListCache;
+			const currentId = this._item.getPullRequestId();
+			let matches = active.filter(pr => pr.getPullRequestId() !== currentId);
+			if (query) {
+				matches = matches.filter(pr => pr.getPullRequestId().toString().includes(query));
+			}
+			const items = matches
+				.slice(0, 10)
+				.map(pr => ({ id: pr.getPullRequestId(), title: pr.item.title ?? '', status: pr.item.status ?? 0 }));
+			if (/^\d+$/.test(query) && items.every(i => i.id !== Number(query))) {
+				// getPullRequestBrief never rejects (it catches internally and returns undefined).
+				const brief = await this._item.azdoRepository.getPullRequestBrief(Number(query));
+				if (brief && brief.id !== currentId) {
+					items.unshift({ id: brief.id, title: brief.title, status: brief.status });
+				}
+			}
+			return this._replyMessage(message, items.slice(0, 10));
+		} catch {
+			return this._replyMessage(message, []);
+		}
+	}
+
+	// Parse PR ids from a work item's artifact links (vstfs:///Git/PullRequestId/{proj}%2F{repo}%2F{prId});
+	// the trailing segment is the PR id. Single loop so the guard `continue`s stay readable.
+	private parsePrIdsFromRelations(relations: WorkItemRelation[] | undefined): number[] {
+		const ids: number[] = [];
+		const list = relations ?? [];
+		for (const rel of list) {
+			if (rel.rel !== 'ArtifactLink' || !rel.url || !/PullRequestId/i.test(rel.url)) {
+				continue;
+			}
+			const id = Number(rel.url.replaceAll('%2F', '/').split('/').at(-1));
+			if (id > 0 && Number.isSafeInteger(id)) {
+				ids.push(id);
+			}
+		}
+		return ids;
+	}
+
+	// PRs sharing a linked work item with this one, derived from the work items' PR artifact links.
+	// The current PR is excluded.
+	private async getRelatedPullRequests(
+		workItems: WorkItem[],
+		currentPrId: number,
+	): Promise<{ id: number; title: string; status: number; url: string }[]> {
+		const ids = new Set<number>();
+		for (const wi of workItems) {
+			const prIds = this.parsePrIdsFromRelations(wi.relations);
+			for (const id of prIds) {
+				if (id !== currentPrId) {
+					ids.add(id);
+				}
+			}
+		}
+		if (ids.size === 0) {
+			return [];
+		}
+		// getPullRequestBrief never rejects (it catches internally and returns undefined).
+		const briefs = await Promise.all([...ids].map(id => this._item.azdoRepository.getPullRequestBrief(id)));
+		return briefs.filter((b): b is { id: number; title: string; status: number; url: string } => !!b);
 	}
 
 	private async addReviewerToPr(message: IRequestMessage<any>) {

@@ -46,8 +46,11 @@ function activeQuery(query: string): boolean {
 	return !(query.includes('\n') || query.length > 60 || /\s$/.test(query));
 }
 
+// PullRequestStatus enum values (azure-devops-node-api GitInterfaces) as picker detail text.
+const PR_STATUS_LABEL: Record<number, string> = { 1: 'Active', 2: 'Abandoned', 3: 'Completed' };
+
 // Build the trigger providers bound to the host-backed searches on the PR context. `@` behaves exactly
-// as before; `#`/`AB#` searches work items.
+// as before; `#`/`AB#` searches work items; `!` searches pull requests.
 function buildProviders(ctx: React.ContextType<typeof PullRequestContext>): CompletionProvider[] {
 	const mention: CompletionProvider = {
 		detect(before) {
@@ -112,7 +115,37 @@ function buildProviders(ctx: React.ContextType<typeof PullRequestContext>): Comp
 		},
 	};
 
-	return [mention, workItem];
+	const pullRequest: CompletionProvider = {
+		detect(before) {
+			const bang = before.lastIndexOf('!');
+			if (bang === -1) {
+				return null;
+			}
+			if (!boundaryOk(bang > 0 ? before[bang - 1] : '')) {
+				return null;
+			}
+			const query = before.slice(bang + 1);
+			if (!activeQuery(query)) {
+				return null;
+			}
+			// `!` is common in prose; only treat it as a PR ref when the query is empty or numeric.
+			if (query.length > 0 && !/^\d+$/.test(query)) {
+				return null;
+			}
+			return { at: bang, query };
+		},
+		async search(query) {
+			const results = await ctx.searchPullRequests(query);
+			return (results ?? []).map(p => ({
+				id: `pr-${p.id}`,
+				label: `!${p.id} ${p.title}`,
+				detail: PR_STATUS_LABEL[p.status] ?? '',
+				insertText: `!${p.id} `,
+			}));
+		},
+	};
+
+	return [mention, workItem, pullRequest];
 }
 
 // A drop-in <textarea> with an autocomplete dropdown. Typing a trigger (`@`, `#`/`AB#`) at a word

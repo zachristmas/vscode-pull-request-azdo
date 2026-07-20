@@ -13,10 +13,16 @@ import { checkIcon, crossIcon, plusIcon } from './icon';
 import { REVIEW_STATE_ICON, Reviewer, VOTE_STATE_TEXT } from './reviewer';
 import { nbsp } from './space';
 import { ReviewState } from '../../src/azdo/interface';
-import { PullRequest } from '../common/cache';
+import { PullRequest, RelatedPullRequest } from '../common/cache';
 import PullRequestContext from '../common/context';
 
-export default function Sidebar({ reviewers, workItems, hasWritePermission, isActive }: PullRequest & { isActive: boolean }) {
+export default function Sidebar({
+	reviewers,
+	workItems,
+	relatedPRs,
+	hasWritePermission,
+	isActive,
+}: PullRequest & { isActive: boolean }) {
 	const { addRequiredReviewers, addOptionalReviewers, associateWorkItem, pr } = useContext(PullRequestContext);
 
 	// UX-02: on a finished PR keep the reviewer/work-item rows (they are the review record) but drop
@@ -66,9 +72,31 @@ export default function Sidebar({ reviewers, workItems, hasWritePermission, isAc
 					)}
 				</div>
 			</div>
+			{/* Read-only: PRs sharing a linked work item with this one. Shown only when non-empty to avoid
+			    adding a permanent "None" row for a niche, derived relationship. */}
+			{relatedPRs && relatedPRs.length > 0 ? (
+				<div id="related-prs" className="section">
+					<div className="section-header">
+						<div className="section-title">Related Pull Requests</div>
+					</div>
+					<div className="related-pr-body-container">
+						{relatedPRs.map(relatedPR => (
+							<RelatedPR key={relatedPR.id} {...relatedPR} />
+						))}
+					</div>
+				</div>
+			) : null}
 		</div>
 	);
 }
+
+const RelatedPR = (relatedPR: RelatedPullRequest) => (
+	<div className="section-item related-pr">
+		<a href={relatedPR.url} title={relatedPR.title}>
+			<span className="related-pr-id">!{relatedPR.id}</span> {relatedPR.title}
+		</a>
+	</div>
+);
 
 function WorkItem(workItem: WorkItem & { canDelete: boolean }) {
 	const canDelete = workItem.canDelete;
