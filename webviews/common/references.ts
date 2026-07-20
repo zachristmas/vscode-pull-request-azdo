@@ -44,3 +44,33 @@ export function linkifyWorkItems(text: string, workItems: WorkItem[] | undefined
 		return `[#${digits}](${href} "${tip}")`;
 	});
 }
+
+// Match a `!123` pull-request reference. Group 1 is the digits. `\b` keeps `!12ab` from matching.
+const PR_REF = /!(\d+)\b/g;
+
+/**
+ * Turn `!<id>` pull-request references (Azure DevOps markdown syntax) into links that open that PR, with
+ * the PR title as a tooltip when we know it (PRs sharing a work item with this one). The URL is built
+ * from `repoWebUrl` so any id resolves - ADO itself renders `!123` this way. `!` is common in prose, so
+ * we only trigger at a word boundary.
+ */
+export function linkifyPullRequests(
+	text: string,
+	relatedPRs: { id: number; title?: string }[] | undefined,
+	repoWebUrl: string | undefined,
+): string {
+	if (!text || !repoWebUrl) {
+		return text;
+	}
+	const titleById = new Map<number, string | undefined>((relatedPRs ?? []).map(p => [p.id, p.title]));
+	return text.replaceAll(PR_REF, (full: string, digits: string, offset: number, whole: string) => {
+		const prev = offset > 0 ? whole[offset - 1] : '';
+		if (prev && prev !== '(' && !/\s/.test(prev)) {
+			return full;
+		}
+		const id = Number(digits);
+		const href = `${repoWebUrl}/pullrequest/${id}`;
+		const title = titleById.get(id);
+		return title ? `[!${digits}](${href} "${title.replaceAll('"', "'")}")` : `[!${digits}](${href})`;
+	});
+}
