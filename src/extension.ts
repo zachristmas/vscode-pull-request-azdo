@@ -223,17 +223,34 @@ async function init(
 		return true;
 	};
 
-	const reconcileRepositories = () => {
+	// Sync folder managers to the live git repo list. Each repo is isolated in its own try/catch so one
+	// repo that fails to construct a manager (e.g. an odd branch state) cannot abort the whole sweep and
+	// silently drop every repo after it. `refresh` is false when called from the tree's own render path
+	// to avoid a refresh->getChildren->reconcile loop.
+	const reconcileRepositories = (refresh: boolean = true): void => {
 		let added = false;
 		for (const repo of git.repositories) {
-			if (ensureManagerForRepo(repo)) {
-				added = true;
+			try {
+				if (ensureManagerForRepo(repo)) {
+					added = true;
+				}
+			} catch (e) {
+				Logger.appendLine(`Reconcile: failed to add repo ${repo.rootUri.toString()}: ${e}`);
 			}
 		}
-		if (added) {
+		Logger.appendLine(
+			`Reconcile: git.repositories=${git.repositories.length}, tracked=${reposManager.folderManagers.length}${
+				added ? ' (added new)' : ''
+			}`,
+		);
+		if (added && refresh) {
 			tree.refresh();
 		}
 	};
+
+	// The tree reconciles on every root render, so clicking Refresh (or any auto-refresh) picks up a
+	// repo the git extension opened late - no reload required.
+	tree.setRepositoryReconciler(() => reconcileRepositories(false));
 
 	git.onDidChangeState(() => {
 		reconcileRepositories();
@@ -241,8 +258,12 @@ async function init(
 	});
 
 	git.onDidOpenRepository(repo => {
-		if (ensureManagerForRepo(repo)) {
-			tree.refresh();
+		try {
+			if (ensureManagerForRepo(repo)) {
+				tree.refresh();
+			}
+		} catch (e) {
+			Logger.appendLine(`onDidOpenRepository: failed to add repo ${repo.rootUri.toString()}: ${e}`);
 		}
 	});
 
@@ -250,7 +271,7 @@ async function init(
 	// nested repos slightly after we initialize, and this catches the stragglers automatically (the
 	// reload race) instead of the user having to reload again. All idempotent.
 	reconcileRepositories();
-	for (const delay of [1500, 5000, 15_000]) {
+	for (const delay of [1500, 5000, 15_000, 30_000]) {
 		const handle = setTimeout(() => reconcileRepositories(), delay);
 		context.subscriptions.push(new vscode.Disposable(() => clearTimeout(handle)));
 	}
@@ -288,6 +309,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	const apiImpl = new GitApiImpl();
 
 	const version = vscode.extensions.getExtension(EXTENSION_ID)!.packageJSON.version;
+	Logger.appendLine(`AzDO Pull Requests extension v${version} activating`);
 	const telemetry = new TelemetryReporter(EXTENSION_ID, version, aiKey);
 	extensionState.telemetry = telemetry;
 	context.subscriptions.push(telemetry);

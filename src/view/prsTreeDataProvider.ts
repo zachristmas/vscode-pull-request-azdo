@@ -28,6 +28,14 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 	private _view: vscode.TreeView<TreeNode>;
 	private _reposManager: RepositoriesManager | undefined;
 	private _initialized: boolean = false;
+	// Syncs the extension's folder managers against the live git repo list. Run on every root render so
+	// a repo the git extension opened late (nested repos race window/reload) appears without a reload -
+	// clicking Refresh is enough. Set by extension.ts.
+	private _reconcileRepositories?: () => void;
+
+	setRepositoryReconciler(reconcile: () => void): void {
+		this._reconcileRepositories = reconcile;
+	}
 
 	get view(): vscode.TreeView<TreeNode> {
 		return this._view;
@@ -194,6 +202,12 @@ export class PullRequestsTreeDataProvider implements vscode.TreeDataProvider<Tre
 	}
 
 	async getChildren(element?: TreeNode): Promise<TreeNode[]> {
+		// Reconcile against the live git repo list before building the root, so a late-opened repo shows
+		// up on the next render / Refresh instead of waiting for another reload.
+		if (!element) {
+			this._reconcileRepositories?.();
+		}
+
 		if (!this._reposManager) {
 			return !vscode.workspace.workspaceFolders
 				? Promise.resolve([new PRCategoryActionNode(this, PRCategoryActionType.NoOpenFolder)])
