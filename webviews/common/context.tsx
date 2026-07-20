@@ -45,9 +45,7 @@ export class PRContext {
 
 	public checkout = () => this.postMessage({ command: 'pr.checkout' });
 
-	public copyPrLink = () => this.postMessage({ command: 'pr.copy-prlink' });
-
-	public copyVscodeDeepLink = () => this.postMessage({ command: 'pr.copy-vscode-deeplink' });
+	public copyLink = () => this.postMessage({ command: 'pr.copy-link' });
 
 	public exitReviewMode = async () => {
 		if (!this.pr) {

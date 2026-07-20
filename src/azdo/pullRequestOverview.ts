@@ -17,7 +17,7 @@ import {
 } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as vscode from 'vscode';
 import { onDidUpdatePR } from '../commands';
-import { buildPullRequestDeepLink, deepLinkParamsFromPullRequest } from '../common/deepLink';
+import { buildShareableLink, deepLinkParamsFromPullRequest } from '../common/deepLink';
 import { DiffHunk } from '../common/diffHunk';
 import Logger from '../common/logger';
 import { formatError } from '../common/utils';
@@ -433,8 +433,8 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			vscode.window.showErrorMessage(message.args);
 			return;
 		}
-		if (message.command === 'pr.copy-vscode-deeplink') {
-			return this.copyVscodeDeepLink(message);
+		if (message.command === 'pr.copy-link') {
+			return this.copyLink(message);
 		}
 		// Handled before the switch to keep it under the max-switch-cases lint limit (as with 'alert').
 		if (message.command === 'pr.search-identities') {
@@ -513,8 +513,6 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				return this.addReviewerToPr(message);
 			case 'pr.remove-reviewer':
 				return this.removeReviewer(message);
-			case 'pr.copy-prlink':
-				return this.copyPrLink(message);
 			case 'azdopr.close':
 				return this.close(message);
 			case 'scroll':
@@ -1219,21 +1217,19 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			});
 	}
 
-	private async copyPrLink(_message: IRequestMessage<string>): Promise<void> {
-		await vscode.env.clipboard.writeText(this._item.url ?? '');
-		vscode.window.showInformationMessage(`Copied link to PR ${this._item.item.title}!`);
-	}
-
-	private async copyVscodeDeepLink(_message: IRequestMessage<undefined>): Promise<void> {
-		const params = deepLinkParamsFromPullRequest(this._item);
-		if (!params) {
-			vscode.window.showErrorMessage(
-				'Unable to build a deep link: the organization or project of this pull request could not be determined.',
-			);
+	// Single "Copy link" affordance on the PR header. Prefers the shareable https link (opens the PR
+	// in VS Code, falls back to the ADO web page) when a redirect base is configured; otherwise copies
+	// the plain PR web URL. The vscode:// and web variants remain available as palette commands.
+	private async copyLink(_message: IRequestMessage<undefined>): Promise<void> {
+		const baseUrl = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('shareLinkBaseUrl')?.trim();
+		const params = baseUrl ? deepLinkParamsFromPullRequest(this._item) : undefined;
+		if (baseUrl && params) {
+			await vscode.env.clipboard.writeText(buildShareableLink(baseUrl, params));
+			vscode.window.showInformationMessage('Shareable link copied to clipboard.');
 			return;
 		}
-		await vscode.env.clipboard.writeText(buildPullRequestDeepLink(params));
-		vscode.window.showInformationMessage('VS Code deep link copied to clipboard.');
+		await vscode.env.clipboard.writeText(this._item.url ?? '');
+		vscode.window.showInformationMessage(`Copied link to PR ${this._item.item.title}.`);
 	}
 
 	protected editCommentPromise(comment: Comment, threadId: number, text: string): Promise<Comment> {
