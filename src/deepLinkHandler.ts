@@ -110,7 +110,7 @@ export async function handleDeepLinkUri(
 			params.prNumber
 		}`;
 		const choice = await vscode.window.showErrorMessage(
-			`'${params.repo}' is not open in any window, so its pull request can't be opened in VS Code. Open the folder containing ${params.repo} and follow the link again, or open it on the web.`,
+			`'${params.repo}' is not active in VS Code, so its pull request can't be opened here. If you closed it in the Source Control view, reopen it (Command Palette: "Git: Reopen Closed Repositories"); otherwise open the folder containing ${params.repo}. Then follow the link again, or open it on the web.`,
 			openWeb,
 		);
 		if (choice === openWeb) {
