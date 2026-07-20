@@ -12,7 +12,7 @@ import Logger from './common/logger';
 
 const ID = 'DeepLinkHandler';
 
-interface DeepLinkTarget {
+export interface DeepLinkTarget {
 	folderManager: FolderRepositoryManager;
 	azdoRepository: AzdoRepository;
 }
@@ -66,7 +66,10 @@ function matchCandidate(
 	};
 }
 
-function findDeepLinkTarget(reposManager: RepositoriesManager, params: PullRequestDeepLinkParams): DeepLinkTarget | undefined {
+export function findDeepLinkTarget(
+	reposManager: RepositoriesManager,
+	params: PullRequestDeepLinkParams,
+): DeepLinkTarget | undefined {
 	const wantedOrg = orgNameFromUrl(params.orgUrl) ?? trimTrailingSlashes(params.orgUrl.trim()).toLowerCase();
 	const wantedRepo = params.repo.toLowerCase();
 	const wantedProject = params.project.toLowerCase();

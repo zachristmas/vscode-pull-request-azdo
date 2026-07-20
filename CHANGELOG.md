@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.0
+
+- Open pull request tabs now survive a window reload. Previously a reopened window lost the PR tab; it is now restored automatically and reconnected to the live pull request (its identity is persisted with the tab and re-resolved when the extension reactivates). If the repository can no longer be found, the placeholder is closed cleanly instead of hanging.
+
 ## 2.4.1
 
 - Fix: hovering a tab turned its label unreadable (blue text on the theme's green button-hover background). Tabs now use a neutral hover with normal-contrast text.

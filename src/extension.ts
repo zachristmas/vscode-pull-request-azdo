@@ -9,12 +9,13 @@ import { Repository } from './api/api';
 import { GitApiImpl } from './api/api1';
 import { CredentialStore } from './azdo/credentials';
 import { FileReviewedStatusService } from './azdo/fileReviewedStatusService';
-import { FolderRepositoryManager } from './azdo/folderRepositoryManager';
+import { FolderRepositoryManager, ReposManagerState } from './azdo/folderRepositoryManager';
+import { PullRequestOverviewPanel } from './azdo/pullRequestOverview';
 import { RepositoriesManager } from './azdo/repositoriesManager';
 import { AzdoUserManager } from './azdo/userManager';
 import { AzdoWorkItem } from './azdo/workItem';
 import { registerCommands } from './commands';
-import { parsePullRequestDeepLink } from './common/deepLink';
+import { parsePullRequestDeepLink, PullRequestDeepLinkParams } from './common/deepLink';
 import { LocalStorageService } from './common/localStorageService';
 import Logger from './common/logger';
 import * as PersistentState from './common/persistentState';
@@ -22,7 +23,7 @@ import { Resource } from './common/resources';
 import { handler as uriHandler } from './common/uri';
 import { onceEvent } from './common/utils';
 import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from './constants';
-import { handleDeepLinkUri } from './deepLinkHandler';
+import { findDeepLinkTarget, handleDeepLinkUri } from './deepLinkHandler';
 import { registerBuiltinGitProvider, registerLiveShareGitProvider } from './gitProviders/api';
 import { MockGitProvider } from './gitProviders/mockGitProvider';
 import { MockRepository } from './gitProviders/mockRepository';
@@ -51,6 +52,28 @@ const extensionState: {
 } = { telemetry: undefined, deepLinkProcessor: undefined };
 
 const pendingDeepLinkUris: vscode.Uri[] = [];
+
+// Resolves once repositories have finished loading (so a PR can be resolved), or after a cap so a stuck
+// or unauthenticated load never blocks webview restore forever.
+function waitForRepositoriesLoaded(reposManager: RepositoriesManager): Promise<void> {
+	if (reposManager.state === ReposManagerState.RepositoriesLoaded) {
+		return Promise.resolve();
+	}
+	return new Promise<void>(resolve => {
+		const timer = setTimeout(() => {
+			listener.dispose();
+			resolve();
+		}, 20_000);
+		const listener = reposManager.onDidChangeState(() => {
+			if (reposManager.state !== ReposManagerState.RepositoriesLoaded) {
+				return;
+			}
+			clearTimeout(timer);
+			listener.dispose();
+			resolve();
+		});
+	});
+}
 
 async function init(
 	context: vscode.ExtensionContext,
@@ -148,6 +171,34 @@ async function init(
 	const bufferedDeepLinkUris = [...pendingDeepLinkUris];
 	pendingDeepLinkUris.length = 0;
 	bufferedDeepLinkUris.forEach(uri => deepLinkProcessor(uri));
+
+	// Persist open PR tabs across window reloads: VS Code keeps a placeholder for each open PR webview
+	// and calls this serializer on reactivation with the state the webview saved (which includes the PR
+	// identity under `restore`). Re-resolve the PR - reusing the deep-link resolver - and re-hydrate the
+	// panel it hands back.
+	context.subscriptions.push(
+		vscode.window.registerWebviewPanelSerializer('PullRequestOverview', {
+			async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: { restore?: PullRequestDeepLinkParams }) {
+				const params = state?.restore;
+				if (!params) {
+					panel.dispose();
+					return;
+				}
+				await waitForRepositoriesLoaded(reposManager);
+				const target = findDeepLinkTarget(reposManager, params);
+				if (!target) {
+					panel.dispose();
+					return;
+				}
+				const pr = await target.azdoRepository.getPullRequest(params.prNumber);
+				if (!pr) {
+					panel.dispose();
+					return;
+				}
+				PullRequestOverviewPanel.revive(panel, context.extensionPath, target.folderManager, pr, workItem, userManager);
+			},
+		}),
+	);
 	const layout = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('fileListLayout');
 	await vscode.commands.executeCommand('setContext', 'fileListLayout:flat', layout === 'flat');
 
