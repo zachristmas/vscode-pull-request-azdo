@@ -34,3 +34,6 @@ docs/**
 out/**
 test_workspace/**
 **/*webpack.config*.js
+
+# Local Claude Code session state (lock files, scratch), never intended to ship.
+.claude/**
