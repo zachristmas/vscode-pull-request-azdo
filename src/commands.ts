@@ -26,6 +26,7 @@ import { ITelemetry } from './common/telemetry';
 import { asImageDataURI, fromPRUri, fromReviewUri, ReviewUriParams } from './common/uri';
 import { formatError, gitErrorCode } from './common/utils';
 import { SETTINGS_NAMESPACE, URI_SCHEME_PR, URI_SCHEME_REVIEW } from './constants';
+import { PullRequestDashboardPanel } from './view/prDashboardPanel';
 import { PullRequestsTreeDataProvider } from './view/prsTreeDataProvider';
 import { ReviewManager } from './view/reviewManager';
 import { CommitNode } from './view/treeNodes/commitNode';
@@ -220,6 +221,12 @@ export function registerCommands(
 	credentialStore: CredentialStore,
 	tree: PullRequestsTreeDataProvider,
 ) {
+	context.subscriptions.push(
+		vscode.commands.registerCommand('azdopr.openDashboardPage', () => {
+			PullRequestDashboardPanel.createOrShow(context.extensionPath, reposManager, telemetry, workItem, azdoUserManager);
+		}),
+	);
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('azdopr.signout', async () => {
 			credentialStore.logout();

@@ -1,0 +1,279 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+#dashboard {
+	max-width: 960px;
+	margin: 0 auto;
+	padding-bottom: var(--azdo-space-6);
+}
+
+.dashboard-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: var(--azdo-space-4);
+}
+
+.dashboard-header h1 {
+	font-size: 20px;
+	font-weight: 600;
+	margin: 0;
+}
+
+.dashboard-header-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-3);
+}
+
+.dashboard-sort-label {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+	font-size: 12px;
+	color: var(--azdo-muted);
+}
+
+.dashboard-sort-label select {
+	background: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	border: 1px solid var(--vscode-dropdown-border, var(--azdo-border));
+	border-radius: var(--azdo-radius-md);
+	padding: 2px var(--azdo-space-1);
+}
+
+.pr-tabs {
+	display: flex;
+	gap: var(--azdo-space-1);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	margin-bottom: var(--azdo-space-4);
+}
+
+.pr-tab {
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	padding: var(--azdo-space-2) var(--azdo-space-3);
+	font-size: 13px;
+}
+
+.pr-tab:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+	color: var(--vscode-foreground);
+}
+
+.pr-tab.selected {
+	border-bottom-color: var(--vscode-textLink-activeForeground, var(--vscode-focusBorder));
+	font-weight: 600;
+}
+
+.dashboard-empty {
+	color: var(--azdo-muted);
+	padding: var(--azdo-space-5) 0;
+}
+
+.dashboard-scroll-sentinel {
+	text-align: center;
+	color: var(--azdo-muted);
+	font-size: 12px;
+	padding: var(--azdo-space-3) 0;
+}
+
+.dashboard-category {
+	margin-bottom: var(--azdo-space-6);
+}
+
+.dashboard-category-title {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 600;
+	color: var(--azdo-muted);
+	margin: 0 0 var(--azdo-space-2) 0;
+	padding-bottom: var(--azdo-space-2);
+	border-bottom: 1px solid var(--azdo-border-subtle);
+}
+
+.dashboard-count {
+	background: var(--azdo-surface-header);
+	border-radius: var(--azdo-radius-sm);
+	padding: 0 var(--azdo-space-1);
+	font-weight: 400;
+}
+
+.dashboard-rows {
+	display: flex;
+	flex-direction: column;
+}
+
+.dashboard-row {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-3);
+	padding: var(--azdo-space-2) var(--azdo-space-1);
+	border-bottom: 1px solid var(--azdo-border-subtle);
+	cursor: pointer;
+}
+
+.dashboard-row:last-child {
+	border-bottom: none;
+}
+
+.dashboard-row:hover,
+.dashboard-row:focus-visible {
+	background: var(--azdo-surface-header);
+	outline: none;
+}
+
+.dashboard-row-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.dashboard-row-title {
+	display: flex;
+	align-items: baseline;
+	gap: var(--azdo-space-2);
+	min-width: 0;
+}
+
+.dashboard-row-title .repo-chip {
+	flex-shrink: 0;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: var(--azdo-muted);
+	background: var(--azdo-surface-header);
+	border-radius: var(--azdo-radius-sm);
+	padding: 0 var(--azdo-space-1);
+}
+
+.dashboard-row-title .pr-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+}
+
+.dashboard-row-subtitle {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+	font-size: 12px;
+	color: var(--azdo-muted);
+}
+
+.status-badge {
+	border-radius: var(--azdo-radius-sm);
+	padding: 0 var(--azdo-space-1);
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+}
+
+.status-badge.status-open {
+	color: var(--azdo-success);
+	background: color-mix(in srgb, var(--azdo-success) 16%, transparent);
+}
+
+.status-badge.status-draft {
+	color: var(--azdo-muted);
+	background: var(--azdo-surface-header);
+}
+
+.status-badge.status-merged {
+	color: var(--azdo-info);
+	background: color-mix(in srgb, var(--azdo-info) 16%, transparent);
+}
+
+.status-badge.status-closed {
+	color: var(--azdo-danger);
+	background: color-mix(in srgb, var(--azdo-danger) 16%, transparent);
+}
+
+.auto-complete-badge,
+.blocker-badge {
+	border-radius: var(--azdo-radius-sm);
+	padding: 0 var(--azdo-space-1);
+}
+
+.blocker-badge {
+	color: var(--azdo-danger);
+}
+
+.dashboard-row-reviewers {
+	display: flex;
+	flex-shrink: 0;
+}
+
+.dashboard-reviewer {
+	position: relative;
+	margin-left: -6px;
+}
+
+.dashboard-reviewer:first-child {
+	margin-left: 0;
+}
+
+.dashboard-reviewer .avatar,
+.dashboard-reviewer .avatar-icon {
+	border: 1px solid var(--azdo-surface);
+}
+
+.dashboard-reviewer-vote {
+	position: absolute;
+	right: -2px;
+	bottom: -2px;
+	background: var(--azdo-surface);
+	border-radius: 50%;
+	line-height: 0;
+}
+
+.dashboard-reviewer-vote svg {
+	width: 10px;
+	height: 10px;
+}
+
+.dashboard-load-more {
+	margin-top: var(--azdo-space-2);
+}
+
+.dashboard-copy-link {
+	flex-shrink: 0;
+	background: none;
+	border: none;
+	color: var(--azdo-muted);
+	cursor: pointer;
+	padding: var(--azdo-space-1);
+	border-radius: var(--azdo-radius-sm);
+	/* Hidden until the row is hovered/focused (or a keyboard/touch user tabs to it directly), so the
+	   list doesn't show an icon-button per row at rest. */
+	visibility: hidden;
+}
+
+.dashboard-row:hover .dashboard-copy-link,
+.dashboard-row:focus-within .dashboard-copy-link,
+.dashboard-copy-link:focus {
+	visibility: visible;
+}
+
+.dashboard-copy-link:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+	color: var(--vscode-foreground);
+}
+
+.dashboard-copy-link svg {
+	width: 14px;
+	height: 14px;
+}

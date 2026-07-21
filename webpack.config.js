@@ -136,6 +136,10 @@ async function getWebviewConfig(mode, env, entry) {
 				path: require.resolve('path-browserify'),
 			},
 		},
+		// These are size/performance budgets webpack inherited from its web-page defaults; a webview
+		// bundle here is loaded once into a VS Code panel, not paid for on every page load, so the
+		// warning is just noise in every production build.
+		performance: { hints: false },
 		plugins: plugins,
 	};
 }
@@ -346,6 +350,17 @@ async function getExtensionConfig(target, mode, env) {
 			'applicationinsights-native-metrics': 'applicationinsights-native-metrics',
 			'@opentelemetry/tracing': '@opentelemetry/tracing',
 		},
+		// mocha's own bundle does a runtime `require(dynamicExpression)` for its optional
+		// reporters/interfaces lookup. It only ships in the webworker target's test/index.js
+		// entry (never in the shipped extension.js), and the expression is never reached in a
+		// browser/webworker context, so the dependency this warns about can never actually load.
+		ignoreWarnings:
+			target === 'webworker'
+				? [{ module: /node_modules[\\/]mocha[\\/]mocha\.js$/, message: /Critical dependency/ }]
+				: undefined,
+		// See the comment on the webview config's `performance` option: these are web-page load
+		// budgets, not meaningful for an extension host bundle loaded once at activation.
+		performance: { hints: false },
 		plugins: plugins,
 		stats: {
 			preset: 'errors-warnings',
@@ -379,6 +394,7 @@ module.exports =
 			getWebviewConfig(mode, env, {
 				'webview-pr-description': './webviews/editorWebview/index.ts',
 				'webview-open-pr-view': './webviews/activityBarView/index.ts',
+				'webview-pr-dashboard': './webviews/dashboardWebview/index.ts',
 			}),
 		]);
 	};

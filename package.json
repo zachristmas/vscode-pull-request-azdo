@@ -11,7 +11,7 @@
 		"url": "https://github.com/zachristmas/vscode-pull-request-azdo/issues"
 	},
 	"enableProposedApi": false,
-	"version": "2.5.2",
+	"version": "2.8.1",
 	"packageManager": "pnpm@10.3.0",
 	"pnpm": {
 		"onlyBuiltDependencies": [
@@ -230,6 +230,12 @@
 					"visibility": "visible"
 				},
 				{
+					"id": "azdoprDashboard:azdo",
+					"name": "Dashboard",
+					"when": "ReposManagerStateContext != NeedsAuthentication && !azdo:focusedReview",
+					"icon": "resources/icons/pull-request.png"
+				},
+				{
 					"id": "azdopr:azdo",
 					"name": "Pull Requests",
 					"when": "ReposManagerStateContext != NeedsAuthentication && !azdo:focusedReview",
@@ -328,6 +334,12 @@
 				"icon": "$(plus)"
 			},
 			{
+				"command": "azdopr.openDashboardPage",
+				"title": "Open Pull Request Dashboard",
+				"category": "AzDO Pull Requests",
+				"icon": "$(preview)"
+			},
+			{
 				"command": "azdopr.createDraftPullRequest",
 				"title": "Create Draft Pull Request",
 				"category": "AzDO Pull Requests"
@@ -421,6 +433,12 @@
 			{
 				"command": "azdopr.refreshList",
 				"title": "Refresh Pull Requests List",
+				"icon": "$(refresh)",
+				"category": "AzDO Pull Requests"
+			},
+			{
+				"command": "azdopr.refreshDashboard",
+				"title": "Refresh Dashboard",
 				"icon": "$(refresh)",
 				"category": "AzDO Pull Requests"
 			},
@@ -675,6 +693,14 @@
 					"when": "gitOpenRepositoryCount != 0 && azdo:authenticated && azdo:hasAzdoRemotes"
 				},
 				{
+					"command": "azdopr.refreshDashboard",
+					"when": "gitOpenRepositoryCount != 0 && azdo:authenticated && azdo:hasAzdoRemotes"
+				},
+				{
+					"command": "azdopr.openDashboardPage",
+					"when": "gitOpenRepositoryCount != 0 && azdo:authenticated && azdo:hasAzdoRemotes"
+				},
+				{
 					"command": "azdopr.setFileListLayoutAsTree",
 					"when": "false"
 				},
@@ -743,6 +769,21 @@
 					"command": "azdopr.refreshChanges",
 					"when": "view == azdoprStatus:azdo",
 					"group": "navigation@2"
+				},
+				{
+					"command": "azdopr.openDashboardPage",
+					"when": "gitOpenRepositoryCount != 0 && azdo:initialized && view == azdopr:azdo",
+					"group": "navigation@1"
+				},
+				{
+					"command": "azdopr.refreshDashboard",
+					"when": "gitOpenRepositoryCount != 0 && azdo:initialized && view == azdoprDashboard:azdo",
+					"group": "navigation@2"
+				},
+				{
+					"command": "azdopr.openDashboardPage",
+					"when": "gitOpenRepositoryCount != 0 && azdo:initialized && view == azdoprDashboard:azdo",
+					"group": "navigation@1"
 				},
 				{
 					"command": "azdopr.setFileListLayoutAsTree",

@@ -30,6 +30,7 @@ import { MockRepository } from './gitProviders/mockRepository';
 import { FileTypeDecorationProvider } from './view/fileTypeDecorationProvider';
 import { getInMemPRContentProvider } from './view/inMemPRContentProvider';
 import { PullRequestChangesTreeDataProvider } from './view/prChangesTreeDataProvider';
+import { PullRequestDashboardTreeDataProvider } from './view/prDashboardTreeDataProvider';
 import { PullRequestsTreeDataProvider } from './view/prsTreeDataProvider';
 import { ReviewManager } from './view/reviewManager';
 import { ReviewsManager } from './view/reviewsManager';
@@ -81,6 +82,7 @@ async function init(
 	credentialStore: CredentialStore,
 	repositories: Repository[],
 	tree: PullRequestsTreeDataProvider,
+	dashboardTree: PullRequestDashboardTreeDataProvider,
 	liveshareApiPromise: Promise<LiveShare | undefined>,
 	telemetry: TelemetryReporter,
 ): Promise<void> {
@@ -160,6 +162,7 @@ async function init(
 	const reviewsManager = new ReviewsManager(context, reposManager, reviewManagers, tree, changesTree, telemetry, git);
 	context.subscriptions.push(reviewsManager);
 	tree.initialize(reposManager);
+	dashboardTree.initialize(reposManager);
 	registerCommands(context, reposManager, reviewManagers, workItem, userManager, telemetry, credentialStore, tree);
 
 	const deepLinkProcessor = (uri: vscode.Uri) => {
@@ -366,15 +369,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	const prTree = new PullRequestsTreeDataProvider(telemetry);
 	context.subscriptions.push(prTree);
 
+	const dashboardTree = new PullRequestDashboardTreeDataProvider(telemetry);
+	context.subscriptions.push(dashboardTree);
+
 	context.subscriptions.push(
 		vscode.workspace.registerTextDocumentContentProvider(URI_SCHEME_PR, getInMemPRContentProvider()),
 	);
 
 	if (apiImpl.repositories.length > 0) {
-		await init(context, apiImpl, credentialStore, apiImpl.repositories, prTree, liveshareApiPromise, telemetry);
+		await init(
+			context,
+			apiImpl,
+			credentialStore,
+			apiImpl.repositories,
+			prTree,
+			dashboardTree,
+			liveshareApiPromise,
+			telemetry,
+		);
 	} else {
 		onceEvent(apiImpl.onDidOpenRepository)(r =>
-			init(context, apiImpl, credentialStore, [r], prTree, liveshareApiPromise, telemetry),
+			init(context, apiImpl, credentialStore, [r], prTree, dashboardTree, liveshareApiPromise, telemetry),
 		);
 	}
 
