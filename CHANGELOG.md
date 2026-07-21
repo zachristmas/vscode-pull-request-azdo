@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.8.4
+
+- Pull Request Dashboard: each row now shows its source and target branch (e.g. `feature/x → main`). Already resolved for every PR the dashboard fetches, so this adds no extra requests.
+- Fix: the Dashboard (both the tree view and the webview page) never updated when a PR's status changed elsewhere - merging, closing, or otherwise updating a PR only ever refreshed the main "Pull Requests" tree. Both Dashboard views now refresh on the same signal.
+
 ## 2.8.3
 
 - Fix: opening a changed file on a completed/merged pull request could show an empty diff (one blank line, no code) instead of the real content. A local git lookup could report a commit/file as available from tree metadata alone while `git show` still failed to produce its content (e.g. a clone that never fetched that specific historical blob) - this path had no fallback, so the failure was silent. It now falls back to fetching the file directly from Azure DevOps, the same reliable path already used elsewhere.

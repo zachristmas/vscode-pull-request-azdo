@@ -308,6 +308,11 @@ function PullRequestRow({
 						{entry.title}
 					</span>
 				</div>
+				{entry.sourceBranch && entry.targetBranch ? (
+					<div className="dashboard-row-branches">
+						<code>{entry.sourceBranch}</code> <span aria-hidden="true">→</span> <code>{entry.targetBranch}</code>
+					</div>
+				) : null}
 				<div className="dashboard-row-subtitle">
 					<span className={`status-badge status-${status.toLowerCase()}`}>{status}</span>
 					<AuthorLink url={entry.author.url ?? ''} text={entry.author.name ?? 'Unknown'} />
