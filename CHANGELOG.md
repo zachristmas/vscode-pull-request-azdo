@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.8.5
+
+- Fix: the "Delete branch" button on a completed PR always showed, even when there was nothing left to clean up (both the remote and local branch already gone), so clicking it just popped a confusing "There is no longer an upstream or local branch" warning. It now only shows when there's actually a local branch or remote left to delete.
+- Fix: spacing between the description card and the policy/status-checks card below it, and between a "Show" link and the text next to it, on the pull request overview page.
+
 ## 2.8.4
 
 - Pull Request Dashboard: each row now shows its source and target branch (e.g. `feature/x → main`). Already resolved for every PR the dashboard fetches, so this adds no extra requests.

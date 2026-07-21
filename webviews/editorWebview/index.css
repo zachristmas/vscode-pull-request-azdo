@@ -279,7 +279,12 @@ body .comment-container .review-comment-header {
 	margin-left: var(--azdo-space-4);
 }
 
-.status-item,
+.status-item {
+	display: flex;
+	align-items: center;
+	gap: var(--azdo-space-2);
+}
+
 .form-actions {
 	display: flex;
 }
@@ -320,6 +325,12 @@ body .comment-container .review-comment-header {
 
 .status-section {
 	padding-bottom: var(--azdo-space-3);
+}
+
+/* The policy section is the first thing after the description card - without its own top margin it
+   sat flush against the card above it, reading as one run-on block instead of two distinct cards. */
+.policy-section {
+	margin-top: var(--azdo-space-5);
 }
 
 #status-checks a {

@@ -378,6 +378,13 @@ export class PullRequestOverviewPanel extends WebviewBase {
 			this._panel.title = `Pull Request #${pullRequestModel.getPullRequestId().toString()}`;
 
 			const isCurrentlyCheckedOut = pullRequestModel.equals(this._folderRepositoryManager.activePullRequest);
+			// AC-08's DeleteBranch button always renders on a completed PR (local cleanup is still
+			// useful even after deleteSourceBranch already removed the remote branch) - but when
+			// there's truly nothing left (no local branch, no remote), clicking it just pops a
+			// "nothing to delete" warning, which reads as broken rather than as "already cleaned up".
+			// Compute it once here (cheap - local git config only) so the button can skip rendering in
+			// that case instead of round-tripping just to find out.
+			const hasBranchToDelete = !!(await this._folderRepositoryManager.getBranchNameForPullRequest(pullRequest));
 			const hasWritePermission = repositoryAccess!.hasWritePermission;
 			const mergeMethodsAvailability = repositoryAccess!.mergeMethodsAvailability;
 			const canEdit = hasWritePermission || canEditPr;
@@ -441,6 +448,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 					threadHunks: threadHunks,
 					commits: commits,
 					isCurrentlyCheckedOut: isCurrentlyCheckedOut,
+					hasBranchToDelete,
 					// AC-08: getBranchRef() returns undefined once a branch no longer exists (e.g. the
 					// source branch deleteSourceBranch already removed on a completed PR) - the branch
 					// NAME is still known from source/targetRefName even when the live ref lookup fails,
