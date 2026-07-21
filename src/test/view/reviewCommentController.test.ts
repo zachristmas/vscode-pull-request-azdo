@@ -121,6 +121,10 @@ describe('ReviewCommentController', function () {
 
 		const pr = createMock<GitPullRequest>();
 		const repo = new AzdoRepository(remote, credentialStore, asReal(fileReviewedStatusService), telemetry);
+		// convertAzdoPullRequestToRawPullRequest resolves head/base via a real getBranchRef() network
+		// call against the repo's remote - dev.azure.com.com isn't a real host, so unstubbed this hangs
+		// until mocha's own per-test timeout (600000ms) kills it, dominating the whole suite's runtime.
+		sinon.stub(AzdoRepository.prototype, 'getBranchRef').resolves(undefined);
 		activePullRequest = new PullRequestModel(
 			telemetry,
 			repo,
