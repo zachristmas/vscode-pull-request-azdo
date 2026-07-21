@@ -317,6 +317,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 	extensionState.telemetry = telemetry;
 	context.subscriptions.push(telemetry);
 
+	// A Marketplace auto-update swaps the on-disk manifest/code without restarting this extension
+	// host, so a newly contributed view (or any other manifest-level change) silently does nothing
+	// until the window reloads - `onDidChange` still fires here even though this old host is the one
+	// running it, letting it notice its own version has drifted from what's now installed on disk.
+	let notifiedOfUpdate = false;
+	context.subscriptions.push(
+		vscode.extensions.onDidChange(() => {
+			const installedVersion = vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON.version;
+			if (notifiedOfUpdate || !installedVersion || installedVersion === version) {
+				return;
+			}
+			notifiedOfUpdate = true;
+			vscode.window
+				.showInformationMessage(
+					`AzDO Pull Requests was updated to v${installedVersion}. Reload the window to finish updating - new views and fixes won't take effect until then.`,
+					'Reload Window',
+				)
+				.then(selection => {
+					if (selection === 'Reload Window') {
+						vscode.commands.executeCommand('workbench.action.reloadWindow');
+					}
+				});
+		}),
+	);
+
 	PersistentState.init(context);
 
 	// The URI handler must be registered during activation (not init) so vscode:// deep links are
