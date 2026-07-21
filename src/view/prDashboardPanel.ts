@@ -34,6 +34,8 @@ interface DashboardEntryPayload {
 	url: string;
 	createdAt: string | undefined;
 	activityAt: string | undefined;
+	sourceBranch: string | undefined;
+	targetBranch: string | undefined;
 	author: { name: string | undefined; url: string | undefined; avatarUrl: string | undefined };
 	isDraft: boolean;
 	state: number | undefined;
@@ -72,6 +74,13 @@ function toPayload(folderManager: FolderRepositoryManager, pr: PullRequestModel)
 		url: pr.url,
 		createdAt: pr.item.creationDate as unknown as string | undefined,
 		activityAt: getActivityDate(pr)?.toISOString(),
+		// Already resolved with zero extra requests: FolderRepositoryManager.getPullRequests() resolves
+		// head/base for every PR it fetches (convertAzdoPullRequestToRawPullRequest), so this is free
+		// to show here. Line-level +/- counts deliberately aren't: they need a separate per-PR diff
+		// fetch (getMergeBase + getCommitDiffs), which would multiply the request count by the
+		// category size - not worth it for a list view like this.
+		sourceBranch: pr.head?.ref,
+		targetBranch: pr.base?.ref,
 		author: {
 			name: pr.item.createdBy?.displayName,
 			url: pr.item.createdBy?.url,
