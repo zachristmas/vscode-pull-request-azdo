@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.8.1
+
+- Pull Request Dashboard's Closed tab now only fetches when the tab is actually clicked, instead of loading on every dashboard open/refresh.
+- Closed tab pages now query Completed and Abandoned separately instead of filtering an "all statuses" query client-side, so every page fetched is entirely closed PRs - no more scrolling past pages that came back sparse because most of that page was still-active PRs.
+
+## 2.8.0
+
+- Pull Request Dashboard: sort control (Recent activity / Created date, ascending or descending), defaulting to most-recently-active first. "Recent activity" is the latest of when a PR closed, its source branch was last pushed to, or when it was created.
+- Pull Request Dashboard: a "Closed" tab lists completed/abandoned pull requests across every repo, with infinite scroll (loads another page as you scroll near the bottom) instead of fetching an entire repo's merged history up front.
+- Pull Request Dashboard: each row has a "Copy shareable link" button (same link format as the PR overview page's copy-link action).
+
+## 2.7.0
+
+- Pull Request Dashboard page: a full webview page (opened via the new preview-icon button on the "Pull Requests"/"Dashboard" views, or "Open Pull Request Dashboard" in the command palette), styled like the pull request description page. Lists Waiting For My Review, Assigned To Me, Created By Me, and All Active across every repo in the workspace, with author avatar, status badge, reviewer avatars/votes, and conflict/policy-block/auto-complete indicators per row. Click a row to open that PR's full overview tab.
+
+## 2.6.0
+
+- New "Dashboard" view above "Pull Requests" in the sidebar: Waiting For My Review, Assigned To Me, Created By Me, and All Active, each merged across every repo in the workspace instead of one subtree per repo - no more clicking through each project to see what needs your attention. Each entry is labeled with its source repo. "Continue fetching from other remotes" fetches additional pages the same way the per-repo list already does.
+
 ## 2.5.2
 
 - More robust repository detection. The tree now reconciles against the live git repository list on every render, so clicking Refresh reliably picks up any repo the git extension opened late (no reload needed). Each repo is added independently, so one repo that fails to initialize can no longer drop the repos listed after it. Adds a longer post-activation sweep and logs the active version and repo counts to the "AzDO Pull Request" output channel for easier diagnosis.

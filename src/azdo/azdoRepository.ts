@@ -278,7 +278,7 @@ export class AzdoRepository implements vscode.Disposable {
 		}
 	}
 
-	async getPullRequests(search: GitPullRequestSearchCriteria): Promise<PullRequestModel[]> {
+	async getPullRequests(search: GitPullRequestSearchCriteria, skip?: number, top?: number): Promise<PullRequestModel[]> {
 		try {
 			Logger.debug(`Fetch pull requests for branch - enter`, AzdoRepository.ID);
 			const azdo = await this.ensure();
@@ -291,7 +291,7 @@ export class AzdoRepository implements vscode.Disposable {
 				return [];
 			}
 			const gitApi = await azdo._hub?.connection.getGitApi();
-			const result = await gitApi?.getPullRequests(metadata.id, search);
+			const result = await gitApi?.getPullRequests(metadata.id, search, undefined, undefined, skip, top);
 
 			if (!result || result.length === 0) {
 				Logger.appendLine(

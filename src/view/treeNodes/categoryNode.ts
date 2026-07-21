@@ -32,7 +32,16 @@ export class PRCategoryActionNode extends TreeNode implements vscode.TreeItem {
 	public type: PRCategoryActionType;
 	public command?: vscode.Command;
 
-	constructor(parent: TreeNodeParent, type: PRCategoryActionType, node?: CategoryTreeNode) {
+	// `node` just needs to be a fetchNextPage-able tree node (CategoryTreeNode or, for the
+	// dashboard, DashboardCategoryTreeNode) - kept structural so this file doesn't need to import
+	// the dashboard node type. `commandName` lets callers other than the main list (e.g. the
+	// dashboard) wire "load more" to their own command instead of 'azdopr.loadMore'.
+	constructor(
+		parent: TreeNodeParent,
+		type: PRCategoryActionType,
+		node?: TreeNode & { fetchNextPage: boolean },
+		commandName: string = 'azdopr.loadMore',
+	) {
 		super();
 		this.parent = parent;
 		this.type = type;
@@ -45,7 +54,7 @@ export class PRCategoryActionNode extends TreeNode implements vscode.TreeItem {
 				this.label = 'Load more';
 				this.command = {
 					title: 'Load more',
-					command: 'azdopr.loadMore',
+					command: commandName,
 					arguments: [node],
 				};
 				break;
@@ -53,7 +62,7 @@ export class PRCategoryActionNode extends TreeNode implements vscode.TreeItem {
 				this.label = 'Continue fetching from other remotes';
 				this.command = {
 					title: 'Load more',
-					command: 'azdopr.loadMore',
+					command: commandName,
 					arguments: [node],
 				};
 				break;
