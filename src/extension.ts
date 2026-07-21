@@ -381,7 +381,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 
 	const credentialStore = new CredentialStore(telemetry, context.secrets, apiImpl);
 	context.subscriptions.push(credentialStore);
-	await credentialStore.initialize();
+	if (context.extensionMode === vscode.ExtensionMode.Test) {
+		// Under the test harness (vscode-test, --extensionTestsPath) there's no user present to
+		// respond to an interactive sign-in - login()'s default createIfNone: true would otherwise
+		// block activation on a real OAuth prompt that can never resolve headless, hanging the whole
+		// CI job. Individual test files build their own isolated CredentialStore/mocks (see
+		// azdoRepository.test.ts) - they never depend on this extension instance's own credential
+		// store - so it's safe to fire-and-forget rather than block activation on it here.
+		void credentialStore.initialize();
+	} else {
+		await credentialStore.initialize();
+	}
 
 	const liveshareGitProvider = registerLiveShareGitProvider(apiImpl);
 	context.subscriptions.push(liveshareGitProvider);
