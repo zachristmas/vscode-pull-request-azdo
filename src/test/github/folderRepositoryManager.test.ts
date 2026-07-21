@@ -57,6 +57,11 @@ describe('PullRequestManager', function () {
 			const protocol = new Protocol(url);
 			const remote = new Remote('origin', url, protocol);
 			const repository = new AzdoRepository(remote, manager.credentialStore, asReal(fileReviewedStatusService), telemetry);
+			// convertAzdoPullRequestToRawPullRequest resolves head/base via a real getBranchRef() call
+			// against the repo's remote - dev.azure.com.com isn't a real host, so unstubbed this hangs
+			// on a socket-level timeout (~9.5 minutes observed in CI) instead of failing fast. This test
+			// only cares about activePullRequest assignment/event firing, not real branch data.
+			sinon.stub(AzdoRepository.prototype, 'getBranchRef').resolves(undefined);
 			const prItem = await convertAzdoPullRequestToRawPullRequest(createMock<GitPullRequest>(), repository);
 			const pr = new PullRequestModel(telemetry, repository, remote, prItem);
 
