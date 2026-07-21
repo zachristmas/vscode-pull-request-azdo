@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import { ReposManagerState } from '../azdo/folderRepositoryManager';
 import { PRType } from '../azdo/interface';
 import { RepositoriesManager } from '../azdo/repositoriesManager';
+import { onDidUpdatePR } from '../commands';
 import { ITelemetry } from '../common/telemetry';
 import { PRCategoryActionNode, PRCategoryActionType } from './treeNodes/categoryNode';
 import { DashboardCategoryTreeNode } from './treeNodes/dashboardCategoryNode';
@@ -51,6 +52,11 @@ export class PullRequestDashboardTreeDataProvider
 		});
 		this._disposables.push(this._view);
 		this._childrenDisposables = [];
+
+		// Merging/closing/etc. a PR (from its overview panel, the main tree, or here) fires this same
+		// event everywhere - without it, this view only ever updated on an explicit Refresh click, so
+		// a just-merged PR stuck around in "All Active" until you remembered to hit refresh yourself.
+		this._disposables.push(onDidUpdatePR(() => this._onDidChangeTreeData.fire()));
 	}
 
 	async reveal(element: TreeNode, options?: { select?: boolean; focus?: boolean; expand?: boolean }): Promise<void> {

@@ -3,6 +3,7 @@
 ## 2.8.4
 
 - Pull Request Dashboard: each row now shows its source and target branch (e.g. `feature/x → main`). Already resolved for every PR the dashboard fetches, so this adds no extra requests.
+- Fix: the Dashboard (both the tree view and the webview page) never updated when a PR's status changed elsewhere - merging, closing, or otherwise updating a PR only ever refreshed the main "Pull Requests" tree. Both Dashboard views now refresh on the same signal.
 
 ## 2.8.3
 

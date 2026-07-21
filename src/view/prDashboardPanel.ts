@@ -6,6 +6,7 @@
 import path from 'path';
 import { PullRequestAsyncStatus } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import * as vscode from 'vscode';
+import { onDidUpdatePR } from '../commands';
 import {
 	ClosedPullRequestsCursor,
 	createClosedPullRequestsCursors,
@@ -174,6 +175,11 @@ export class PullRequestDashboardPanel extends WebviewBase {
 		super.initialize();
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 		this._panel.webview.html = this.getHtmlForWebview();
+
+		// Merging/closing/etc. a PR (from its own overview panel, the main tree, or elsewhere) fires
+		// this same event everywhere - without it, a just-merged PR stuck around in "All Active" on
+		// this page until the user remembered to hit Refresh themselves.
+		this._disposables.push(onDidUpdatePR(() => void this.refreshAll()));
 
 		/* __GDPR__
 			"pr.dashboard.openPage" : {}
