@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.3
+
+- Fix: opening a changed file on a completed/merged pull request could show an empty diff (one blank line, no code) instead of the real content. A local git lookup could report a commit/file as available from tree metadata alone while `git show` still failed to produce its content (e.g. a clone that never fetched that specific historical blob) - this path had no fallback, so the failure was silent. It now falls back to fetching the file directly from Azure DevOps, the same reliable path already used elsewhere.
+
 ## 2.8.2
 
 - Notifies you when a background Marketplace update needs a window reload to take effect. A silent auto-update leaves the old extension host running against the new manifest, so a newly added view (like the Dashboard) can fail with "No view is registered" until reload - this now shows a prompt with a one-click "Reload Window" button as soon as the update lands.

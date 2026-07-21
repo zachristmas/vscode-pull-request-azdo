@@ -123,11 +123,20 @@ export async function provideDocumentContentForChangeModel(
 
 	const { commit, originalFileName } = resolveLocalCommitAndFileName(params, fileChange);
 	const originalFilePath = vscode.Uri.joinPath(folderReposManager.repository.rootUri, originalFileName!);
-	const originalContent = await folderReposManager.repository.show(commit, originalFilePath.fsPath);
-	return originalContent;
-	// if (params.isBase) {
-	// 	return originalContent;
-	// } else {
-	// 	return getModifiedContentFromDiffHunkAzdo(originalContent, fileChange.diffHunks);
-	// }
+	try {
+		return await folderReposManager.repository.show(commit, originalFilePath.fsPath);
+	} catch (e) {
+		// The local-object probe upstream (parseSingleDiffAzdo) can say a commit/path is resolvable
+		// from tree/commit metadata alone, while `git show` - which needs the actual blob content -
+		// still fails (e.g. a shallow/partial clone that hasn't fetched that specific blob). Without
+		// this, the failure was silent: the diff editor just rendered an empty document with no
+		// indication anything went wrong. Fall back to the same reliable AzDO blob fetch the "remote"
+		// path already uses (mirrors createPatch()'s local-diff-then-remote-fallback a bit further
+		// down in pullRequestModel.ts).
+		Logger.appendLine(
+			`PR> Local git show failed for ${originalFileName} @ ${commit}, falling back to AzDO: ${e}`,
+			'InMemPRContentProvider',
+		);
+		return await fetchRemoteFileContent(params, pullRequestModel, fileChange);
+	}
 }
