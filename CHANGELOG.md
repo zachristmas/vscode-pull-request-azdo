@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.2
+
+- Notifies you when a background Marketplace update needs a window reload to take effect. A silent auto-update leaves the old extension host running against the new manifest, so a newly added view (like the Dashboard) can fail with "No view is registered" until reload - this now shows a prompt with a one-click "Reload Window" button as soon as the update lands.
+
 ## 2.8.1
 
 - Pull Request Dashboard's Closed tab now only fetches when the tab is actually clicked, instead of loading on every dashboard open/refresh.
