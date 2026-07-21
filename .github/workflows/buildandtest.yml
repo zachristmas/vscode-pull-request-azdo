@@ -47,10 +47,12 @@ jobs:
 
       # Shadow mode: the suite was repaired in v1.5.2 but had never actually run in CI - it crash-exited
       # on load (utils.ts/diffHunk.ts circular-import init, fixed alongside this) so the step passed in
-      # seconds without running a single test. With the crash gone the suite now runs, but the
-      # auth-dependent suites hang headless in beforeEach when no working ADO auth is available (real
-      # login()/connect()), so bound the non-blocking step to keep runs from approaching the 6h job cap.
-      # Flip to required on evidence (auth-layer mocked so the suite is green), not on a date.
+      # seconds without running a single test. With the crash gone the suite now runs; the one live-network
+      # suite (azdoRepository.test.ts) self-skips when AZDO_PAT_TOKEN_TEST isn't set instead of hanging
+      # until this step's timeout, so this no longer needs continue-on-error/timeout-minutes as a
+      # hang-safety-net - kept anyway as a backstop against a future test introducing the same mistake.
+      # Flip to required (remove continue-on-error) once AZDO_PAT_TOKEN_TEST is set and this is
+      # observed green a few times, not on a date.
       - name: Run tests (non-blocking)
         continue-on-error: true
         timeout-minutes: 12
@@ -58,3 +60,7 @@ jobs:
         env:
           TEST_JUNIT_XML_PATH: ${{ github.workspace }}/test-results.xml
           VSCODE_PR_AZDO_TEST_PAT: ${{ secrets.AZDO_PAT_TOKEN_TEST }}
+          # Optional: point azdoRepository.test.ts at a real repo in your org instead of the
+          # upstream maintainer's personal test org. Not secret - fine as repo/org Variables.
+          VSCODE_PR_AZDO_TEST_REPO: ${{ vars.AZDO_TEST_REPO }}
+          VSCODE_PR_AZDO_TEST_REPO_URL: ${{ vars.AZDO_TEST_REPO_URL }}
