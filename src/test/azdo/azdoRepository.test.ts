@@ -17,6 +17,10 @@ import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
 import { asReal } from '../mocks/stub';
 
+// Loaded at module scope (not inside a hook) so a local .env-configured PAT is visible to the
+// hasPat check below, which runs before any mocha hook does.
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
 // Org/project/repo are parameterized (env-driven) rather than hardcoded to one person's ADO
 // tenant, since this suite makes a real network call - whoever owns AZDO_PAT_TOKEN_TEST /
 // VSCODE_PR_AZDO_TEST_PAT decides what it authenticates against. test_workspace/.vscode/settings.json
@@ -26,7 +30,16 @@ const TEST_REPO_NAME = process.env.VSCODE_PR_AZDO_TEST_REPO ?? 'test';
 const TEST_REPO_URL =
 	process.env.VSCODE_PR_AZDO_TEST_REPO_URL ?? `https://dev.azure.com/anksinha/test/_git/${TEST_REPO_NAME}`;
 
-describe('AzdoRepository', function () {
+const hasPat = !!process.env.VSCODE_PR_AZDO_TEST_PAT;
+
+// This suite hits a real ADO org over the network. Without a PAT, CredentialStore falls through to
+// interactive OAuth (createIfNone: true by default), which hangs forever in CI or any other
+// unattended run. describe.skip - not this.skip() inside an async before() hook - is what actually
+// prevents that: this.skip() in an async hook is unreliable in this mocha/vscode-test setup (it did
+// not reliably stop the hook/test from running, and CI kept eating its full 12-minute timeout on
+// every run even after that guard was added). describe.skip registers the whole suite as skipped up
+// front, so its hooks and tests are never invoked at all.
+(hasPat ? describe : describe.skip)('AzdoRepository', function () {
 	let sinon: SinonSandbox;
 	let credentialStore: CredentialStore;
 	let telemetry: MockTelemetry;
@@ -36,18 +49,6 @@ describe('AzdoRepository', function () {
 	this.timeout(1_000_000);
 
 	before(async function () {
-		dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
-
-		// This suite hits a real ADO org over the network. Without a PAT, CredentialStore falls
-		// through to interactive OAuth (createIfNone: true by default), which just hangs forever in
-		// CI or any other unattended run - it used to eat the full 12-minute job timeout on every
-		// single run. Skip instead of relying on an outer timeout to bail it out.
-		if (!process.env.VSCODE_PR_AZDO_TEST_PAT) {
-			// eslint-disable-next-line unicorn/no-this-outside-of-class -- mocha suite context
-			this.skip();
-			return;
-		}
-
 		// Feed the PAT through the same VS Code setting a real user would configure manually
 		// (CredentialStore.acquireToken reads azdoPullRequests.patToken), so this exercises the
 		// actual production auth path instead of a test-only shortcut.
