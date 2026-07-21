@@ -57,6 +57,11 @@ export interface PullRequest {
 	state: PullRequestStatus;
 	events: TimelineEvent[];
 	isCurrentlyCheckedOut: boolean;
+	// Whether there's a local branch (or remote created for this PR) left to delete - the button
+	// still shows on a completed PR even when the remote branch is already gone (local cleanup is
+	// still useful), but when this is false there's truly nothing left, so the button shouldn't
+	// render at all rather than popping a "nothing to delete" warning on click.
+	hasBranchToDelete: boolean;
 	base: string;
 	head: string;
 	labels: ILabel[];

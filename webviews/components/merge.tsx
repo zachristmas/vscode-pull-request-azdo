@@ -81,7 +81,7 @@ const PullRequestStatusChecks = ({ pr, isSimple }: { pr: PullRequest; isSimple: 
 				{/* AC-08: the working pr.deleteBranch handler (local/remote quickpick, checks out the
 				    default branch when the deleted branch is active) already existed but was
 				    unreachable here - nothing offered to clean up the now-merged branch. */}
-				<DeleteBranch {...pr} />
+				<MergedBranchCleanup pr={pr} />
 			</>
 		);
 	} else if (state === PullRequestStatus.Abandoned) {
@@ -621,6 +621,11 @@ export const MergeSimple = (pr: PullRequest) => {
 
 	return <Dropdown options={availableOptions} defaultOption={pr.defaultMergeMethod} submitAction={submitAction} />;
 };
+
+// Only shown when there's actually something left to clean up (hasBranchToDelete) - otherwise
+// clicking DeleteBranch just popped a "nothing to delete" warning, reading as broken rather than as
+// "already cleaned up".
+const MergedBranchCleanup = ({ pr }: { pr: PullRequest }) => (pr.hasBranchToDelete ? <DeleteBranch {...pr} /> : null);
 
 export const DeleteBranch = (_pr: PullRequest) => {
 	const { deleteBranch } = useContext(PullRequestContext);
