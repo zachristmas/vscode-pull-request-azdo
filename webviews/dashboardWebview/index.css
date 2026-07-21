@@ -165,6 +165,19 @@
 	font-weight: 500;
 }
 
+.dashboard-row-branches {
+	font-size: 12px;
+	color: var(--azdo-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dashboard-row-branches code {
+	font-family: Menlo, Monaco, Consolas, 'Droid Sans Mono', 'Courier New', monospace, 'Droid Sans Fallback';
+	font-size: 11px;
+}
+
 .dashboard-row-subtitle {
 	display: flex;
 	align-items: center;

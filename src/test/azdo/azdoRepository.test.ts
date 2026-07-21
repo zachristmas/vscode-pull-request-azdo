@@ -2,18 +2,29 @@ import path from 'path';
 import { expect } from 'chai';
 import * as dotenv from 'dotenv';
 import { createSandbox, SinonSandbox, SinonStubbedInstance } from 'sinon';
+import * as vscode from 'vscode';
 import { GitApiImpl } from '../../api/api1';
 import { AzdoRepository } from '../../azdo/azdoRepository';
 import { CredentialStore } from '../../azdo/credentials';
 import { FileReviewedStatusService } from '../../azdo/fileReviewedStatusService';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
+import { SETTINGS_NAMESPACE } from '../../constants';
 import { MockGitProvider } from '../../gitProviders/mockGitProvider';
 import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
 import { asReal } from '../mocks/stub';
+
+// Org/project/repo are parameterized (env-driven) rather than hardcoded to one person's ADO
+// tenant, since this suite makes a real network call - whoever owns AZDO_PAT_TOKEN_TEST /
+// VSCODE_PR_AZDO_TEST_PAT decides what it authenticates against. test_workspace/.vscode/settings.json
+// still needs azdoPullRequests.orgUrl/projectName pointed at the same org (CredentialStore resolves
+// the org from settings, not from the remote URL passed to AzdoRepository).
+const TEST_REPO_NAME = process.env.VSCODE_PR_AZDO_TEST_REPO ?? 'test';
+const TEST_REPO_URL =
+	process.env.VSCODE_PR_AZDO_TEST_REPO_URL ?? `https://dev.azure.com/anksinha/test/_git/${TEST_REPO_NAME}`;
 
 describe('AzdoRepository', function () {
 	let sinon: SinonSandbox;
@@ -24,8 +35,25 @@ describe('AzdoRepository', function () {
 	// eslint-disable-next-line unicorn/no-this-outside-of-class -- mocha suite context
 	this.timeout(1_000_000);
 
-	before(function () {
+	before(async function () {
 		dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
+		// This suite hits a real ADO org over the network. Without a PAT, CredentialStore falls
+		// through to interactive OAuth (createIfNone: true by default), which just hangs forever in
+		// CI or any other unattended run - it used to eat the full 12-minute job timeout on every
+		// single run. Skip instead of relying on an outer timeout to bail it out.
+		if (!process.env.VSCODE_PR_AZDO_TEST_PAT) {
+			// eslint-disable-next-line unicorn/no-this-outside-of-class -- mocha suite context
+			this.skip();
+			return;
+		}
+
+		// Feed the PAT through the same VS Code setting a real user would configure manually
+		// (CredentialStore.acquireToken reads azdoPullRequests.patToken), so this exercises the
+		// actual production auth path instead of a test-only shortcut.
+		await vscode.workspace
+			.getConfiguration(SETTINGS_NAMESPACE)
+			.update('patToken', process.env.VSCODE_PR_AZDO_TEST_PAT, vscode.ConfigurationTarget.Global);
 	});
 
 	beforeEach(function () {
@@ -50,11 +78,10 @@ describe('AzdoRepository', function () {
 	describe('getMetadata', function () {
 		it('get repo information from Azdo', async function () {
 			await credentialStore.initialize();
-			const url = 'https://dev.azure.com/anksinha/test/_git/test';
-			const remote = new Remote('origin', url, new Protocol(url));
+			const remote = new Remote('origin', TEST_REPO_URL, new Protocol(TEST_REPO_URL));
 			const azdoRepo = new AzdoRepository(remote, credentialStore, asReal(fileReviewedStatusService), telemetry);
 			const metadata = await azdoRepo.getMetadata();
-			expect(metadata?.name).to.be.eq('test');
+			expect(metadata?.name).to.be.eq(TEST_REPO_NAME);
 		});
 	});
 

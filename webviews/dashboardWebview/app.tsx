@@ -17,6 +17,8 @@ export interface DashboardEntry {
 	url: string;
 	createdAt?: string;
 	activityAt?: string;
+	sourceBranch?: string;
+	targetBranch?: string;
 	author: { name?: string; url?: string; avatarUrl?: string };
 	isDraft: boolean;
 	state?: number;
