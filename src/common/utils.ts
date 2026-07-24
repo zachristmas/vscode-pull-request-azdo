@@ -27,7 +27,7 @@ export async function mapWithConcurrency<T, R>(
 	limit: number,
 	fn: (item: T) => Promise<R>,
 ): Promise<R[]> {
-	const results: R[] = new Array(items.length);
+	const results: R[] = Array.from({ length: items.length });
 	let next = 0;
 
 	async function worker() {
@@ -37,7 +37,8 @@ export async function mapWithConcurrency<T, R>(
 		}
 	}
 
-	await Promise.all(new Array(Math.min(limit, items.length)).fill(0).map(worker));
+	const workerCount = Math.min(limit, items.length);
+	await Promise.all(Array.from({ length: workerCount }, () => worker()));
 	return results;
 }
 

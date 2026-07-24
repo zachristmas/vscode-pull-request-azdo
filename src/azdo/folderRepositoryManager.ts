@@ -639,17 +639,16 @@ export class FolderRepositoryManager implements vscode.Disposable {
 
 		// Resolving PR-association metadata is a local git-config read (cheap, no network),
 		// so do it for every branch up front before deciding what's actually worth fetching.
-		const branchesWithMetadata = (
-			await Promise.all(
-				localBranches.map(async localBranchName => ({
+		const branchMetadataEntries = await Promise.all(
+			localBranches.map(async localBranchName => ({
+				localBranchName,
+				matchingPRMetadata: await PullRequestGitHelper.getMatchingPullRequestMetadataForBranch(
+					this.repository,
 					localBranchName,
-					matchingPRMetadata: await PullRequestGitHelper.getMatchingPullRequestMetadataForBranch(
-						this.repository,
-						localBranchName,
-					),
-				})),
-			)
-		).filter(
+				),
+			})),
+		);
+		const branchesWithMetadata = branchMetadataEntries.filter(
 			(entry): entry is { localBranchName: string; matchingPRMetadata: NonNullable<typeof entry.matchingPRMetadata> } =>
 				!!entry.matchingPRMetadata,
 		);
