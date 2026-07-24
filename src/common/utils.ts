@@ -22,6 +22,26 @@ export function uniqBy<T>(arr: T[] | readonly T[], fn: (el: T) => string): T[] {
 	});
 }
 
+export async function mapWithConcurrency<T, R>(
+	items: readonly T[],
+	limit: number,
+	fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+	const results: R[] = Array.from({ length: items.length });
+	let next = 0;
+
+	async function worker() {
+		while (next < items.length) {
+			const index = next++;
+			results[index] = await fn(items[index]);
+		}
+	}
+
+	const workerCount = Math.min(limit, items.length);
+	await Promise.all(Array.from({ length: workerCount }, () => worker()));
+	return results;
+}
+
 export function dispose<T extends Disposable>(disposables: T[]): T[] {
 	disposables.forEach(d => d.dispose());
 	return [];

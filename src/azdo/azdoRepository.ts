@@ -32,6 +32,7 @@ export class AzdoRepository implements vscode.Disposable {
 	protected _metadata: IMetadata | undefined;
 	private _metadataNotFound: boolean = false;
 	private _policyTypeMap: Map<string, string> | undefined;
+	private _branchRefCache: Map<string, IGitHubRef> = new Map();
 	private _toDispose: vscode.Disposable[] = [];
 	public commentsController?: vscode.CommentController;
 	public commentsHandler?: PRCommentControllerRegistry;
@@ -404,6 +405,12 @@ export class AzdoRepository implements vscode.Disposable {
 	}
 
 	async getBranchRef(branchName: string): Promise<IGitHubRef | undefined> {
+		const cached = this._branchRefCache.get(branchName);
+		if (cached) {
+			Logger.debug(`Get branch for name ${branchName} - cache hit`, AzdoRepository.ID);
+			return cached;
+		}
+
 		try {
 			Logger.debug(`Get branch for name ${branchName} - enter`, AzdoRepository.ID);
 			const azdo = await this.ensure();
@@ -420,15 +427,22 @@ export class AzdoRepository implements vscode.Disposable {
 			}
 
 			Logger.debug(`Get branch for name ${branchName} - done`, AzdoRepository.ID);
-			return convertAzdoBranchRefToIGitHubRef(branch, this.remote.url);
+			const ref = convertAzdoBranchRefToIGitHubRef(branch, this.remote.url);
+			this._branchRefCache.set(branchName, ref);
+			return ref;
 		} catch (e) {
 			Logger.appendLine(`Azdo> Unable to fetch PR: ${e}`);
-			return {
+			const ref: IGitHubRef = {
 				ref: branchName,
 				repo: { cloneUrl: this.remote.url },
 				sha: '',
 				exists: false,
 			};
+			// Cache the "doesn't exist" result too - stale local branches with leftover PR
+			// git-config repeatedly re-resolve the same deleted source/target branch names
+			// (see getLocalPullRequests), and each miss was a live network round-trip.
+			this._branchRefCache.set(branchName, ref);
+			return ref;
 		}
 	}
 
