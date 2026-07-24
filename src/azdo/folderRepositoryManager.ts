@@ -20,7 +20,7 @@ import { parseRepositoryRemotes, Remote } from '../common/remote';
 import { ITelemetry } from '../common/telemetry';
 import { EventType, TimelineEvent } from '../common/timelineEvent';
 import { fromPRUri } from '../common/uri';
-import { formatError, gitErrorCode, Predicate } from '../common/utils';
+import { formatError, gitErrorCode, mapWithConcurrency, Predicate } from '../common/utils';
 import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from '../constants';
 import { AzdoRepository } from './azdoRepository';
 import { CredentialStore } from './credentials';
@@ -637,34 +637,45 @@ export class FolderRepositoryManager implements vscode.Disposable {
 			.filter(r => r.type === RefType.Head && r.name !== undefined)
 			.map(r => r.name!);
 
-		const promises = localBranches.map(async localBranchName => {
-			const matchingPRMetadata = await PullRequestGitHelper.getMatchingPullRequestMetadataForBranch(
-				this.repository,
-				localBranchName,
+		// Resolving PR-association metadata is a local git-config read (cheap, no network),
+		// so do it for every branch up front before deciding what's actually worth fetching.
+		const branchesWithMetadata = (
+			await Promise.all(
+				localBranches.map(async localBranchName => ({
+					localBranchName,
+					matchingPRMetadata: await PullRequestGitHelper.getMatchingPullRequestMetadataForBranch(
+						this.repository,
+						localBranchName,
+					),
+				})),
+			)
+		).filter(
+			(entry): entry is { localBranchName: string; matchingPRMetadata: NonNullable<typeof entry.matchingPRMetadata> } =>
+				!!entry.matchingPRMetadata,
+		);
+
+		// Fetching the PR (and resolving its head/base branch refs) is a live AzDo API call.
+		// Repos can accumulate many stale local branches with leftover PR git-config, so cap
+		// how many of those network fetches run at once instead of firing them all in parallel.
+		const results = await mapWithConcurrency(branchesWithMetadata, 5, async ({ localBranchName, matchingPRMetadata }) => {
+			const { owner, prNumber } = matchingPRMetadata;
+			const githubRepo = githubRepositories.find(
+				repo => repo.remote.owner.toLocaleLowerCase() === owner.toLocaleLowerCase(),
 			);
 
-			if (matchingPRMetadata) {
-				const { owner, prNumber } = matchingPRMetadata;
-				const githubRepo = githubRepositories.find(
-					repo => repo.remote.owner.toLocaleLowerCase() === owner.toLocaleLowerCase(),
-				);
+			if (githubRepo) {
+				const pullRequest: PullRequestModel | undefined = await githubRepo.getPullRequest(prNumber);
 
-				if (githubRepo) {
-					const pullRequest: PullRequestModel | undefined = await githubRepo.getPullRequest(prNumber);
-
-					if (pullRequest) {
-						pullRequest.localBranchName = localBranchName;
-						return pullRequest;
-					}
+				if (pullRequest) {
+					pullRequest.localBranchName = localBranchName;
+					return pullRequest;
 				}
 			}
 
 			return null;
 		});
 
-		return Promise.all(promises).then(values => {
-			return values.filter(value => value !== null) as PullRequestModel[];
-		});
+		return results.filter(value => value !== null) as PullRequestModel[];
 	}
 
 	// async getLabels(issue?: IssueModel, repoInfo?: { owner: string, repo: string }): Promise<ILabel[]> {
