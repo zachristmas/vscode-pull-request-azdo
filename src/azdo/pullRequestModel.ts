@@ -28,17 +28,6 @@ import { PolicyEvaluationRecord } from 'azure-devops-node-api/interfaces/PolicyI
 import * as diff from 'diff';
 import equals from 'fast-deep-equal';
 import * as vscode from 'vscode';
-import { Repository } from '../api/api';
-import { IReviewThread, ViewedState } from '../common/comment';
-import { parseDiffAzdo } from '../common/diffHunk';
-import { GitChangeType, InMemFileChange, SlimFileChange } from '../common/file';
-import { GitHubRef } from '../common/githubRef';
-import Logger from '../common/logger';
-import { Remote } from '../common/remote';
-import { ITelemetry } from '../common/telemetry';
-import { toPRUriAzdo, toReviewUri } from '../common/uri';
-import { formatError } from '../common/utils';
-import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
 import { resolveAvatarsDeep } from './avatarCache';
 import { AzdoRepository } from './azdoRepository';
 import { FileViewedStatus, PRFileViewedState } from './fileReviewedStatusService';
@@ -46,6 +35,7 @@ import { FolderRepositoryManager } from './folderRepositoryManager';
 import {
 	CommentPermissions,
 	DiffBaseConfig,
+	IFileChangeNode,
 	IRawFileChange,
 	PullRequest,
 	PullRequestChecks,
@@ -66,6 +56,18 @@ import {
 	readableToString,
 	removeLeadingSlash,
 } from './utils';
+import { Repository } from '../api/api';
+import { IReviewThread, ViewedState } from '../common/comment';
+import { parseDiffAzdo } from '../common/diffHunk';
+import { GitChangeType, InMemFileChange, SlimFileChange } from '../common/file';
+import { GitHubRef } from '../common/githubRef';
+import Logger from '../common/logger';
+import { Remote } from '../common/remote';
+import { ITelemetry } from '../common/telemetry';
+import { fromPRUri, toPRUriAzdo, toReviewUri } from '../common/uri';
+import { formatError } from '../common/utils';
+import { AUTO_COMPLETE_CLEAR_ID, SETTINGS_NAMESPACE } from '../constants';
+import { getInMemPRContentProvider, provideDocumentContentForChangeModel } from '../view/inMemPRContentProvider';
 
 interface IPullRequestModel {
 	head: GitHubRef | null;
@@ -1365,6 +1367,13 @@ export class PullRequestModel implements IPullRequestModel {
 
 		let headUri, baseUri: vscode.Uri;
 		if (!pullRequestModel.equals(folderManager.activePullRequest)) {
+			// pr_azdo-scheme URIs (below) are served by InMemPRContentProvider, which only knows how
+			// to answer for a PR once something has registered a content resolver for its number. The
+			// PR tree normally does this on node expand (PRNode.getChildren), but opening a PR straight
+			// from the overview webview's Files Changed tab - without ever expanding it in the tree -
+			// skipped that step entirely, so the diff silently rendered blank. Register it here too.
+			this.registerRemoteFileContentProvider(folderManager, pullRequestModel, contentChanges);
+
 			const headCommit = pullRequestModel.head!.sha;
 			const fileName = change.status === GitChangeType.DELETE ? change.previousFileName! : change.fileName;
 			// Falls back to the head-side name for added files so the base URI stays resolvable (#109).
@@ -1418,6 +1427,42 @@ export class PullRequestModel implements IPullRequestModel {
 
 		const pathSegments = targetPath.split('/');
 		vscode.commands.executeCommand('vscode.diff', baseUri, headUri, `${pathSegments.at(-1)} (Pull Request)`, opts);
+	}
+
+	// Mirrors PRNode.resolveFileChanges/provideDocumentContent (pullRequestNode.ts) for the case where
+	// the PR is opened without ever expanding it in the tree, so no content provider exists yet for it.
+	private static registerRemoteFileContentProvider(
+		folderManager: FolderRepositoryManager,
+		pullRequestModel: PullRequestModel,
+		contentChanges: (InMemFileChange | SlimFileChange)[],
+	): void {
+		getInMemPRContentProvider().registerTextDocumentContentProvider(pullRequestModel.getPullRequestId(), async uri => {
+			const params = fromPRUri(uri);
+			if (!params) {
+				return '';
+			}
+
+			const change = contentChanges.find(c => {
+				const fileName = c.status === GitChangeType.DELETE ? c.previousFileName : c.fileName;
+				return fileName === params.fileName;
+			});
+			if (!change) {
+				Logger.appendLine(`PR> can not find content for document ${uri.toString()}`);
+				return '';
+			}
+
+			const isFileRemote = change instanceof SlimFileChange || (change instanceof InMemFileChange && change.isPartial);
+			const fileChangeNode: IFileChangeNode = {
+				status: change.status,
+				sha: change.status === GitChangeType.DELETE ? change.previousFileSHA : change.fileSHA,
+				blobUrl: change.blobUrl,
+				fileName: change.status === GitChangeType.DELETE ? change.previousFileName! : change.fileName,
+				previousFileName: change.previousFileName,
+				previousFileSha: change.previousFileSHA,
+			};
+
+			return provideDocumentContentForChangeModel(params, pullRequestModel, folderManager, fileChangeNode, isFileRemote);
+		});
 	}
 
 	static async openDiffFromComment(
