@@ -1083,7 +1083,23 @@ export class PullRequestModel implements IPullRequestModel {
 		// source branch is a fast-forward descendant of target with no divergent commits on either
 		// side. The unguarded [0].commitId here used to throw in that case, which getChildren()'s
 		// catch swallowed silently, leaving the PR's tree node with no children and no visible error.
-		const mergeBases = await this.getMergeBase(base.version!, target.version!);
+		//
+		// The call itself can also reject outright (observed live: the underlying SDK's
+		// getMergeBases occasionally throws "An object ID must be 40 characters long..." on a
+		// perfectly valid 40-char commit, correlated with long-idle sessions / token refresh -
+		// not a data problem with this PR). Left unguarded, that rejection propagates through this
+		// function and hits the exact same silent-swallow in getChildren(), wiping out the whole
+		// File Changes tab for a merge-base lookup that's advisory only (commonCommit below already
+		// falls back to base.version without it). Treat it the same as the empty-array case.
+		let mergeBases: GitCommitRef[] | undefined;
+		try {
+			mergeBases = await this.getMergeBase(base.version!, target.version!);
+		} catch (e) {
+			Logger.debug(
+				`Fetch file changes of PR #${this.getPullRequestId()} - getMergeBase failed, continuing without it: ${formatError(e)}`,
+				PullRequestModel.ID,
+			);
+		}
 		this.mergeBase = mergeBases?.[0]?.commitId;
 
 		const diffBase = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string>('diffBase');
