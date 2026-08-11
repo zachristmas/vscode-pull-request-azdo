@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import { FolderRepositoryManager } from '../azdo/folderRepositoryManager';
 import { IFileChangeNode } from '../azdo/interface';
-import { PullRequestModel } from '../azdo/pullRequestModel';
+import type { PullRequestModel } from '../azdo/pullRequestModel';
 import { GitChangeType } from '../common/file';
 import Logger from '../common/logger';
 import { fromPRUri, PRUriParams } from '../common/uri';

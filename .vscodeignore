@@ -37,3 +37,7 @@ test_workspace/**
 
 # Local Claude Code session state (lock files, scratch), never intended to ship.
 .claude/**
+
+# Internal agent tooling state and scratch planning docs, never intended to ship.
+.forgeflow/**
+PROMPT-*.md
