@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.9.0
+
+- The pull request overview page now shows which Azure DevOps project the PR belongs to ("wants to merge changes in `<project>` into `<base>` from `<head>`") - not obvious before when a linked work item lives in a different project than the repo.
+- Fix: switching accounts (sign out, then sign back in) had no effect until the old session's access token expired on its own (up to ~90 minutes). The session-change handler only rebuilt the connection when it already considered itself unauthenticated, which checked the *old* token's expiry rather than whether the session had actually changed - so work items (and anything else gated on the account) kept failing silently against the stale identity.
+
 ## 2.8.5
 
 - Fix: the "Delete branch" button on a completed PR always showed, even when there was nothing left to clean up (both the remote and local branch already gone), so clicking it just popped a confusing "There is no longer an upstream or local branch" warning. It now only shows when there's actually a local branch or remote left to delete.
