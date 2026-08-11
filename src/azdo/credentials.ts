@@ -91,10 +91,12 @@ export class CredentialStore implements vscode.Disposable {
 	) {
 		this._disposables = [];
 		this._disposables.push(
+			// Rebuild unconditionally - gating on isAuthenticated() checked the *old* connection's
+			// token expiry, not whether the session actually changed. A sign-out/sign-in (e.g. to
+			// switch accounts) kept using the stale token until it naturally expired, since the old
+			// token was still technically unexpired and isAuthenticated() returned true.
 			vscode.authentication.onDidChangeSessions(async () => {
-				if (!this.isAuthenticated()) {
-					return await this.initialize();
-				}
+				await this.initialize();
 			}),
 		);
 	}
