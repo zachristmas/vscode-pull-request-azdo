@@ -49,6 +49,7 @@ export interface FileChangeSummary {
 export interface PullRequest {
 	number: number;
 	title: string;
+	project: string;
 	url: string;
 	createdAt: string;
 	body: string;

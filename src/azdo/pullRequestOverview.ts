@@ -336,6 +336,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				pullRequestModel.getStatusChecks(),
 				this._folderRepositoryManager.getPullRequestRepositoryAccessAndMergeMethods(pullRequestModel),
 				pullRequestModel.azdoRepository.getAuthenticatedUser(),
+				pullRequestModel.azdoRepository.getRepositoryProject(),
 				this.getWorkItemsWithPr(pullRequestModel),
 				// POL-01: policy data is progressive enhancement - a fetch failure must not sink the
 				// whole panel the way the other members here fail loudly.
@@ -354,6 +355,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				status,
 				repositoryAccess,
 				currentUser,
+				project,
 				workItems,
 				policies,
 				fileChanges,
@@ -431,6 +433,7 @@ export class PullRequestOverviewPanel extends WebviewBase {
 				pullrequest: {
 					number: pullRequest.getPullRequestId(),
 					title: pullRequest.item.title,
+					project: project ?? pullRequestModel.remote.repositoryName,
 					url: pullRequest.url,
 					createdAt: pullRequest.item.creationDate,
 					body: pullRequest.item.description,

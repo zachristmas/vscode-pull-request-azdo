@@ -117,6 +117,11 @@ async function getWebviewConfig(mode, env, entry) {
 									configFile: path.join(__dirname, 'tsconfig.webviews.json'),
 									experimentalWatchApi: true,
 									transpileOnly: true,
+									// TS5011 fires here even with rootDir explicit and transpileOnly on - plain
+									// `tsc -p tsconfig.webviews.json` has no complaint, so this is a ts-loader/
+									// experimentalWatchApi quirk recomputing the common source dir per entry,
+									// not a real config problem. Full type-checking still runs via ForkTsCheckerPlugin.
+									ignoreDiagnostics: [5011],
 								},
 						  },
 				},
@@ -248,6 +253,10 @@ async function getExtensionConfig(target, mode, env) {
 									),
 									experimentalWatchApi: true,
 									transpileOnly: true,
+									// Same ts-loader/experimentalWatchApi rootDir-recomputation quirk as the
+									// webviews config - only surfaces on a cold build (no .tsbuildinfo yet).
+									// ForkTsCheckerPlugin still runs full type-checking for this config.
+									ignoreDiagnostics: [5011],
 								},
 						  },
 				},

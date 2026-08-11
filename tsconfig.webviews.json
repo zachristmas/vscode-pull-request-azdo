@@ -7,6 +7,7 @@
 			"dom.iterable",
 			"es2023"
 		],
+		"rootDir": ".",
 		"tsBuildInfoFile": "tsconfig.webviews.tsbuildinfo"
 	},
 	"include": [
