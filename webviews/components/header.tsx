@@ -27,6 +27,7 @@ export function Header({
 	head,
 	base,
 	title,
+	project,
 	number,
 	url,
 	createdAt,
@@ -48,6 +49,7 @@ export function Header({
 						<Spaced>
 							<AuthorLink url={author.url!} text={author.name!} />
 							{getActionText(state)}
+							in <code>{project}</code>
 							into <code>{base}</code>
 							from <code>{head}</code>
 						</Spaced>
