@@ -10,6 +10,10 @@
 - Fix: opening a PR's diff directly from the Files Changed tab on the overview webview, without ever expanding that PR in the tree view first, could render a blank diff. The tree view registers a content provider for the PR's diff URIs when it expands the PR node; opening straight from the webview skipped that step, so nothing was registered to answer for it. It's now registered on open as well.
 - Fix: a failed merge-base lookup (observed after long-idle sessions, correlated with token refresh) could throw and silently empty a PR's whole File Changes tab instead of just skipping the merge-base, which is advisory-only.
 
+## 2.8.6
+
+- Fix: scanning local branches for leftover PR git-config resolved full PR + head/base branch data for every matching branch, unbounded in parallel and with no caching, saturating the shared AzDO connection and slowing down the PR detail/diff views competing for it. Branch-ref lookups are now cached per repo instance and the branch scan is capped to 5 concurrent PR fetches.
+
 ## 2.8.5
 
 - Fix: the "Delete branch" button on a completed PR always showed, even when there was nothing left to clean up (both the remote and local branch already gone), so clicking it just popped a confusing "There is no longer an upstream or local branch" warning. It now only shows when there's actually a local branch or remote left to delete.
