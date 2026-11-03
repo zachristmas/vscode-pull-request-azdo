@@ -65,8 +65,11 @@ export class PullRequestChangesTreeDataProvider
 			localFileChanges,
 		);
 		this._pullRequestManagerMap.set(pullRequestManager, node);
-		await vscode.commands.executeCommand('setContext', 'azdo:inReviewMode', true);
+		// Refresh before revealing the view: setting azdo:inReviewMode shows it and it starts loading at
+		// once, and a full refresh fired mid-load cancels the pending child fetches - those folders then
+		// render empty until the next refresh.
 		this._onDidChangeTreeData.fire();
+		await vscode.commands.executeCommand('setContext', 'azdo:inReviewMode', true);
 	}
 
 	async removePrFromView(pullRequestManager: FolderRepositoryManager) {

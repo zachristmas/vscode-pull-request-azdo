@@ -8,7 +8,7 @@
  */
 
 import { IResolvedPullRequestModel, PullRequestModel } from './pullRequestModel';
-import { Repository } from '../api/api';
+import { Branch, Repository } from '../api/api';
 import Logger from '../common/logger';
 import { Protocol } from '../common/protocol';
 import { parseRepositoryRemotes, Remote } from '../common/remote';
@@ -71,8 +71,17 @@ export const PullRequestGitHelper = {
 		const branchName = pullRequest.head.ref;
 		const remoteName = remote.remoteName;
 
+		// Only a missing local branch means "create it". Catching every error here also caught a failed
+		// checkout of an existing branch (e.g. local changes in the way), which then failed again as
+		// "a branch named ... already exists" and hid the real error.
+		let branch: Branch | undefined;
 		try {
-			const branch = await repository.getBranch(branchName);
+			branch = await repository.getBranch(branchName);
+		} catch {
+			branch = undefined;
+		}
+
+		if (branch) {
 			Logger.debug(`Checkout ${branchName}`, PullRequestGitHelper.ID);
 			await repository.checkout(branchName);
 
@@ -86,7 +95,7 @@ export const PullRequestGitHelper = {
 				Logger.debug(`Pull from upstream`, PullRequestGitHelper.ID);
 				await repository.pull();
 			}
-		} catch {
+		} else {
 			// there is no local branch with the same name, so we are good to fetch, create and checkout the remote branch.
 			Logger.appendLine(`Branch ${remoteName}/${branchName} doesn't exist on local disk yet.`, PullRequestGitHelper.ID);
 			const trackedBranchName = `refs/remotes/${remoteName}/${branchName}`;

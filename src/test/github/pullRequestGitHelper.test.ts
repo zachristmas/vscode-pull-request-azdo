@@ -3,11 +3,12 @@ import { strict as assert } from 'assert';
 import { GitPullRequest } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { createSandbox, SinonSandbox } from 'sinon';
 import { createMock } from 'ts-auto-mock';
+import { Repository } from '../../api/api';
 import { GitApiImpl, RefType } from '../../api/api1';
 import { CredentialStore } from '../../azdo/credentials';
 import { IRepository } from '../../azdo/interface';
 import { PullRequestGitHelper } from '../../azdo/pullRequestGitHelper';
-import { PullRequestModel } from '../../azdo/pullRequestModel';
+import { IResolvedPullRequestModel, PullRequestModel } from '../../azdo/pullRequestModel';
 import { convertAzdoPullRequestToRawPullRequest } from '../../azdo/utils';
 import { Protocol } from '../../common/protocol';
 import { Remote } from '../../common/remote';
@@ -17,6 +18,17 @@ import { MockCommandRegistry } from '../mocks/mockCommandRegistry';
 import { createFakeSecretStorage } from '../mocks/mockExtensionContext';
 import { MockRepository } from '../mocks/mockRepository';
 import { MockTelemetry } from '../mocks/mockTelemetry';
+
+function fakeRepository(sandbox: SinonSandbox) {
+	return {
+		getBranch: sandbox.stub(),
+		checkout: sandbox.stub().resolves(),
+		createBranch: sandbox.stub().resolves(),
+		fetch: sandbox.stub().resolves(),
+		setBranchUpstream: sandbox.stub().resolves(),
+		pull: sandbox.stub().resolves(),
+	};
+}
 
 describe('PullRequestGitHelper', function () {
 	let sinon: SinonSandbox;
@@ -108,6 +120,44 @@ describe('PullRequestGitHelper', function () {
 				},
 			});
 			assert.strictEqual(await repository.getConfig('branch.pr/me/100.github-pr-owner-number'), 'you#bbb#100');
+		});
+	});
+
+	describe('fetchAndCheckout', function () {
+		const url = 'https://dev.azure.com/org/project/_git/repo';
+		const remote = new Remote('origin', url, new Protocol(url));
+		const pullRequest = ({
+			validatePullRequestModel: () => true,
+			head: { ref: 'feature', repositoryCloneUrl: remote.gitProtocol },
+			base: { repositoryCloneUrl: remote.gitProtocol },
+		} as unknown) as PullRequestModel & IResolvedPullRequestModel;
+
+		beforeEach(function () {
+			sinon.stub(PullRequestGitHelper, 'associateBranchWithPullRequest').resolves();
+			sinon.stub(PullRequestGitHelper, 'unshallow').resolves();
+		});
+
+		it('surfaces a failed checkout of an existing branch instead of trying to create it', async function () {
+			const repo = fakeRepository(sinon);
+			repo.getBranch.withArgs('feature').resolves({ name: 'feature', upstream: { remote: 'origin', name: 'feature' } });
+			repo.checkout.rejects(new Error('Your local changes would be overwritten by checkout'));
+
+			await assert.rejects(
+				PullRequestGitHelper.fetchAndCheckout((repo as unknown) as Repository, [remote], pullRequest),
+				/local changes would be overwritten/,
+			);
+			assert.equal(repo.createBranch.callCount, 0);
+		});
+
+		it('creates the branch from the remote when there is no local one', async function () {
+			const repo = fakeRepository(sinon);
+			repo.getBranch.withArgs('feature').rejects(new Error('No such branch: feature'));
+			repo.getBranch.withArgs('refs/remotes/origin/feature').resolves({ commit: 'abc123' });
+
+			await PullRequestGitHelper.fetchAndCheckout((repo as unknown) as Repository, [remote], pullRequest);
+
+			assert.deepEqual(repo.createBranch.firstCall.args, ['feature', true, 'abc123']);
+			assert.equal(repo.checkout.callCount, 0);
 		});
 	});
 });
