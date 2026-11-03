@@ -101,15 +101,18 @@ async function init(
 	const localStorageService = new LocalStorageService(context.workspaceState);
 	const fileReviewedStatusService = new FileReviewedStatusService(localStorageService);
 
+	const refreshCredentials = async () => {
+		await reposManager.clearCredentialCache();
+		if (reviewManagers) {
+			reviewManagers.forEach(reviewManager => reviewManager.updateState());
+		}
+	};
 	vscode.authentication.onDidChangeSessions(async e => {
 		if (e.provider.id !== 'microsoft') {
 			return;
 		}
 
-		await reposManager.clearCredentialCache();
-		if (reviewManagers) {
-			reviewManagers.forEach(reviewManager => reviewManager.updateState());
-		}
+		await refreshCredentials();
 	});
 
 	context.subscriptions.push(new FileTypeDecorationProvider());
@@ -164,6 +167,8 @@ async function init(
 	tree.initialize(reposManager);
 	dashboardTree.initialize(reposManager);
 	registerCommands(context, reposManager, reviewManagers, workItem, userManager, telemetry, credentialStore, tree);
+	// Subscribed only now: refreshCredentials needs reposManager and reviewManagers to exist.
+	context.subscriptions.push(credentialStore.onDidFindSession(refreshCredentials));
 
 	const deepLinkProcessor = (uri: vscode.Uri) => {
 		handleDeepLinkUri(uri, reposManager, context.extensionPath, workItem, userManager).catch(e => {

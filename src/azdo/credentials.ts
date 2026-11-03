@@ -19,6 +19,12 @@ const TRY_AGAIN = vscode.l10n.t('Try again?');
 const CANCEL = vscode.l10n.t('Cancel');
 const ERROR = vscode.l10n.t('Error signing in to Azure DevOps');
 
+// Background sign-ins (activation, token expiry, session changes) must never prompt: every open
+// window runs one, so each would raise its own modal. With no options set, VS Code adds a sign-in
+// entry to the Accounts menu instead. Only an explicit sign-in or "Try again" prompts, for that attempt.
+const BACKGROUND_SESSION_OPTIONS: vscode.AuthenticationGetSessionOptions = {};
+const SESSION_RECHECK_DELAY_MS = 60_000;
+
 class AzdoOrgConfig {
 	constructor(public orgUrl: string, public projectName: string) {}
 }
@@ -82,7 +88,14 @@ export class CredentialStore implements vscode.Disposable {
 	private _onDidInitialize: vscode.EventEmitter<void> = new vscode.EventEmitter();
 	public readonly onDidInitialize: vscode.Event<void> = this._onDidInitialize.event;
 	private _sessionId: string | undefined;
-	private _sessionOptions: vscode.AuthenticationGetSessionOptions = { createIfNone: true };
+	private _sessionOptions: vscode.AuthenticationGetSessionOptions = BACKGROUND_SESSION_OPTIONS;
+	private _signedOut = false;
+	private _checkingForSession = false;
+	private _sessionRecheck: ReturnType<typeof setTimeout> | undefined;
+	private _onDidFindSession: vscode.EventEmitter<void> = new vscode.EventEmitter();
+	// Fires when sign-in finds a usable session that no onDidChangeSessions announced, e.g. one
+	// another window signed in.
+	public readonly onDidFindSession: vscode.Event<void> = this._onDidFindSession.event;
 
 	constructor(
 		private readonly _telemetry: ITelemetry,
@@ -98,25 +111,64 @@ export class CredentialStore implements vscode.Disposable {
 			vscode.authentication.onDidChangeSessions(async () => {
 				await this.initialize();
 			}),
+			vscode.window.onDidChangeWindowState(async state => {
+				if (state.focused) {
+					await this.checkForSession();
+				}
+			}),
+			this._onDidFindSession,
 		);
 	}
 
 	public async initialize(): Promise<void> {
-		this._azdoAPI = await this.login();
+		try {
+			this._azdoAPI = await this.login();
+		} finally {
+			this._sessionOptions = BACKGROUND_SESSION_OPTIONS;
+		}
+		if (!this._azdoAPI) {
+			// The focused window gets no focus event, so retry once on a timer too - startup sign-in
+			// can fail transiently, e.g. connectionData timing out while the network comes up.
+			clearTimeout(this._sessionRecheck);
+			this._sessionRecheck = setTimeout(() => void this.checkForSession(), SESSION_RECHECK_DELAY_MS);
+		}
 	}
 
 	public async reset() {
-		this._sessionOptions.forceNewSession = false;
-		this._sessionOptions.createIfNone = false;
-		this._sessionOptions.clearSessionPreference = false;
+		this._sessionOptions = BACKGROUND_SESSION_OPTIONS;
 		await this.initialize();
 	}
 
+	// Explicit sign-in. createIfNone reuses a session that is already valid (e.g. signed in from
+	// another window) and only opens the browser when there is none.
 	public async forceAuthentication() {
-		this._sessionOptions.forceNewSession = true;
-		this._sessionOptions.createIfNone = false;
-		this._sessionOptions.clearSessionPreference = true;
+		this._signedOut = false;
+		this._sessionOptions = { createIfNone: true, clearSessionPreference: true };
 		await this.initialize();
+		// Reusing an existing session fires no onDidChangeSessions, so nothing else would refresh the views.
+		if (this._azdoAPI) {
+			this._onDidFindSession.fire();
+		}
+	}
+
+	// Re-authenticating an existing account in another window (e.g. after MFA expiry) updates the
+	// shared token cache, but the Microsoft provider only fires onDidChangeSessions when accounts are
+	// added or removed - so a window that failed to sign in would stay signed out. Check again on focus.
+	private async checkForSession(): Promise<void> {
+		if (this._azdoAPI || this._signedOut || this._checkingForSession || this.getPatToken()) {
+			return;
+		}
+		this._checkingForSession = true;
+		try {
+			if (await this.getSession({ silent: true })) {
+				Logger.appendLine('Auth> Found a session on focus, signing in', CredentialStore.ID);
+				this._onDidFindSession.fire();
+			}
+		} catch (e) {
+			Logger.appendLine(`Auth> Session check on focus failed: ${errorMessage(e)}`, CredentialStore.ID);
+		} finally {
+			this._checkingForSession = false;
+		}
 	}
 
 	public isAuthenticated(): boolean {
@@ -128,6 +180,7 @@ export class CredentialStore implements vscode.Disposable {
 	}
 
 	public async logout(): Promise<void> {
+		this._signedOut = true;
 		this._azdoAPI = undefined;
 	}
 
@@ -242,10 +295,14 @@ export class CredentialStore implements vscode.Disposable {
 			});
 	}
 
+	private getPatToken(): string | undefined {
+		return vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PATTOKEN_SETTINGS);
+	}
+
 	// Resolves the auth token for login: the configured PAT when set, otherwise a Microsoft
 	// auth session token. Returns undefined (after logging + telemetry) when neither works.
 	private async acquireToken(): Promise<{ token: string; isPatTokenAuth: boolean } | undefined> {
-		const patToken = vscode.workspace.getConfiguration(SETTINGS_NAMESPACE).get<string | undefined>(PATTOKEN_SETTINGS);
+		const patToken = this.getPatToken();
 		if (patToken) {
 			return { token: patToken, isPatTokenAuth: true };
 		}
@@ -301,9 +358,6 @@ export class CredentialStore implements vscode.Disposable {
 
 				Logger.debug(`Auth> Successful: Logged userid: ${azdo?.authenticatedUser?.id}`, CredentialStore.ID);
 				this._telemetry.sendTelemetryEvent('auth.success');
-				this._sessionOptions.forceNewSession = false;
-				this._sessionOptions.createIfNone = true;
-				this._sessionOptions.clearSessionPreference = false;
 
 				return azdo;
 			} catch (e) {
@@ -312,18 +366,25 @@ export class CredentialStore implements vscode.Disposable {
 				if (e instanceof Error && e.stack) {
 					Logger.appendLine(e.stack);
 				}
-				if (errorMessage(e) === 'User canceled authentication') {
+				if (!this.shouldOfferRetry(e)) {
 					return undefined;
 				}
 			}
 
 			retry = (await vscode.window.showErrorMessage(ERROR, TRY_AGAIN, CANCEL)) === TRY_AGAIN;
 			if (retry) {
-				this._sessionOptions.forceNewSession = true;
-				this._sessionOptions.createIfNone = false;
-				this._sessionOptions.clearSessionPreference = true;
+				this._sessionOptions = { forceNewSession: true, clearSessionPreference: true };
 			}
 		}
+	}
+
+	private shouldOfferRetry(e: unknown): boolean {
+		if (errorMessage(e) === 'User canceled authentication') {
+			return false;
+		}
+		// A background attempt fails quietly in every window; the Accounts menu entry and the focus
+		// check recover it. PAT failures still surface, since nothing else would.
+		return !!this._sessionOptions.createIfNone || !!this._sessionOptions.forceNewSession || !!this.getPatToken();
 	}
 
 	private async getSession(
@@ -347,6 +408,7 @@ export class CredentialStore implements vscode.Disposable {
 	}
 
 	dispose() {
+		clearTimeout(this._sessionRecheck);
 		this._disposables.forEach(disposable => disposable.dispose());
 	}
 }
