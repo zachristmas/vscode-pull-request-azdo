@@ -70,6 +70,8 @@ export class JjGitProvider implements IGit, vscode.Disposable {
 					await this.openIfJjWorkspace(added.uri);
 				}
 			}),
+			// Untrusted folders are skipped (see openIfJjWorkspace); pick them up once the user trusts them.
+			vscode.workspace.onDidGrantWorkspaceTrust(() => this.scanWorkspaceFolders()),
 		);
 	}
 
@@ -81,6 +83,12 @@ export class JjGitProvider implements IGit, vscode.Disposable {
 	}
 
 	private async openIfJjWorkspace(folderUri: vscode.Uri): Promise<void> {
+		// The workspace's .jj files choose which git dir we run `git --git-dir` against, and git and jj
+		// both honour repo config that can run commands (core.fsmonitor, core.sshCommand, ...). VS Code's
+		// git extension stays off in untrusted workspaces for the same reason.
+		if (!vscode.workspace.isTrusted) {
+			return;
+		}
 		if (folderUri.scheme !== 'file' || this._repositories.has(folderUri.toString())) {
 			return;
 		}
