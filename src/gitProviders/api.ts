@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import { BuiltinGitProvider } from './builtinGit';
+import { JjGitProvider } from './jj/jjGitProvider';
 import { LiveShareManager } from './vsls';
 import { API } from '../api/api';
 
@@ -20,5 +21,14 @@ export async function registerBuiltinGitProvider(
 	if (builtInGitProvider) {
 		apiImpl.registerGitProvider(builtInGitProvider);
 		return builtInGitProvider;
+	}
+}
+
+/** Serves jj workspaces without a `.git` (see JjGitProvider); resolves to undefined where jj is unavailable. */
+export async function registerJjGitProvider(apiImpl: API): Promise<vscode.Disposable | undefined> {
+	const jjGitProvider = await JjGitProvider.createProvider();
+	if (jjGitProvider) {
+		apiImpl.registerGitProvider(jjGitProvider);
+		return jjGitProvider;
 	}
 }

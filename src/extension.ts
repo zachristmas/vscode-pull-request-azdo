@@ -24,7 +24,7 @@ import { handler as uriHandler } from './common/uri';
 import { onceEvent } from './common/utils';
 import { EXTENSION_ID, SETTINGS_NAMESPACE, URI_SCHEME_PR } from './constants';
 import { findDeepLinkTarget, handleDeepLinkUri } from './deepLinkHandler';
-import { registerBuiltinGitProvider, registerLiveShareGitProvider } from './gitProviders/api';
+import { registerBuiltinGitProvider, registerJjGitProvider, registerLiveShareGitProvider } from './gitProviders/api';
 import { MockGitProvider } from './gitProviders/mockGitProvider';
 import { MockRepository } from './gitProviders/mockRepository';
 import { FileTypeDecorationProvider } from './view/fileTypeDecorationProvider';
@@ -377,6 +377,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<GitApi
 		void mockRepository.addRemote('origin', 'https://anksinha@dev.azure.com/anksinha/test/_git/test');
 		const mockGitProvider = new MockGitProvider(mockRepository);
 		context.subscriptions.push(apiImpl.registerGitProvider(mockGitProvider));
+	}
+
+	// Jujutsu workspaces created with `jj workspace add` have no .git, so the git extension never
+	// reports them; this provider fills that gap by talking to jj and the shared git store directly.
+	const jjGitProvider = await registerJjGitProvider(apiImpl);
+	if (jjGitProvider) {
+		context.subscriptions.push(jjGitProvider);
 	}
 
 	const credentialStore = new CredentialStore(telemetry, context.secrets, apiImpl);
