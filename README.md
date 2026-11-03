@@ -76,6 +76,12 @@ Opening a deep link (`vscode://.../open-pr?...&path=/src/file.ts&line=42`) finds
 3. Open a repository whose git remote points at Azure DevOps. Org and project are auto-detected from the remote (HTTPS, SSH, and legacy visualstudio.com URLs all work); the `azdoPullRequests.orgUrl` and `azdoPullRequests.projectName` settings exist as a fallback.
 4. Sign in with the same Microsoft account you use for Azure DevOps, or set a PAT via `azdoPullRequests.patToken`.
 
+### Jujutsu (jj) workspaces
+
+Folders that are [Jujutsu](https://jj-vcs.github.io/jj/) workspaces without a `.git` directory (the secondary workspaces `jj workspace add` creates) are supported too, as long as `jj` is on your PATH. The extension reads the workspace's shared git store directly and drives it with jj: **Checkout Pull Request** runs `jj new <bookmark>` so your working copy becomes a new empty change on top of the PR head, the working-copy parent (`@-`) stands in for HEAD, and a bookmark on it (or its tracked remote bookmark) is treated as the current branch. If you commit on top of a checked-out PR without moving the bookmark, the bookmark below is still recognised as the branch until those commits are pushed. Deleting a branch from the extension untracks it first, so no remote bookmark is ever scheduled for deletion. Colocated jj repos (with a `.git`) are handled by VS Code's git extension exactly as before.
+
+One jj-specific gotcha: jj snapshots every file that is not ignored, so personal files such as a `.vscode/*.code-workspace` end up in your working-copy commit, and **Checkout Pull Request** (`jj new <PR head>`) then removes them from disk - taking VS Code's own workspace file with it and reloading the window. Ignore such files in the shared git dir's `info/exclude` (for a secondary workspace that is the main workspace's `.git/info/exclude`) and, if jj already snapshotted them, run `jj file untrack <path>` once; ignored files are left alone when the working copy moves.
+
 ## Settings
 
 #### azdoPullRequests.orgUrl

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Jujutsu (jj) workspaces without a `.git` directory - the secondary workspaces `jj workspace add` creates - now work: the extension talks to `jj` and the workspace's shared git store directly, so the pull request list, dashboard, deep links, checkout, review-mode diffs and comments all function there. VS Code's git extension never reports such folders (no `.git`), so previously the extension was simply inert in them. Checkout is jj-native (`jj new <bookmark>`), the working-copy parent `@-` plays the role of HEAD, and a bookmark on it (or the tracked remote bookmark) is the current branch; deleting a branch untracks first so a remote bookmark is never scheduled for deletion. Colocated jj repos (which do have a `.git`) keep using the git extension as before. Requires `jj` on PATH; jj 0.42 is what this was developed against.
+
 ## 2.9.0
 
 - The pull request overview page now shows which Azure DevOps project the PR belongs to ("wants to merge changes in `<project>` into `<base>` from `<head>`") - not obvious before when a linked work item lives in a different project than the repo.
